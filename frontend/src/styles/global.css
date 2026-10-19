@@ -1,0 +1,167 @@
+:root {
+  font-family: Inter, 'Segoe UI', Arial, sans-serif;
+  color: #25384c;
+  background: #f4f7fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: #f4f7fa;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.layout-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  min-height: 70px;
+  align-items: center;
+  gap: 34px;
+  padding: 0 5vw;
+  border-bottom: 1px solid #e3eaf0;
+  background: #fff;
+}
+
+.brand {
+  color: #176f96;
+  font-size: 1.22rem;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav a {
+  color: #63768a;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav a:hover,
+.nav a.active {
+  color: #14769f;
+}
+
+.topbar-badge {
+  margin-left: auto;
+  padding: 7px 11px;
+  border-radius: 20px;
+  background: #eff5f8;
+  color: #60798b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.page-content {
+  width: 100%;
+  padding: 44px 5vw 64px;
+}
+
+.page-panel {
+  max-width: 760px;
+  margin: 7vh auto;
+  padding: clamp(26px, 5vw, 54px);
+  border: 1px solid #e1e9f0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 15px 45px rgba(30, 54, 78, 0.06);
+}
+
+.page-panel > p:not(.eyebrow) {
+  line-height: 1.7;
+}
+
+.customer-layout {
+  display: flex;
+}
+
+.customer-layout .sidebar {
+  width: 240px;
+  flex: 0 0 auto;
+  padding: 24px;
+  border-right: 1px solid #e3eaf0;
+  background: #fff;
+}
+
+.customer-layout .sidebar h3 {
+  margin: 0 0 22px;
+  color: #176f96;
+}
+
+.customer-layout .nav-column {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.customer-layout .page-content {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    padding: 14px 5vw;
+  }
+
+  .nav {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .topbar-badge {
+    font-size: 0.68rem;
+  }
+
+  .page-content {
+    padding: 28px 5vw 44px;
+  }
+
+  .customer-layout {
+    flex-direction: column;
+  }
+
+  .customer-layout .sidebar {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid #e3eaf0;
+  }
+
+  .customer-layout .nav-column {
+    flex-direction: row;
+  }
+}
