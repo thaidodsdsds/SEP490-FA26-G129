@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import env from '../config/env.js';
+import { entities } from './entities.js';
+import CreateRolesAndCustomers from './migrations/1792500000000-CreateRolesAndCustomers.js';
+import CreateAccounts from './migrations/1792510000000-CreateAccounts.js';
 
 const dataSource = new DataSource({
   type: 'postgres',
@@ -12,7 +15,8 @@ const dataSource = new DataSource({
   ssl: env.db.ssl ? { rejectUnauthorized: false } : false,
   synchronize: false,
   logging: env.nodeEnv === 'development',
-  migrations: [],
+  entities,
+  migrations: [CreateRolesAndCustomers, CreateAccounts],
   migrationsTableName: 'migrations',
   subscribers: [],
 });
