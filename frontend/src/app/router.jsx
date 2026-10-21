@@ -1,10 +1,12 @@
 import { Link, Navigate, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
+import AccountantLayout from '../layouts/AccountantLayout.jsx';
 import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
+import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
@@ -39,6 +41,22 @@ const customerRoutes = [
   },
 ];
 
+const accountantRoutes = [
+  {
+    path: '/internal/accountant',
+    element: <AccountantLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/accountant">
+            <AccountantDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+    ],
+  },
+];
 
 
 const legacyRoutes = [
@@ -84,6 +102,7 @@ const router = createBrowserRouter([
   ...publicRoutes,
   ...legacyRoutes,
   ...customerRoutes,
+  ...accountantRoutes,
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
@@ -158,6 +177,11 @@ function InternalDashboardPage() {
           <span className="shortcut-icon" aria-hidden="true">◎</span>
           <strong>Tổng quan khách hàng</strong>
           <span>Theo dõi thiết bị, đơn dịch vụ, báo giá, chứng nhận và công nợ.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/accountant">
+          <span className="shortcut-icon" aria-hidden="true">₫</span>
+          <strong>Tổng quan kế toán</strong>
+          <span>Theo dõi doanh thu, hoá đơn, thanh toán và công nợ khách hàng.</span>
         </Link>
       </div>
       <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>

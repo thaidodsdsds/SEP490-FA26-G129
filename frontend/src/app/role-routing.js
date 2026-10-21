@@ -26,6 +26,7 @@ export function getRoleDashboardPath(account) {
 
   const role = normalizeRole(getAccountRole(account));
   if (role === 'customer' || account.customer_id != null) return '/internal/customer';
+  if (role === 'accountant' || role.includes('ketoan')) return '/internal/accountant';
   if (role === 'technician') return '/internal/technician';
   if (
     role === 'reviewer'
