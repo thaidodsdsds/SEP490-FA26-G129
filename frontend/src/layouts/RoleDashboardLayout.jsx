@@ -1,16 +1,46 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppContext } from '../app/providers.jsx';
 import { getUserInitials } from '../app/role-routing.js';
 
 function RoleDashboardLayout({ role, description, links, initials, name }) {
   const { session } = useAppContext();
+  const [isNavOpen, setIsNavOpen] = useState(false);
   const displayName = session.user?.full_name || session.user?.name || name;
   const displayInitials = getUserInitials(session.user, initials);
+
+  useEffect(() => {
+    if (!isNavOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsNavOpen(false);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isNavOpen]);
+
+  const closeNav = () => setIsNavOpen(false);
 
   return (
     <div className="role-dashboard-shell">
       <header className="role-dashboard-topbar">
-        <NavLink aria-label="ISOCAL — về khu vực nội bộ" className="role-dashboard-brand" to="/internal">
+        <button
+          aria-controls="role-dashboard-nav"
+          aria-expanded={isNavOpen}
+          aria-label="Mở menu điều hướng"
+          className="role-menu-toggle"
+          onClick={() => setIsNavOpen(true)}
+          type="button"
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+        <NavLink
+          aria-label="ISOCAL — về khu vực nội bộ"
+          className="role-dashboard-brand"
+          onClick={closeNav}
+          to="/internal"
+        >
           ISO<span>CAL</span>
         </NavLink>
         <div className="role-dashboard-context">
@@ -19,11 +49,29 @@ function RoleDashboardLayout({ role, description, links, initials, name }) {
         </div>
         <div className="role-user">
           <span className="role-user-avatar">{displayInitials}</span>
-          <span className="role-user-details"><strong>{displayName}</strong><small>{session.role === 'public' ? role : session.role}</small></span>
+          <span className="role-user-details">
+            <strong>{displayName}</strong>
+            <small>{session.role === 'public' ? role : session.role}</small>
+          </span>
         </div>
       </header>
-      <div className="role-dashboard-body">
-        <aside aria-label={`Điều hướng ${role}`} className="role-dashboard-sidebar">
+      <div className={`role-dashboard-body${isNavOpen ? ' nav-open' : ''}`}>
+        <button
+          aria-label="Đóng menu điều hướng"
+          className="role-nav-backdrop"
+          onClick={closeNav}
+          tabIndex={isNavOpen ? 0 : -1}
+          type="button"
+        />
+        <aside aria-label={`Điều hướng ${role}`} className="role-dashboard-sidebar" id="role-dashboard-nav">
+          <button
+            aria-label="Đóng menu"
+            className="role-nav-close"
+            onClick={closeNav}
+            type="button"
+          >
+            ×
+          </button>
           <div className="role-sidebar-intro">
             <span className="role-sidebar-eyebrow">KHÔNG GIAN LÀM VIỆC</span>
             <strong>{role}</strong>
@@ -32,15 +80,24 @@ function RoleDashboardLayout({ role, description, links, initials, name }) {
           <nav className="role-sidebar-nav">
             <span className="role-sidebar-label">MENU</span>
             {links.map((link) => (
-              <NavLink
-                className={({ isActive }) => `role-nav-link${isActive ? ' role-nav-link-active' : ''}`}
-                end
-                key={link.to}
-                to={link.to}
-              >
-                <span aria-hidden="true">{link.icon}</span>
-                {link.label}
-              </NavLink>
+              link.soon ? (
+                <span className="role-nav-link role-nav-link-soon" key={`${link.to}-${link.label}`}>
+                  <span aria-hidden="true">{link.icon}</span>
+                  {link.label}
+                  <small className="role-nav-soon">Sắp có</small>
+                </span>
+              ) : (
+                <NavLink
+                  className={({ isActive }) => `role-nav-link${isActive ? ' role-nav-link-active' : ''}`}
+                  end
+                  key={link.to}
+                  onClick={closeNav}
+                  to={link.to}
+                >
+                  <span aria-hidden="true">{link.icon}</span>
+                  {link.label}
+                </NavLink>
+              )
             ))}
           </nav>
           <div className="role-sidebar-footer">
