@@ -2,11 +2,13 @@ import { Link, Navigate, RouterProvider, createBrowserRouter, useLocation } from
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import AccountantLayout from '../layouts/AccountantLayout.jsx';
+import AdminLayout from '../layouts/AdminLayout.jsx';
 import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
+import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
@@ -58,6 +60,22 @@ const accountantRoutes = [
   },
 ];
 
+const adminRoutes = [
+  {
+    path: '/internal/admin',
+    element: <AdminLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/admin">
+            <AdminDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+    ],
+  },
+];
 
 const legacyRoutes = [
   { path: '/customer', element: <Navigate replace to="/internal/customer" /> },
@@ -103,6 +121,7 @@ const router = createBrowserRouter([
   ...legacyRoutes,
   ...customerRoutes,
   ...accountantRoutes,
+  ...adminRoutes,
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
@@ -182,6 +201,11 @@ function InternalDashboardPage() {
           <span className="shortcut-icon" aria-hidden="true">₫</span>
           <strong>Tổng quan kế toán</strong>
           <span>Theo dõi doanh thu, hoá đơn, thanh toán và công nợ khách hàng.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/admin">
+          <span className="shortcut-icon" aria-hidden="true">⚙</span>
+          <strong>Tổng quan quản trị</strong>
+          <span>Tài khoản, vai trò, danh mục và tình trạng vận hành hệ thống.</span>
         </Link>
       </div>
       <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>
