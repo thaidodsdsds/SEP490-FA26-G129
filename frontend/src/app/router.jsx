@@ -4,7 +4,6 @@ import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
-import CustomerManagementPage from '../features/customers/CustomerManagementPage.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
@@ -39,7 +38,6 @@ const internalRoutes = [
     element: <InternalLayout />,
     children: [
       { index: true, element: <InternalDashboardLanding /> },
-      { path: 'customers', element: <CustomerManagementPage /> },
       { path: 'settings', element: <InternalSettingsPage /> },
     ],
   },
@@ -95,10 +93,7 @@ function HomePage() {
     <section className="page-panel">
       <p className="eyebrow">NỀN TẢNG QUẢN LÝ HIỆU CHUẨN</p>
       <h1>ISOCAL</h1>
-      <p>Quản lý khách hàng và các quy trình dịch vụ hiệu chuẩn trong một nơi.</p>
-      <Link className="button button-primary home-cta" to="/internal/customers">
-        Mở quản lý khách hàng
-      </Link>
+      <p>Quản lý các quy trình dịch vụ hiệu chuẩn trong một nơi.</p>
     </section>
   );
 }
@@ -162,11 +157,6 @@ function InternalDashboardPage() {
           <span className="shortcut-icon" aria-hidden="true">⌁</span>
           <strong>Công việc kỹ thuật viên</strong>
           <span>Thực hiện kiểm tra, nhập kết quả đo và trình hồ sơ soát xét.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/customers">
-          <span className="shortcut-icon" aria-hidden="true">◎</span>
-          <strong>Quản lý khách hàng</strong>
-          <span>Tạo hồ sơ khách hàng để sử dụng trong các quy trình dịch vụ.</span>
         </Link>
       </div>
       <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>

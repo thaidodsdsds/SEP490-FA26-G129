@@ -7,7 +7,6 @@ function InternalLayout() {
         <NavLink className="brand" to="/internal">ISOCAL</NavLink>
         <nav className="nav">
           <NavLink end to="/internal">Tổng quan</NavLink>
-          <NavLink to="/internal/customers">Khách hàng</NavLink>
           <NavLink to="/internal/head-of-tech">Điều phối</NavLink>
           <NavLink to="/internal/technician">Kỹ thuật viên</NavLink>
           <NavLink to="/internal/settings">Cài đặt</NavLink>
