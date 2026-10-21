@@ -1,15 +1,22 @@
-import { Link, Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { Link, Navigate, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import InternalLayout from '../layouts/InternalLayout.jsx';
+import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
+import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerManagementPage from '../features/customers/CustomerManagementPage.jsx';
+import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
+import TechnicianPage from '../features/operations/TechnicianPage.jsx';
+import { useAppContext } from './providers.jsx';
+import { getRoleDashboardPath } from './role-routing.js';
+import RoleDashboardGate from './RoleDashboardGate.jsx';
 
 const publicRoutes = [
   {
     path: '/',
     element: <PublicLayout />,
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: <PublicLandingPage /> },
       { path: 'login', element: <LoginPage /> },
     ],
   },
@@ -20,8 +27,8 @@ const customerRoutes = [
     path: '/customer',
     element: <CustomerLayout />,
     children: [
-      { index: true, element: <CustomerDashboardPage /> },
-      { path: 'profile', element: <CustomerProfilePage /> },
+      { index: true, element: <RoleDashboardGate dashboardPath="/customer"><CustomerDashboardPage /></RoleDashboardGate> },
+      { path: 'profile', element: <RoleDashboardGate dashboardPath="/customer"><CustomerProfilePage /></RoleDashboardGate> },
     ],
   },
 ];
@@ -31,10 +38,34 @@ const internalRoutes = [
     path: '/internal',
     element: <InternalLayout />,
     children: [
-      { index: true, element: <InternalDashboardPage /> },
+      { index: true, element: <InternalDashboardLanding /> },
       { path: 'customers', element: <CustomerManagementPage /> },
       { path: 'settings', element: <InternalSettingsPage /> },
     ],
+  },
+  {
+    path: '/internal/head-of-tech',
+    element: <HeadOfTechLayout />,
+    children: [{
+      index: true,
+      element: (
+        <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+          <HeadOfTechPage />
+        </RoleDashboardGate>
+      ),
+    }],
+  },
+  {
+    path: '/internal/technician',
+    element: <TechnicianLayout />,
+    children: [{
+      index: true,
+      element: (
+        <RoleDashboardGate dashboardPath="/internal/technician">
+          <TechnicianPage />
+        </RoleDashboardGate>
+      ),
+    }],
   },
 ];
 
@@ -44,6 +75,20 @@ const router = createBrowserRouter([
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
+
+function PublicLandingPage() {
+  const { session } = useAppContext();
+  const destination = getRoleDashboardPath(session.user);
+  return destination ? <Navigate replace to={destination} /> : <HomePage />;
+}
+
+function InternalDashboardLanding() {
+  const { session } = useAppContext();
+  const destination = getRoleDashboardPath(session.user);
+  return destination && destination !== '/internal'
+    ? <Navigate replace to={destination} />
+    : <InternalDashboardPage />;
+}
 
 function HomePage() {
   return (
@@ -59,10 +104,24 @@ function HomePage() {
 }
 
 function LoginPage() {
+  const { session } = useAppContext();
+  const location = useLocation();
+  const destination = getRoleDashboardPath(session.user);
+  if (destination) return <Navigate replace to={destination} />;
+
   return (
     <section className="page-panel">
-      <h2>Login</h2>
-      <p>This is a placeholder for future authentication flows.</p>
+      <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
+      <h2>Đăng nhập ISOCAL</h2>
+      <p>
+        Luồng xác thực đang chờ tích hợp. Khi API đăng nhập trả về tài khoản kèm Role,
+        gọi <code>startSession(account)</code> rồi điều hướng theo Role; dashboard sẽ được chọn tự động.
+      </p>
+      {location.state?.from?.pathname && (
+        <p className="login-return-note">
+          Sau khi đăng nhập, bạn sẽ quay lại khu vực phù hợp với quyền tài khoản.
+        </p>
+      )}
     </section>
   );
 }
@@ -87,14 +146,31 @@ function CustomerProfilePage() {
 
 function InternalDashboardPage() {
   return (
-    <section className="page-panel">
-      <p className="eyebrow">KHU VỰC NỘI BỘ</p>
-      <h1>Xin chào!</h1>
-      <p>Chọn chức năng để bắt đầu quản lý hoạt động của ISOCAL.</p>
-      <Link className="button button-primary home-cta" to="/internal/customers">
-        Đi đến quản lý khách hàng
-      </Link>
-    </section>
+    <div className="internal-home">
+      <section className="page-panel internal-welcome">
+        <p className="eyebrow">KHU VỰC NỘI BỘ</p>
+        <h1>Xin chào!</h1>
+        <p>Chọn không gian làm việc để bắt đầu quản lý hoạt động hiệu chuẩn và kiểm định.</p>
+      </section>
+      <div className="internal-shortcuts">
+        <Link className="shortcut-card" to="/internal/head-of-tech">
+          <span className="shortcut-icon" aria-hidden="true">↗</span>
+          <strong>Điều phối kỹ thuật</strong>
+          <span>Phân công công việc, chuẩn đối chứng và lịch hẹn cho từng thiết bị.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/technician">
+          <span className="shortcut-icon" aria-hidden="true">⌁</span>
+          <strong>Công việc kỹ thuật viên</strong>
+          <span>Thực hiện kiểm tra, nhập kết quả đo và trình hồ sơ soát xét.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/customers">
+          <span className="shortcut-icon" aria-hidden="true">◎</span>
+          <strong>Quản lý khách hàng</strong>
+          <span>Tạo hồ sơ khách hàng để sử dụng trong các quy trình dịch vụ.</span>
+        </Link>
+      </div>
+      <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>
+    </div>
   );
 }
 
