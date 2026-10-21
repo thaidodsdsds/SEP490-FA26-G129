@@ -25,7 +25,7 @@ export function getRoleDashboardPath(account) {
   if (!account) return null;
 
   const role = normalizeRole(getAccountRole(account));
-  if (role === 'customer' || account.customer_id != null) return '/customer';
+  if (role === 'customer' || account.customer_id != null) return '/internal/customer';
   if (role === 'technician') return '/internal/technician';
   if (
     role === 'reviewer'

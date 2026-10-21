@@ -4,6 +4,7 @@ import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
+import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
@@ -23,13 +24,25 @@ const publicRoutes = [
 
 const customerRoutes = [
   {
-    path: '/customer',
+    path: '/internal/customer',
     element: <CustomerLayout />,
     children: [
-      { index: true, element: <RoleDashboardGate dashboardPath="/customer"><CustomerDashboardPage /></RoleDashboardGate> },
-      { path: 'profile', element: <RoleDashboardGate dashboardPath="/customer"><CustomerProfilePage /></RoleDashboardGate> },
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/customer">
+            <CustomerDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
     ],
   },
+];
+
+
+
+const legacyRoutes = [
+  { path: '/customer', element: <Navigate replace to="/internal/customer" /> },
 ];
 
 const internalRoutes = [
@@ -69,6 +82,7 @@ const internalRoutes = [
 
 const router = createBrowserRouter([
   ...publicRoutes,
+  ...legacyRoutes,
   ...customerRoutes,
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
@@ -121,24 +135,6 @@ function LoginPage() {
   );
 }
 
-function CustomerDashboardPage() {
-  return (
-    <section className="page-panel">
-      <h2>Customer Dashboard</h2>
-      <p>Placeholder for customer-facing workflows.</p>
-    </section>
-  );
-}
-
-function CustomerProfilePage() {
-  return (
-    <section className="page-panel">
-      <h2>Customer Profile</h2>
-      <p>Placeholder for customer account details.</p>
-    </section>
-  );
-}
-
 function InternalDashboardPage() {
   return (
     <div className="internal-home">
@@ -157,6 +153,11 @@ function InternalDashboardPage() {
           <span className="shortcut-icon" aria-hidden="true">⌁</span>
           <strong>Công việc kỹ thuật viên</strong>
           <span>Thực hiện kiểm tra, nhập kết quả đo và trình hồ sơ soát xét.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/customer">
+          <span className="shortcut-icon" aria-hidden="true">◎</span>
+          <strong>Tổng quan khách hàng</strong>
+          <span>Theo dõi thiết bị, đơn dịch vụ, báo giá, chứng nhận và công nợ.</span>
         </Link>
       </div>
       <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>

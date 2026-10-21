@@ -1,19 +1,22 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import RoleDashboardLayout from './RoleDashboardLayout.jsx';
+
+const links = [
+  { to: '/internal/customer', label: 'Tổng quan', icon: '▦' },
+  { to: '/internal/customer/devices', label: 'Thiết bị', icon: '▤', soon: true },
+  { to: '/internal/customer/service-requests', label: 'Đơn dịch vụ', icon: '⌁', soon: true },
+  { to: '/internal/customer/certificates', label: 'Chứng nhận & tem', icon: '✓', soon: true },
+  { to: '/internal/customer/invoices', label: 'Công nợ', icon: '₫', soon: true },
+];
 
 function CustomerLayout() {
   return (
-    <div className="layout-shell customer-layout">
-      <aside className="sidebar">
-        <h3>Customer Portal</h3>
-        <nav className="nav nav-column">
-          <NavLink to="/customer">Dashboard</NavLink>
-          <NavLink to="/customer/profile">Profile</NavLink>
-        </nav>
-      </aside>
-      <main className="page-content">
-        <Outlet />
-      </main>
-    </div>
+    <RoleDashboardLayout
+      description="Theo dõi thiết bị, đơn dịch vụ, chứng nhận và công nợ của công ty."
+      initials="KH"
+      links={links}
+      name="Khách hàng"
+      role="Customer"
+    />
   );
 }
 
