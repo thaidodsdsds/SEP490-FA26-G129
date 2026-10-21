@@ -10,6 +10,23 @@ import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashb
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
+
+import ReviewerWorkspaceProvider from '../features/reviewer/ReviewerWorkspaceProvider.jsx';
+import ReviewerDashboardPage from '../features/reviewer/pages/dashboard/ReviewerDashboardPage.jsx';
+import WorkOrdersPage from '../features/reviewer/features/work-orders/WorkOrdersPage.jsx';
+import AssignmentsPage from '../features/reviewer/features/assignments/AssignmentsPage.jsx';
+import ServiceTypesPage from '../features/reviewer/features/service-types/ServiceTypesPage.jsx';
+import ProceduresPage from '../features/reviewer/features/procedures/ProceduresPage.jsx';
+import StandardsPage from '../features/reviewer/features/standards/StandardsPage.jsx';
+import ReviewQueuePage from '../features/reviewer/features/review-queue/ReviewQueuePage.jsx';
+import DriftPage from '../features/reviewer/features/drift/DriftPage.jsx';
+import CertificatesPage from '../features/reviewer/features/certificates/CertificatesPage.jsx';
+import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
+import VerificationLogsPage from '../features/reviewer/features/verification-logs/VerificationLogsPage.jsx';
+import SignaturesPage from '../features/reviewer/features/signatures/SignaturesPage.jsx';
+import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
+import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
+import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
@@ -94,12 +111,28 @@ const internalRoutes = [
     path: '/internal/head-of-tech',
     element: <HeadOfTechLayout />,
     children: [{
-      index: true,
       element: (
         <RoleDashboardGate dashboardPath="/internal/head-of-tech">
-          <HeadOfTechPage />
+          <ReviewerWorkspaceProvider />
         </RoleDashboardGate>
       ),
+      children: [
+        { index: true, element: <ReviewerDashboardPage /> },
+        { path: 'work-orders', element: <WorkOrdersPage /> },
+        { path: 'assignments', element: <AssignmentsPage /> },
+        { path: 'service-types', element: <ServiceTypesPage /> },
+        { path: 'procedures', element: <ProceduresPage /> },
+        { path: 'standards', element: <StandardsPage /> },
+        { path: 'review-queue', element: <ReviewQueuePage /> },
+        { path: 'drift', element: <DriftPage /> },
+        { path: 'certificates', element: <CertificatesPage /> },
+        { path: 'seals', element: <SealsPage /> },
+        { path: 'verification-logs', element: <VerificationLogsPage /> },
+        { path: 'signatures', element: <SignaturesPage /> },
+        { path: 'chat', element: <ChatPage /> },
+        { path: 'notifications', element: <NotificationsPage /> },
+        { path: 'warehouse', element: <WarehousePage /> },
+      ],
     }],
   },
   {
@@ -184,8 +217,8 @@ function InternalDashboardPage() {
       <div className="internal-shortcuts">
         <Link className="shortcut-card" to="/internal/head-of-tech">
           <span className="shortcut-icon" aria-hidden="true">↗</span>
-          <strong>Điều phối kỹ thuật</strong>
-          <span>Phân công công việc, chuẩn đối chứng và lịch hẹn cho từng thiết bị.</span>
+          <strong>Reviewer (Head of Tech)</strong>
+          <span>Dashboard Reviewer: quản lý Work Order, quy trình, soát xét và vận hành phòng kỹ thuật.</span>
         </Link>
         <Link className="shortcut-card" to="/internal/technician">
           <span className="shortcut-icon" aria-hidden="true">⌁</span>
