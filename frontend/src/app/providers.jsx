@@ -3,8 +3,38 @@ import { getAccountRole, getRoleDashboardPath } from './role-routing.js';
 
 const AppContext = createContext(null);
 
+/**
+ * Decode a JWT payload without verifying the signature.
+ * Used only to restore UI session from localStorage on page load.
+ */
+function decodeJwtPayload(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Try to restore a user session from a stored JWT token.
+ * Returns the decoded account payload, or null if invalid/expired.
+ */
+function restoreSessionFromStorage() {
+  const token = localStorage.getItem('isocal_token');
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  // Check expiry
+  if (payload.exp && Date.now() / 1000 > payload.exp) {
+    localStorage.removeItem('isocal_token');
+    return null;
+  }
+  return payload; // { id, email, role, customer_id }
+}
+
 export function AppProviders({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => restoreSessionFromStorage());
 
   const startSession = (account) => {
     if (!account || typeof account !== 'object') {
@@ -21,7 +51,11 @@ export function AppProviders({ children }) {
     return dashboardPath;
   };
 
-  const endSession = () => setUser(null);
+  const endSession = () => {
+    localStorage.removeItem('isocal_token');
+    setUser(null);
+  };
+
   const session = useMemo(() => ({
     user,
     isAuthenticated: Boolean(user),
@@ -33,3 +67,4 @@ export function AppProviders({ children }) {
 }
 
 export const useAppContext = () => useContext(AppContext);
+

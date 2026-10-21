@@ -1,4 +1,4 @@
-import { Link, Navigate, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom';
+import { Link, Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import AccountantLayout from '../layouts/AccountantLayout.jsx';
@@ -32,13 +32,23 @@ import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
 import RoleDashboardGate from './RoleDashboardGate.jsx';
 
+// Auth pages
+import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
+import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
+import { RegisterPage } from '../features/auth/RegisterPage.jsx';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+
 const publicRoutes = [
+  // Standalone auth pages — no wrapping layout, each manages its own shell
+  { path: '/login', element: <CustomerLoginPage /> },
+  { path: '/staff-login', element: <StaffLoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
     path: '/',
     element: <PublicLayout />,
     children: [
       { index: true, element: <PublicLandingPage /> },
-      { path: 'login', element: <LoginPage /> },
     ],
   },
 ];
@@ -162,7 +172,8 @@ const router = createBrowserRouter([
 function PublicLandingPage() {
   const { session } = useAppContext();
   const destination = getRoleDashboardPath(session.user);
-  return destination ? <Navigate replace to={destination} /> : <HomePage />;
+  // If logged in, go to dashboard; otherwise redirect to login page
+  return destination ? <Navigate replace to={destination} /> : <Navigate replace to="/login" />;
 }
 
 function InternalDashboardLanding() {
@@ -183,28 +194,7 @@ function HomePage() {
   );
 }
 
-function LoginPage() {
-  const { session } = useAppContext();
-  const location = useLocation();
-  const destination = getRoleDashboardPath(session.user);
-  if (destination) return <Navigate replace to={destination} />;
-
-  return (
-    <section className="page-panel">
-      <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
-      <h2>Đăng nhập ISOCAL</h2>
-      <p>
-        Luồng xác thực đang chờ tích hợp. Khi API đăng nhập trả về tài khoản kèm Role,
-        gọi <code>startSession(account)</code> rồi điều hướng theo Role; dashboard sẽ được chọn tự động.
-      </p>
-      {location.state?.from?.pathname && (
-        <p className="login-return-note">
-          Sau khi đăng nhập, bạn sẽ quay lại khu vực phù hợp với quyền tài khoản.
-        </p>
-      )}
-    </section>
-  );
-}
+// LoginPage removed — replaced by CustomerLoginPage at /login route
 
 function InternalDashboardPage() {
   return (
