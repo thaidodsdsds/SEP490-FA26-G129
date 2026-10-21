@@ -1,5 +1,23 @@
 # React + Vite
 
+## Role-based dashboard routing
+
+After the authentication API succeeds, pass the returned account to the app session and navigate to the path it returns:
+
+```jsx
+const dashboardPath = startSession(account);
+navigate(dashboardPath, { replace: true });
+```
+
+The account response must include its role name or code (`role: { name, code }`, `role_name`, or `role_code`). The role-to-dashboard mapping is centralized in `src/app/role-routing.js`:
+
+- `Customer` or a non-null `customer_id` → `/customer`
+- `Technician` → `/internal/technician`
+- `Reviewer` / Head of Tech → `/internal/head-of-tech`
+- Other supported internal roles → `/internal`
+
+`startSession` is exposed by `useAppContext()` in `src/app/providers.jsx`; it validates the account role, stores the current in-memory session, and returns the correct dashboard path. Role dashboard routes redirect authenticated users to their own landing page if they open a different role's dashboard URL. The current operation screens remain available without a session for mock-data preview until authentication is implemented.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
