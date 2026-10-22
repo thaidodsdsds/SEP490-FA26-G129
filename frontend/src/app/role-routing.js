@@ -29,6 +29,15 @@ export function getRoleDashboardPath(account) {
   if (role === 'admin' || role.includes('quantri')) return '/internal/admin';
   if (role === 'accountant' || role.includes('ketoan')) return '/internal/accountant';
   if (role === 'technician') return '/internal/technician';
+  if (role === 'sales' || role.includes('kinhdoanh') || role.includes('sales')) return '/internal/sales';
+  if (
+    role === 'warehouse'
+    || role === 'warehousestaff'
+    || role.includes('kho')
+    || role.includes('khovan')
+  ) {
+    return '/internal/warehouse';
+  }
   if (
     role === 'reviewer'
     || role.includes('labmanager')
