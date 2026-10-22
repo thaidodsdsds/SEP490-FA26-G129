@@ -9,6 +9,10 @@ import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
+import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
+import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
+import SalesLayout from '../layouts/SalesLayout.jsx';
+import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 
 import ReviewerWorkspaceProvider from '../features/reviewer/ReviewerWorkspaceProvider.jsx';
@@ -94,6 +98,40 @@ const adminRoutes = [
   },
 ];
 
+const salesRoutes = [
+  {
+    path: '/internal/sales',
+    element: <SalesLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/sales">
+            <SalesDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+    ],
+  },
+];
+
+const warehouseRoutes = [
+  {
+    path: '/internal/warehouse',
+    element: <WarehouseLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/warehouse">
+            <WarehouseDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+    ],
+  },
+];
+
 const legacyRoutes = [
   { path: '/customer', element: <Navigate replace to="/internal/customer" /> },
 ];
@@ -155,6 +193,8 @@ const router = createBrowserRouter([
   ...customerRoutes,
   ...accountantRoutes,
   ...adminRoutes,
+  ...salesRoutes,
+  ...warehouseRoutes,
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
@@ -234,6 +274,16 @@ function InternalDashboardPage() {
           <span className="shortcut-icon" aria-hidden="true">₫</span>
           <strong>Tổng quan kế toán</strong>
           <span>Theo dõi doanh thu, hoá đơn, thanh toán và công nợ khách hàng.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/sales">
+          <span className="shortcut-icon" aria-hidden="true">💼</span>
+          <strong>Tổng quan kinh doanh (Sales)</strong>
+          <span>Quản lý quan hệ khách hàng, lập báo giá, soạn thảo hợp đồng cam kết và tiếp nhận dịch vụ.</span>
+        </Link>
+        <Link className="shortcut-card" to="/internal/warehouse">
+          <span className="shortcut-icon" aria-hidden="true">▣</span>
+          <strong>Tổng quan kho vận (Warehouse)</strong>
+          <span>Tiếp nhận thiết bị In-lab, kiểm tra tình trạng vật lý ban đầu và xuất trả bàn giao.</span>
         </Link>
         <Link className="shortcut-card" to="/internal/admin">
           <span className="shortcut-icon" aria-hidden="true">⚙</span>
