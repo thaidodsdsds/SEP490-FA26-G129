@@ -30,11 +30,10 @@ export default class CreateRolesAndCustomers1792500000000 implements MigrationIn
       VALUES
         ('Admin'),
         ('Sales'),
-        ('Technician'),
-        ('Reviewer'),
-        ('Signatory'),
-        ('Warehouse'),
         ('Accountant'),
+        ('Technician'),
+        ('HeadTechnician'),
+        ('CEO'),
         ('Customer')
     `);
   }

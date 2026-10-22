@@ -40,13 +40,14 @@ export function getRoleDashboardPath(account) {
   }
   if (
     role === 'reviewer'
+    || role === 'headtechnician'
     || role.includes('labmanager')
     || role.includes('headoftech')
     || role.includes('technicalmanager')
   ) {
     return '/internal/head-of-tech';
   }
-  if (internalRoles.has(role)) return '/internal';
+  if (internalRoles.has(role) || role === 'ceo' || role === 'sales') return '/internal';
   return null;
 }
 

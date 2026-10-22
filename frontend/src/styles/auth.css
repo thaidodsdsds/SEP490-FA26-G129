@@ -1,0 +1,404 @@
+/* =====================================================
+   AUTH PAGES STYLES - ISOCAL
+   Customer Login | Staff Login | Register | Forgot Password
+   ===================================================== */
+
+/* ── Page shell ─────────────────────────────────── */
+.auth-shell {
+  min-height: 100svh;
+  width: 100%;
+  background-color: #dce8f8;
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  box-sizing: border-box;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Two-column layout ───────────────────────────── */
+.auth-container {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 32px;
+  max-width: 900px;
+  width: 100%;
+  align-items: start;
+}
+
+/* ── Left panel (brand side) ─────────────────────── */
+.auth-brand {
+  padding: 8px 0;
+}
+
+.auth-brand__logo {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f3172;
+  letter-spacing: -0.5px;
+  margin: 0 0 28px;
+}
+
+.auth-brand__headline {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a4ea6;
+  line-height: 1.35;
+  margin: 0 0 16px;
+}
+
+.auth-brand__desc {
+  font-size: 13.5px;
+  color: #4a6591;
+  line-height: 1.6;
+  margin: 0 0 32px;
+  max-width: 300px;
+}
+
+/* Illustration placeholder */
+.auth-illustration {
+  background: rgba(147, 197, 253, 0.3);
+  border: 2px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 18px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #93c5fd;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* ── Right panel (form card) ─────────────────────── */
+.auth-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 4px 32px rgba(15, 49, 114, 0.1), 0 1px 4px rgba(15, 49, 114, 0.06);
+  padding: 36px 40px 40px;
+}
+
+/* ── Tab navigation ──────────────────────────────── */
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e8edf5;
+  margin-bottom: 28px;
+}
+
+.auth-tab {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8fa3c2;
+  padding: 0 0 12px;
+  margin-right: 24px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.auth-tab.active {
+  color: #1a4ea6;
+  border-bottom-color: #1a4ea6;
+  font-weight: 600;
+}
+
+.auth-tab:hover:not(.active) {
+  color: #3b6bc8;
+}
+
+/* ── Card headings ───────────────────────────────── */
+.auth-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f1f3d;
+  margin: 0 0 6px;
+  letter-spacing: -0.4px;
+}
+
+.auth-subtitle {
+  font-size: 13.5px;
+  color: #6b83a5;
+  margin: 0 0 28px;
+}
+
+/* ── Back link ───────────────────────────────────── */
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #4a6591;
+  text-decoration: none;
+  margin-bottom: 28px;
+  transition: color 0.15s ease;
+}
+
+.auth-back-link:hover {
+  color: #1a4ea6;
+}
+
+/* ── Form elements ───────────────────────────────── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-input-wrapper {
+  position: relative;
+}
+
+.auth-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0b4d0;
+  font-size: 14px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px 0 40px;
+  border: 1.5px solid #d4dff0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #0f1f3d;
+  background: #f8fafd;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.auth-input::placeholder {
+  color: #aabbd4;
+}
+
+.auth-input:focus {
+  border-color: #3b6bc8;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 107, 200, 0.12);
+}
+
+.auth-input.error {
+  border-color: #ef4444;
+}
+
+/* Password toggle button */
+.auth-password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #a0b4d0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.auth-password-toggle:hover {
+  color: #3b6bc8;
+}
+
+/* ── Remember me / Forgot row ────────────────────── */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4a6591;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-checkbox-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #1a4ea6;
+  cursor: pointer;
+}
+
+.auth-link {
+  font-size: 13px;
+  color: #1a4ea6;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.auth-link:hover {
+  opacity: 0.75;
+}
+
+/* ── Primary button ──────────────────────────────── */
+.auth-btn-primary {
+  width: 100%;
+  height: 50px;
+  background: linear-gradient(135deg, #1a4ea6 0%, #2563eb 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 4px 14px rgba(26, 78, 166, 0.35);
+  margin-top: 4px;
+}
+
+.auth-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(26, 78, 166, 0.45);
+}
+
+.auth-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.auth-btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ── Secondary button (outline) ──────────────────── */
+.auth-btn-secondary {
+  width: 100%;
+  height: 50px;
+  background: #ffffff;
+  color: #1a4ea6;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+}
+
+.auth-btn-secondary:hover {
+  border-color: #1a4ea6;
+  background: #f0f6ff;
+  transform: translateY(-1px);
+}
+
+/* ── Divider text ────────────────────────────────── */
+.auth-divider {
+  text-align: center;
+  font-size: 13px;
+  color: #8fa3c2;
+  margin: 4px 0;
+}
+
+/* ── Info notice box ─────────────────────────────── */
+.auth-info-box {
+  background: #f0f6ff;
+  border: 1.5px solid #bdd4f5;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.auth-info-box__icon {
+  color: #3b6bc8;
+  font-size: 15px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.auth-info-box__text {
+  font-size: 12.5px;
+  color: #4a6591;
+  line-height: 1.55;
+}
+
+/* ── Error message ───────────────────────────────── */
+.auth-error {
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Success message ─────────────────────────────── */
+.auth-success {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Loading spinner ─────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-brand {
+    display: none;
+  }
+
+  .auth-card {
+    padding: 28px 24px 32px;
+  }
+}
