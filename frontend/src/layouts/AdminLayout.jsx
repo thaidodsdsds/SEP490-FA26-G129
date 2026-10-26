@@ -16,6 +16,7 @@ function AdminLayout() {
       initials="AD"
       links={links}
       name="Quản trị"
+      profilePath="/internal/admin/profile"
       role="Admin"
     />
   );

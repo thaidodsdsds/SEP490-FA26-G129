@@ -16,6 +16,7 @@ function WarehouseLayout() {
       initials="WH"
       links={links}
       name="Trần Văn Khoa"
+      profilePath="/internal/warehouse/profile"
       role="Kho vận · Warehouse"
     />
   );
