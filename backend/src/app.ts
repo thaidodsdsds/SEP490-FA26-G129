@@ -10,6 +10,7 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { AppError } from './common/errors.js';
 import authRouter from './routes/authRouter.js';
+import profileRouter from './routes/profileRouter.js';
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
 app.use(`${API_PREFIX}/auth`, authRouter);
+app.use(`${API_PREFIX}/profile`, profileRouter);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {

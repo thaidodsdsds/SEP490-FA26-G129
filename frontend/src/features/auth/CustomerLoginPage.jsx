@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi } from '../../services/auth-service.js';
+import { isCustomerAccount } from '../../app/role-routing.js';
 import '../../styles/auth.css';
 
 function AuthBrandPanel({ headline, desc }) {
@@ -32,11 +33,24 @@ export function CustomerLoginPage() {
     setLoading(true);
     try {
       const { token, account } = await loginApi(email.trim(), password);
+
+      // ── Portal access check ──────────────────────────────────────────
+      // This portal is ONLY for customer accounts.
+      // Staff/internal accounts must use the Staff Login portal.
+      if (!isCustomerAccount(account)) {
+        setError(
+          'Tài khoản này không phải tài khoản khách hàng. '
+          + 'Vui lòng đăng nhập qua cổng Nhân viên (Staff Login).',
+        );
+        return; // do NOT store token or start session
+      }
+      // ────────────────────────────────────────────────────────────────
+
       localStorage.setItem('isocal_token', token);
       const dashboardPath = startSession(account);
       navigate(dashboardPath, { replace: true });
     } catch (err) {
-      const msg = err?.response?.data?.error?.message || 'Login failed. Please try again.';
+      const msg = err?.response?.data?.error?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -47,7 +61,7 @@ export function CustomerLoginPage() {
     <div className="auth-shell">
       <div className="auth-container">
         <AuthBrandPanel
-          headline="Calibration & Verification for a More Accurate World"
+          headline="Calibration &amp; Verification for a More Accurate World"
           desc="Manage calibration and verification services for measuring equipment, from request to certificate. Trusted by businesses and industries."
         />
 
@@ -62,8 +76,19 @@ export function CustomerLoginPage() {
           <p className="auth-subtitle">Sign in to your ISOCAL customer account</p>
 
           {error && (
-            <div className="auth-error" style={{ marginBottom: 16 }}>
-              <span>⚠</span> {error}
+            <div className="auth-error" id="customer-login-error" style={{ marginBottom: 16 }}>
+              <span>⚠</span>
+              <span>{error}</span>
+              {/* Suggest staff portal if wrong portal */}
+              {error.includes('Staff Login') && (
+                <Link
+                  className="auth-link"
+                  style={{ display: 'block', marginTop: 6, fontWeight: 700 }}
+                  to="/staff-login"
+                >
+                  → Đến trang Staff Login
+                </Link>
+              )}
             </div>
           )}
 
