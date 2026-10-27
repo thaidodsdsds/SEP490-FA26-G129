@@ -100,26 +100,14 @@ router.put('/', async (req, res) => {
 
 /**
  * PUT /api/v1/profile/change-password
- * Allows ONLY customers to change their password.
+ * Allows any authenticated user to change their own password.
  */
 router.put('/change-password', async (req, res) => {
   try {
     const userId = typeof req.user === 'object' && req.user !== null ? (req.user as any).id : null;
-    const userRole = typeof req.user === 'object' && req.user !== null ? (req.user as any).role : null;
 
     if (!userId) {
       return res.status(401).json(buildErrorResponse('Unauthorized.', 'UNAUTHORIZED'));
-    }
-
-    // Only customers can change password via this endpoint
-    const normalizedRole = String(userRole || '').toLowerCase();
-    if (normalizedRole !== 'customer') {
-      return res.status(403).json(
-        buildErrorResponse(
-          'Chỉ tài khoản khách hàng mới được đổi mật khẩu tại đây.',
-          'FORBIDDEN',
-        ),
-      );
     }
 
     const { current_password, new_password } = req.body as {
