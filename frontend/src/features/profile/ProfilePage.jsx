@@ -336,85 +336,72 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Password — only customers */}
-      {isCustomer && (
-        <div className="profile-card">
-          <div className="profile-card-head">
-            <div>
-              <h2 className="profile-card-title">Đổi mật khẩu</h2>
-              <p className="profile-card-sub">Tối thiểu 6 ký tự</p>
-            </div>
+      {/* Password — all authenticated users */}
+      <div className="profile-card">
+        <div className="profile-card-head">
+          <div>
+            <h2 className="profile-card-title">Đổi mật khẩu</h2>
+            <p className="profile-card-sub">Tối thiểu 6 ký tự</p>
           </div>
-          <form className="profile-form" id="profile-password-form" onSubmit={handleChangePassword}>
-            <div className="profile-field">
-              <label className="profile-label" htmlFor="profile-cur-pw">
-                Mật khẩu hiện tại <span className="profile-required">*</span>
-              </label>
-              <input
-                autoComplete="current-password"
-                className="profile-input"
-                id="profile-cur-pw"
-                name="current_password"
-                onChange={handlePwChange}
-                required
-                type="password"
-                value={pwForm.current_password}
-              />
-            </div>
-            <div className="profile-field">
-              <label className="profile-label" htmlFor="profile-new-pw">
-                Mật khẩu mới <span className="profile-required">*</span>
-              </label>
-              <input
-                autoComplete="new-password"
-                className="profile-input"
-                id="profile-new-pw"
-                name="new_password"
-                onChange={handlePwChange}
-                required
-                type="password"
-                value={pwForm.new_password}
-              />
-            </div>
-            <div className="profile-field">
-              <label className="profile-label" htmlFor="profile-confirm-pw">
-                Xác nhận mật khẩu mới <span className="profile-required">*</span>
-              </label>
-              <input
-                autoComplete="new-password"
-                className="profile-input"
-                id="profile-confirm-pw"
-                name="confirm_password"
-                onChange={handlePwChange}
-                required
-                type="password"
-                value={pwForm.confirm_password}
-              />
-            </div>
-            <div className="profile-form-actions">
-              <button
-                className="profile-btn profile-btn-primary"
-                disabled={pwSaving}
-                id="profile-change-pw-btn"
-                type="submit"
-              >
-                {pwSaving ? 'Đang xử lý…' : 'Đổi mật khẩu'}
-              </button>
-            </div>
-          </form>
         </div>
-      )}
-
-      {/* Non-customer password notice */}
-      {!isCustomer && (
-        <div className="profile-card profile-card-notice">
-          <span className="profile-notice-icon">🔒</span>
-          <p>
-            Mật khẩu của tài khoản nội bộ được quản lý bởi <strong>quản trị viên hệ thống</strong>.
-            Vui lòng liên hệ Admin nếu cần đặt lại mật khẩu.
-          </p>
-        </div>
-      )}
+        <form className="profile-form" id="profile-password-form" onSubmit={handleChangePassword}>
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="profile-cur-pw">
+              Mật khẩu hiện tại <span className="profile-required">*</span>
+            </label>
+            <input
+              autoComplete="current-password"
+              className="profile-input"
+              id="profile-cur-pw"
+              name="current_password"
+              onChange={handlePwChange}
+              required
+              type="password"
+              value={pwForm.current_password}
+            />
+          </div>
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="profile-new-pw">
+              Mật khẩu mới <span className="profile-required">*</span>
+            </label>
+            <input
+              autoComplete="new-password"
+              className="profile-input"
+              id="profile-new-pw"
+              name="new_password"
+              onChange={handlePwChange}
+              required
+              type="password"
+              value={pwForm.new_password}
+            />
+          </div>
+          <div className="profile-field">
+            <label className="profile-label" htmlFor="profile-confirm-pw">
+              Xác nhận mật khẩu mới <span className="profile-required">*</span>
+            </label>
+            <input
+              autoComplete="new-password"
+              className="profile-input"
+              id="profile-confirm-pw"
+              name="confirm_password"
+              onChange={handlePwChange}
+              required
+              type="password"
+              value={pwForm.confirm_password}
+            />
+          </div>
+          <div className="profile-form-actions">
+            <button
+              className="profile-btn profile-btn-primary"
+              disabled={pwSaving}
+              id="profile-change-pw-btn"
+              type="submit"
+            >
+              {pwSaving ? 'Đang xử lý…' : 'Đổi mật khẩu'}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {toast && (
         <Toast

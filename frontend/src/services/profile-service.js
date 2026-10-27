@@ -17,7 +17,7 @@ export const updateProfileApi = async ({ full_name, phone }) => {
 };
 
 /**
- * Change password — only allowed for customers.
+ * Change password — allowed for all authenticated users.
  */
 export const changePasswordApi = async ({ current_password, new_password }) => {
   const response = await apiClient.put('/profile/change-password', {
