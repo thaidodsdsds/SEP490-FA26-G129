@@ -12,11 +12,22 @@ const router = Router();
 
 /**
  * GET /api/v1/admin/accounts
- * Query params: type (internal|customer), locked (true|false), search
+ * Query params: type (internal|customer), locked (true|false), role_id, search, page, limit
  */
 router.get('/accounts', async (req, res) => {
   try {
-    const { type, locked, search } = req.query as Record<string, string>;
+    const {
+      type,
+      locked,
+      search,
+      role_id,
+      page = '1',
+      limit = '15',
+    } = req.query as Record<string, string>;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 15));
+    const offset = (pageNum - 1) * limitNum;
 
     const accountRepo = dataSource.getRepository(Account);
     let qb = accountRepo.createQueryBuilder('account')
@@ -28,6 +39,10 @@ router.get('/accounts', async (req, res) => {
       qb = qb.where('account.customer_id IS NOT NULL');
     } else if (type === 'internal') {
       qb = qb.where('account.customer_id IS NULL');
+    }
+
+    if (role_id) {
+      qb = qb.andWhere('account.role_id = :role_id', { role_id: Number(role_id) });
     }
 
     if (locked === 'true') {
@@ -43,7 +58,7 @@ router.get('/accounts', async (req, res) => {
       );
     }
 
-    const accounts = await qb.getMany();
+    const [accounts, total] = await qb.skip(offset).take(limitNum).getManyAndCount();
 
     const result = accounts.map((acc) => ({
       id: acc.id,
@@ -59,12 +74,21 @@ router.get('/accounts', async (req, res) => {
       is_locked: acc.failed_login_attempts >= 5,
     }));
 
-    return res.status(200).json(buildSuccessResponse(result));
+    return res.status(200).json(buildSuccessResponse({
+      accounts: result,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        total_pages: Math.ceil(total / limitNum),
+      },
+    }));
   } catch (error) {
     console.error('[Admin] List accounts error:', error);
     return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
   }
 });
+
 
 /**
  * POST /api/v1/admin/accounts
