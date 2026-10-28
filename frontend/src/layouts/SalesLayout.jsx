@@ -8,7 +8,6 @@ const links = [
   { to: '/internal/sales/contracts', label: 'Hợp đồng cam kết', icon: '⌁', soon: true },
   { to: '/internal/sales/devices', label: 'Thiết bị & Sở hữu', icon: '◫', soon: true },
   { to: '/internal/sales/chat', label: 'Tin nhắn & Trao đổi', icon: '◌', soon: true },
-  { to: '/internal', label: 'Khu vực nội bộ', icon: '⌂' },
 ];
 
 function SalesLayout() {

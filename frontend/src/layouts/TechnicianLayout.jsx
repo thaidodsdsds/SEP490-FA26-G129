@@ -2,8 +2,6 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/technician', label: 'Dashboard công việc', icon: '▦' },
-  { to: '/internal/head-of-tech', label: 'Dashboard Reviewer (Head of Tech)', icon: '↗' },
-  { to: '/internal', label: 'Khu vực nội bộ', icon: '⌂' },
 ];
 
 function TechnicianLayout() {

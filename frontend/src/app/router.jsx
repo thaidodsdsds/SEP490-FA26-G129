@@ -1,9 +1,8 @@
-import { Link, Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import AccountantLayout from '../layouts/AccountantLayout.jsx';
 import AdminLayout from '../layouts/AdminLayout.jsx';
-import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
@@ -149,11 +148,7 @@ const legacyRoutes = [
 const internalRoutes = [
   {
     path: '/internal',
-    element: <InternalLayout />,
-    children: [
-      { index: true, element: <InternalDashboardLanding /> },
-      { path: 'settings', element: <InternalSettingsPage /> },
-    ],
+    element: <InternalDashboardLanding />,
   },
   {
     path: '/internal/head-of-tech',
@@ -219,9 +214,8 @@ function PublicLandingPage() {
 function InternalDashboardLanding() {
   const { session } = useAppContext();
   const destination = getRoleDashboardPath(session.user);
-  return destination && destination !== '/internal'
-    ? <Navigate replace to={destination} />
-    : <InternalDashboardPage />;
+  const dashboardPath = destination && destination !== '/internal' ? destination : '/login';
+  return <Navigate replace to={dashboardPath} />;
 }
 
 function HomePage() {
@@ -235,65 +229,6 @@ function HomePage() {
 }
 
 // LoginPage removed — replaced by CustomerLoginPage at /login route
-
-function InternalDashboardPage() {
-  return (
-    <div className="internal-home">
-      <section className="page-panel internal-welcome">
-        <p className="eyebrow">KHU VỰC NỘI BỘ</p>
-        <h1>Xin chào!</h1>
-        <p>Chọn không gian làm việc để bắt đầu quản lý hoạt động hiệu chuẩn và kiểm định.</p>
-      </section>
-      <div className="internal-shortcuts">
-        <Link className="shortcut-card" to="/internal/head-of-tech">
-          <span className="shortcut-icon" aria-hidden="true">↗</span>
-          <strong>Reviewer (Head of Tech)</strong>
-          <span>Dashboard Reviewer: quản lý Work Order, quy trình, soát xét và vận hành phòng kỹ thuật.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/technician">
-          <span className="shortcut-icon" aria-hidden="true">⌁</span>
-          <strong>Công việc kỹ thuật viên</strong>
-          <span>Thực hiện kiểm tra, nhập kết quả đo và trình hồ sơ soát xét.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/customer">
-          <span className="shortcut-icon" aria-hidden="true">◎</span>
-          <strong>Tổng quan khách hàng</strong>
-          <span>Theo dõi thiết bị, đơn dịch vụ, báo giá, chứng nhận và công nợ.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/accountant">
-          <span className="shortcut-icon" aria-hidden="true">₫</span>
-          <strong>Tổng quan kế toán</strong>
-          <span>Theo dõi doanh thu, hoá đơn, thanh toán và công nợ khách hàng.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/sales">
-          <span className="shortcut-icon" aria-hidden="true">💼</span>
-          <strong>Tổng quan kinh doanh (Sales)</strong>
-          <span>Quản lý quan hệ khách hàng, lập báo giá, soạn thảo hợp đồng cam kết và tiếp nhận dịch vụ.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/warehouse">
-          <span className="shortcut-icon" aria-hidden="true">▣</span>
-          <strong>Tổng quan kho vận (Warehouse)</strong>
-          <span>Tiếp nhận thiết bị In-lab, kiểm tra tình trạng vật lý ban đầu và xuất trả bàn giao.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/admin">
-          <span className="shortcut-icon" aria-hidden="true">⚙</span>
-          <strong>Tổng quan quản trị</strong>
-          <span>Tài khoản, vai trò, danh mục và tình trạng vận hành hệ thống.</span>
-        </Link>
-      </div>
-      <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>
-    </div>
-  );
-}
-
-function InternalSettingsPage() {
-  return (
-    <section className="page-panel">
-      <h2>System Settings</h2>
-      <p>Placeholder for configuration and administration pages.</p>
-    </section>
-  );
-}
 
 export function AppRouter() {
   return <RouterProvider router={router} />;

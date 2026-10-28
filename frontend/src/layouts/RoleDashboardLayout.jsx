@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppContext } from '../app/providers.jsx';
-import { getUserInitials } from '../app/role-routing.js';
+import { getRoleDashboardPath, getUserInitials } from '../app/role-routing.js';
 
 function RoleDashboardLayout({ role, description, links, initials, name }) {
   const { session } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
   const displayName = session.user?.full_name || session.user?.name || name;
   const displayInitials = getUserInitials(session.user, initials);
+  const dashboardPath = getRoleDashboardPath(session.user) || '/login';
 
   useEffect(() => {
     if (!isNavOpen) return undefined;
@@ -36,10 +37,10 @@ function RoleDashboardLayout({ role, description, links, initials, name }) {
           <span aria-hidden="true">☰</span>
         </button>
         <NavLink
-          aria-label="ISOCAL — về khu vực nội bộ"
+          aria-label="ISOCAL — về trang tổng quan"
           className="role-dashboard-brand"
           onClick={closeNav}
-          to="/internal"
+          to={dashboardPath}
         >
           ISO<span>CAL</span>
         </NavLink>
