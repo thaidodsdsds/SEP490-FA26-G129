@@ -21,13 +21,17 @@ async function api(path, options = {}) {
 }
 
 /* ─── Accounts ────────────────────────────────────────────────────── */
-export async function listAccounts({ type, locked, search } = {}) {
+export async function listAccounts({ type, locked, search, role_id, page = 1, limit = 15 } = {}) {
   const params = new URLSearchParams();
   if (type) params.set('type', type);
   if (locked !== undefined && locked !== '') params.set('locked', locked);
   if (search) params.set('search', search);
+  if (role_id) params.set('role_id', String(role_id));
+  params.set('page', String(page));
+  params.set('limit', String(limit));
   const qs = params.toString();
-  return api(`/accounts${qs ? `?${qs}` : ''}`);
+  // Returns { accounts: [], pagination: { total, page, limit, total_pages } }
+  return api(`/accounts?${qs}`);
 }
 
 export async function createAccount(data) {
