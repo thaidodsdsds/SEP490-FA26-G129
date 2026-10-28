@@ -353,12 +353,32 @@
   background: #fef2f2;
   border: 1.5px solid #fca5a5;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   font-size: 13px;
   color: #dc2626;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 8px;
+}
+
+.auth-error > span:first-child {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.auth-error > span:nth-child(2) {
+  flex: 1 1 0;
+  line-height: 1.5;
+}
+
+/* Portal-switch link inside error box */
+.auth-error .auth-link {
+  flex: 0 0 100%;
+  margin-top: 4px;
+  padding-left: 20px;
+  color: #b91c1c;
+  font-size: 12.5px;
 }
 
 /* ── Success message ─────────────────────────────── */

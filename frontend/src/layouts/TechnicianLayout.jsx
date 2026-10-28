@@ -11,6 +11,7 @@ function TechnicianLayout() {
       initials="NQ"
       links={links}
       name="Nguyễn Minh Quân"
+      profilePath="/internal/technician/profile"
       role="Technician"
     />
   );

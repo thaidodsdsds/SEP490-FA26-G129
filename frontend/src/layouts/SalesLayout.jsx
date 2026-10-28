@@ -17,6 +17,7 @@ function SalesLayout() {
       initials="SL"
       links={links}
       name="Nguyễn Hoàng Nam"
+      profilePath="/internal/sales/profile"
       role="Kinh doanh · Sales"
     />
   );

@@ -25,6 +25,7 @@ function HeadOfTechLayout() {
       initials="HT"
       links={links}
       name="Nguyễn Thu Hương"
+      profilePath="/internal/head-of-tech/profile"
       role="Reviewer · Head of Tech"
     />
   );

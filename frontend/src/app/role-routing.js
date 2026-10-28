@@ -21,6 +21,25 @@ export function getAccountRole(account) {
     : role?.name || role?.code || account?.role_name || account?.role_code || '';
 }
 
+/**
+ * Returns true if the account belongs to the customer portal.
+ * Customer = role 'customer' OR has a customer_id linked.
+ */
+export function isCustomerAccount(account) {
+  if (!account) return false;
+  const role = normalizeRole(getAccountRole(account));
+  return role === 'customer' || account.customer_id != null;
+}
+
+/**
+ * Returns true if the account belongs to the internal staff portal.
+ * Staff = any non-customer role.
+ */
+export function isStaffAccount(account) {
+  if (!account) return false;
+  return !isCustomerAccount(account);
+}
+
 export function getRoleDashboardPath(account) {
   if (!account) return null;
 

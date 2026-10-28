@@ -40,6 +40,7 @@ import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
 import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+import ProfilePage from '../features/profile/ProfilePage.jsx';
 
 const publicRoutes = [
   // Standalone auth pages — no wrapping layout, each manages its own shell
@@ -69,6 +70,7 @@ const customerRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -86,6 +88,7 @@ const accountantRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -103,6 +106,7 @@ const adminRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -120,6 +124,7 @@ const salesRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -137,6 +142,7 @@ const warehouseRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -153,42 +159,48 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: <HeadOfTechLayout />,
-    children: [{
-      element: (
-        <RoleDashboardGate dashboardPath="/internal/head-of-tech">
-          <ReviewerWorkspaceProvider />
-        </RoleDashboardGate>
-      ),
-      children: [
-        { index: true, element: <ReviewerDashboardPage /> },
-        { path: 'work-orders', element: <WorkOrdersPage /> },
-        { path: 'assignments', element: <AssignmentsPage /> },
-        { path: 'service-types', element: <ServiceTypesPage /> },
-        { path: 'procedures', element: <ProceduresPage /> },
-        { path: 'standards', element: <StandardsPage /> },
-        { path: 'review-queue', element: <ReviewQueuePage /> },
-        { path: 'drift', element: <DriftPage /> },
-        { path: 'certificates', element: <CertificatesPage /> },
-        { path: 'seals', element: <SealsPage /> },
-        { path: 'verification-logs', element: <VerificationLogsPage /> },
-        { path: 'signatures', element: <SignaturesPage /> },
-        { path: 'chat', element: <ChatPage /> },
-        { path: 'notifications', element: <NotificationsPage /> },
-        { path: 'warehouse', element: <WarehousePage /> },
-      ],
-    }],
+    children: [
+      {
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+            <ReviewerWorkspaceProvider />
+          </RoleDashboardGate>
+        ),
+        children: [
+          { index: true, element: <ReviewerDashboardPage /> },
+          { path: 'work-orders', element: <WorkOrdersPage /> },
+          { path: 'assignments', element: <AssignmentsPage /> },
+          { path: 'service-types', element: <ServiceTypesPage /> },
+          { path: 'procedures', element: <ProceduresPage /> },
+          { path: 'standards', element: <StandardsPage /> },
+          { path: 'review-queue', element: <ReviewQueuePage /> },
+          { path: 'drift', element: <DriftPage /> },
+          { path: 'certificates', element: <CertificatesPage /> },
+          { path: 'seals', element: <SealsPage /> },
+          { path: 'verification-logs', element: <VerificationLogsPage /> },
+          { path: 'signatures', element: <SignaturesPage /> },
+          { path: 'chat', element: <ChatPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
+          { path: 'warehouse', element: <WarehousePage /> },
+        ],
+      },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
   },
   {
     path: '/internal/technician',
     element: <TechnicianLayout />,
-    children: [{
-      index: true,
-      element: (
-        <RoleDashboardGate dashboardPath="/internal/technician">
-          <TechnicianPage />
-        </RoleDashboardGate>
-      ),
-    }],
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/technician">
+            <TechnicianPage />
+          </RoleDashboardGate>
+        ),
+      },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
   },
 ];
 

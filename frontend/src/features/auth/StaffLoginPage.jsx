@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi } from '../../services/auth-service.js';
+import { isStaffAccount } from '../../app/role-routing.js';
 import '../../styles/auth.css';
 
 export function StaffLoginPage() {
@@ -21,11 +22,25 @@ export function StaffLoginPage() {
     setLoading(true);
     try {
       const { token, account } = await loginApi(email.trim(), password);
+
+      // ── Portal access check ──────────────────────────────────────────
+      // This portal is ONLY for internal staff accounts (admin, accountant,
+      // sales, warehouse, technician, head-of-tech, etc.).
+      // Customer accounts must use the Customer Login portal.
+      if (!isStaffAccount(account)) {
+        setError(
+          'Tài khoản này là tài khoản khách hàng. '
+          + 'Vui lòng đăng nhập qua cổng Khách hàng (Customer Login).',
+        );
+        return; // do NOT store token or start session
+      }
+      // ────────────────────────────────────────────────────────────────
+
       localStorage.setItem('isocal_token', token);
       const dashboardPath = startSession(account);
       navigate(dashboardPath, { replace: true });
     } catch (err) {
-      const msg = err?.response?.data?.error?.message || 'Login failed. Please try again.';
+      const msg = err?.response?.data?.error?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -57,8 +72,19 @@ export function StaffLoginPage() {
           <p className="auth-subtitle">Sign in to your ISOCAL staff account</p>
 
           {error && (
-            <div className="auth-error" style={{ marginBottom: 16 }}>
-              <span>⚠</span> {error}
+            <div className="auth-error" id="staff-login-error" style={{ marginBottom: 16 }}>
+              <span>⚠</span>
+              <span>{error}</span>
+              {/* Suggest customer portal if wrong portal */}
+              {error.includes('Customer Login') && (
+                <Link
+                  className="auth-link"
+                  style={{ display: 'block', marginTop: 6, fontWeight: 700 }}
+                  to="/login"
+                >
+                  → Đến trang Customer Login
+                </Link>
+              )}
             </div>
           )}
 

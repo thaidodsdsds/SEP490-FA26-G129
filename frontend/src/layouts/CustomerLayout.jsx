@@ -15,6 +15,7 @@ function CustomerLayout() {
       initials="KH"
       links={links}
       name="Khách hàng"
+      profilePath="/internal/customer/profile"
       role="Customer"
     />
   );
