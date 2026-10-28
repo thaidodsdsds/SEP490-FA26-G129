@@ -9,6 +9,7 @@ import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashb
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
+import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -124,6 +125,7 @@ const salesRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },

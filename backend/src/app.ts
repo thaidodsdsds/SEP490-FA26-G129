@@ -11,6 +11,9 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { AppError } from './common/errors.js';
 import authRouter from './routes/authRouter.js';
 import profileRouter from './routes/profileRouter.js';
+import customerRoutes from './modules/customers/customers.routes.js';
+import serviceTypesRoutes from './modules/service-types/service-types.routes.js';
+import serviceRequestsRoutes from './modules/service-requests/service-requests.routes.js';
 
 const app = express();
 
@@ -22,6 +25,9 @@ app.use(requestLogger);
 
 app.use(`${API_PREFIX}/auth`, authRouter);
 app.use(`${API_PREFIX}/profile`, profileRouter);
+app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/service-types`, serviceTypesRoutes);
+app.use(`${API_PREFIX}/service-requests`, serviceRequestsRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {

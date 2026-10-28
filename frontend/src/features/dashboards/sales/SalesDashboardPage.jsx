@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import StatCard from '../../../components/ui/StatCard.jsx';
 import SectionCard from '../../../components/ui/SectionCard.jsx';
@@ -64,6 +65,7 @@ const deviceCareColumns = [
 
 function SalesDashboardPage() {
   const [toast, setToast] = useState(null);
+  const navigate = useNavigate();
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -198,7 +200,7 @@ function SalesDashboardPage() {
             </button>
             <button
               className="button button-primary"
-              onClick={() => notify('Mở biểu mẫu Tạo Yêu cầu dịch vụ & Báo giá mới (Service Request / Quotation)...')}
+              onClick={() => navigate('/internal/sales/service-requests/new')}
               type="button"
             >
               + Tạo yêu cầu dịch vụ

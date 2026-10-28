@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
+    "seed": "tsx ./src/database/seeds/seed.ts",
     "lint": "eslint . --ext .ts",
     "test": "vitest run --passWithNoTests",
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d ./src/database/dataSource.ts",
