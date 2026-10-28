@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../app/providers.jsx';
-import { getUserInitials } from '../app/role-routing.js';
+import { getRoleDashboardPath, getUserInitials } from '../app/role-routing.js';
 
 /* ─── UserDropdown ─────────────────────────────────────────────── */
 function UserDropdown({ displayName, displayInitials, roleName, profilePath, onLogout }) {
@@ -87,6 +87,7 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
   const [isNavOpen, setIsNavOpen] = useState(false);
   const displayName = session.user?.full_name || session.user?.name || name;
   const displayInitials = getUserInitials(session.user, initials);
+  const dashboardPath = getRoleDashboardPath(session.user) || '/login';
   const roleName = session.role === 'public' ? role : session.role;
 
   useEffect(() => {
@@ -121,10 +122,10 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
           <span aria-hidden="true">☰</span>
         </button>
         <NavLink
-          aria-label="ISOCAL — về khu vực nội bộ"
+          aria-label="ISOCAL — về trang tổng quan"
           className="role-dashboard-brand"
           onClick={closeNav}
-          to="/internal"
+          to={dashboardPath}
         >
           ISO<span>CAL</span>
         </NavLink>
