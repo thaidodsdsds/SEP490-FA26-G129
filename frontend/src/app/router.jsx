@@ -8,6 +8,8 @@ import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
+import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
+import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
@@ -108,6 +110,8 @@ const adminRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'accounts', element: <AccountsPage /> },
+      { path: 'roles', element: <RolesPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
