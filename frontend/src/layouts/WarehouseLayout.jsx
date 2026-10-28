@@ -6,7 +6,6 @@ const links = [
   { to: '/internal/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)', icon: '↑', soon: true },
   { to: '/internal/warehouse/ready-return', label: 'Thiết bị sẵn sàng trả', icon: '✓', soon: true },
   { to: '/internal/warehouse/transactions', label: 'Lịch sử phiếu kho', icon: '≡', soon: true },
-  { to: '/internal', label: 'Khu vực nội bộ', icon: '⌂' },
 ];
 
 function WarehouseLayout() {
@@ -16,6 +15,7 @@ function WarehouseLayout() {
       initials="WH"
       links={links}
       name="Trần Văn Khoa"
+      profilePath="/internal/warehouse/profile"
       role="Kho vận · Warehouse"
     />
   );
