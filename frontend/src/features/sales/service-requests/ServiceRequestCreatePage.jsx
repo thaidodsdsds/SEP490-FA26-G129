@@ -215,7 +215,7 @@ function ServiceRequestCreatePage() {
       });
 
       setCreatedRequest({
-        id: result?.id ? `SR-${String(result.id).padStart(4, '0')}` : 'SR-NEW',
+        id: result?.request_code || (result?.id ? `SR-2026-${String(result.id).padStart(3, '0')}` : 'SR-NEW'),
         rawId: result?.id,
         customer: selectedCustomer.company_name,
         devices: selectedDevices.length,

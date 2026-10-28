@@ -6,6 +6,7 @@ import {
   ALLOWED_LOCATION_TYPES,
   type CreateServiceRequestItemInput,
   createServiceRequest,
+  REQUEST_CODE_REGEX,
   type ServiceRequestLocationType,
 } from './service-requests.service.js';
 
@@ -121,13 +122,27 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
       );
     }
 
-    const { customer_id, location_type, items } = (req.body ?? {}) as Record<string, unknown>;
+    const { request_code, customer_id, location_type, items } = (req.body ?? {}) as Record<string, unknown>;
     const customerId = Number(customer_id);
 
     if (!isPositiveInteger(customerId)) {
       return next(
         new AppError('Invalid customer ID.', 400, ERROR_CODES.BAD_REQUEST),
       );
+    }
+
+    let normalizedRequestCode: string | null = null;
+    if (request_code !== undefined && request_code !== null && String(request_code).trim() !== '') {
+      normalizedRequestCode = String(request_code).trim();
+      if (!REQUEST_CODE_REGEX.test(normalizedRequestCode)) {
+        return next(
+          new AppError(
+            'Invalid request_code format. Expected format: SR-YYYY-XXX (e.g. SR-2026-088).',
+            400,
+            ERROR_CODES.BAD_REQUEST,
+          ),
+        );
+      }
     }
 
     if (
@@ -146,6 +161,7 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
     const normalizedItems = parseRequestItems(items);
 
     const created = await createServiceRequest({
+      request_code: normalizedRequestCode,
       customer_id: customerId,
       created_by: userId,
       location_type: location_type as ServiceRequestLocationType,

@@ -157,11 +157,7 @@ export class ServiceType {
   )
   service_request_items!: ServiceRequestItem[];
 
-  @OneToMany(
-    () => ServiceTypeDeviceType,
-    (link) => link.service_type,
-  )
-  device_type_links!: ServiceTypeDeviceType[];
+ 
 
   @OneToMany(
     () => CalibrationProcedure,
@@ -198,16 +194,8 @@ export class Device {
   @Column({ type: 'integer' })
   customer_id!: number;
 
-  @ManyToOne(
-    () => DeviceType,
-    (deviceType) => deviceType.devices,
-    { nullable: true, onDelete: 'RESTRICT', onUpdate: 'CASCADE' },
-  )
-  @JoinColumn({
-    name: 'device_type_id',
-    foreignKeyConstraintName: 'FK_devices_device_type',
-  })
-  device_type!: DeviceType | null;
+
+ 
 
   @Column({ type: 'integer', nullable: true })
   device_type_id!: number | null;
@@ -248,76 +236,7 @@ export class Device {
 
 // ==================== DEVICE TYPE ====================
 
-@Entity({ name: 'device_types' })
-@Unique('UQ_device_types_code', ['code'])
-@Check('CHK_device_types_status', `"status" IN ('Active', 'Inactive')`)
-export class DeviceType {
-  @PrimaryGeneratedColumn()
-  id!: number;
 
-  @Column({ type: 'varchar', length: 50 })
-  code!: string;
-
-  @Column({ type: 'varchar', length: 150 })
-  name!: string;
-
-  @Column({ type: 'text', nullable: true })
-  description!: string | null;
-
-  @Column({ type: 'varchar', length: 20, default: 'Active' })
-  status!: string;
-
-  @OneToMany(() => Device, (device) => device.device_type)
-  devices!: Device[];
-
-  @OneToMany(
-    () => ServiceTypeDeviceType,
-    (link) => link.device_type,
-  )
-  service_type_links!: ServiceTypeDeviceType[];
-}
-
-// ==================== SERVICE TYPE / DEVICE TYPE LINK ====================
-
-@Entity({ name: 'service_type_device_types' })
-@Index('IDX_stdt_device_type_id', ['device_type_id'])
-export class ServiceTypeDeviceType {
-  @PrimaryColumn({
-    type: 'integer',
-    name: 'service_type_id',
-    primaryKeyConstraintName: 'PK_service_type_device_types',
-  })
-  service_type_id!: number;
-
-  @ManyToOne(
-    () => ServiceType,
-    (serviceType) => serviceType.device_type_links,
-    { nullable: false, onDelete: 'RESTRICT', onUpdate: 'CASCADE' },
-  )
-  @JoinColumn({
-    name: 'service_type_id',
-    foreignKeyConstraintName: 'FK_stdt_service_type',
-  })
-  service_type!: ServiceType;
-
-  @PrimaryColumn({
-    type: 'integer',
-    name: 'device_type_id',
-    primaryKeyConstraintName: 'PK_service_type_device_types',
-  })
-  device_type_id!: number;
-
-  @ManyToOne(
-    () => DeviceType,
-    (deviceType) => deviceType.service_type_links,
-    { nullable: false, onDelete: 'RESTRICT', onUpdate: 'CASCADE' },
-  )
-  @JoinColumn({
-    name: 'device_type_id',
-    foreignKeyConstraintName: 'FK_stdt_device_type',
-  })
-  device_type!: DeviceType;
-}
 
 // ==================== CALIBRATION PROCEDURE ====================
 
@@ -385,6 +304,8 @@ export class CalibrationProcedure {
   `"status" IN ('New', 'Quoted', 'Confirmed', 'InProgress', 'Completed', 'Cancelled')`,
 )
 export class ServiceRequest {
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  request_code!: string | null;
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -658,8 +579,7 @@ export const entities = [
   Account,
   ServiceType,
   Device,
-  DeviceType,
-  ServiceTypeDeviceType,
+
   CalibrationProcedure,
   ServiceRequest,
   ServiceRequestItem,

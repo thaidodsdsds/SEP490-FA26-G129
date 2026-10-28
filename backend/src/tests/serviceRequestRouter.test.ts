@@ -247,7 +247,7 @@ describe('Service Requests Module API', () => {
         },
       ]);
       saveServiceRequestMock.mockImplementation(async (sr) => ({
-        id: 100,
+        id: 88,
         created_at: new Date('2026-10-28T11:30:00.000Z'),
         ...sr,
       }));
@@ -275,7 +275,8 @@ describe('Service Requests Module API', () => {
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toMatchObject({
-        id: 100,
+        id: 88,
+        request_code: 'SR-2026-088',
         customer_id: 1,
         created_by: 8,
         location_type: 'In-lab',
@@ -283,14 +284,14 @@ describe('Service Requests Module API', () => {
         items: [
           {
             id: 500,
-            service_request_id: 100,
+            service_request_id: 88,
             device_id: 10,
             service_type_id: 1,
             status: 'Pending',
           },
           {
             id: 501,
-            service_request_id: 100,
+            service_request_id: 88,
             device_id: 10,
             service_type_id: 2,
             status: 'Pending',

@@ -10,6 +10,7 @@ import AccountantDashboardPage from '../features/dashboards/accountant/Accountan
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
+import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -126,6 +127,8 @@ const salesRoutes = [
         ),
       },
       { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
+      { path: 'quotations', element: <QuotationCreatePage /> },
+      { path: 'quotations/new', element: <QuotationCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
