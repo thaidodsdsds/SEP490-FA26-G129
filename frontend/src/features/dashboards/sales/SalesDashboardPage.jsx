@@ -101,7 +101,7 @@ function SalesDashboardPage() {
       <button
         className="button button-secondary"
         key={`${req.id}-btn`}
-        onClick={() => notify(`Mở soạn thảo báo giá cho đơn ${req.id} (${req.customer})`)}
+        onClick={() => navigate(`/internal/sales/quotations?requestId=${encodeURIComponent(req.id)}`)}
         style={{ padding: '3px 8px', minHeight: 28, fontSize: '0.72rem' }}
         type="button"
       >
@@ -256,7 +256,7 @@ function SalesDashboardPage() {
           action={(
             <button
               className="button button-secondary"
-              onClick={() => notify('Chuyển tới màn hình quản lý Báo giá (Quotation).')}
+              onClick={() => navigate('/internal/sales/quotations')}
               type="button"
             >
               Xem tất cả

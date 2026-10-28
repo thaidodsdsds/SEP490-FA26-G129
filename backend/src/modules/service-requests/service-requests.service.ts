@@ -19,7 +19,10 @@ export interface CreateServiceRequestItemInput {
   service_type_id: number;
 }
 
+export const REQUEST_CODE_REGEX = /^SR-\d{4}-\d{3,}$/;
+
 export interface CreateServiceRequestInput {
+  request_code?: string | null;
   customer_id: number;
   created_by: number;
   location_type: ServiceRequestLocationType;
@@ -36,6 +39,7 @@ export interface CreatedServiceRequestItemResult {
 
 export interface CreatedServiceRequestResult {
   id: number;
+  request_code: string;
   customer_id: number;
   created_by: number;
   location_type: string;
@@ -44,6 +48,14 @@ export interface CreatedServiceRequestResult {
   items: CreatedServiceRequestItemResult[];
 }
 
+export const formatServiceRequestCode = (
+  id: number,
+  date: Date = new Date(),
+): string => {
+  const year = date.getFullYear();
+  return `SR-${year}-${String(id).padStart(3, '0')}`;
+};
+
 /**
  * Tạo phiếu yêu cầu dịch vụ (ServiceRequest) và danh sách hạng mục (ServiceRequestItem)
  * với đầy đủ bước kiểm tra khách hàng, quyền sở hữu thiết bị và tính hợp lệ của dịch vụ.
@@ -51,7 +63,22 @@ export interface CreatedServiceRequestResult {
 export const createServiceRequest = async (
   input: CreateServiceRequestInput,
 ): Promise<CreatedServiceRequestResult> => {
-  const { customer_id: customerId, created_by: createdBy, location_type: locationType, items } = input;
+  const {
+    request_code: rawRequestCode,
+    customer_id: customerId,
+    created_by: createdBy,
+    location_type: locationType,
+    items,
+  } = input;
+  const customRequestCode = rawRequestCode?.trim() || null;
+
+  if (customRequestCode && !REQUEST_CODE_REGEX.test(customRequestCode)) {
+    throw new AppError(
+      'Invalid request_code format. Expected format: SR-YYYY-XXX (e.g. SR-2026-088).',
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
 
   // 1. Kiểm tra khách hàng tồn tại
   const customerRepo = dataSource.getRepository(Customer);
@@ -170,6 +197,7 @@ export const createServiceRequest = async (
     const serviceRequestItemRepo = getRepository(ServiceRequestItem);
 
     const serviceRequestEntity = serviceRequestRepo.create({
+      request_code: customRequestCode,
       customer_id: customerId,
       created_by: createdBy,
       location_type: locationType,
@@ -177,6 +205,17 @@ export const createServiceRequest = async (
     });
 
     const savedRequest = await serviceRequestRepo.save(serviceRequestEntity);
+    const createdAtDate =
+      savedRequest.created_at instanceof Date ? savedRequest.created_at : new Date();
+    const requestCode =
+      customRequestCode
+      || savedRequest.request_code
+      || formatServiceRequestCode(savedRequest.id, createdAtDate);
+
+    if (savedRequest.request_code !== requestCode) {
+      savedRequest.request_code = requestCode;
+      await serviceRequestRepo.save(savedRequest);
+    }
 
     const itemEntities = items.map((item) =>
       serviceRequestItemRepo.create({
@@ -191,6 +230,7 @@ export const createServiceRequest = async (
 
     return {
       id: savedRequest.id,
+      request_code: requestCode,
       customer_id: savedRequest.customer_id,
       created_by: savedRequest.created_by,
       location_type: savedRequest.location_type,
