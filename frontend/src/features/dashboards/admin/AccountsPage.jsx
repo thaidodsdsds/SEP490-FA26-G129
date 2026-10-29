@@ -11,57 +11,6 @@ import {
 } from '../../../services/admin-service.js';
 import AccountFormModal from './AccountFormModal.jsx';
 
-/* ─── Mock data — đầy đủ tất cả role ─────────────────────────────── */
-const MOCK_ACCOUNTS = [
-  // Admin
-  { id: 1,  full_name: 'Phạm Thanh Mai',    email: 'mai.pt@isocal.vn',        phone: '0901234567', role: { id: 1, name: 'Admin' },      role_id: 1, customer_id: null, customer_name: null,             is_2fa_enabled: true,  failed_login_attempts: 0, is_locked: false },
-  { id: 2,  full_name: 'Nguyễn Quốc Hùng',  email: 'hung.nq@isocal.vn',       phone: '0901234568', role: { id: 1, name: 'Admin' },      role_id: 1, customer_id: null, customer_name: null,             is_2fa_enabled: true,  failed_login_attempts: 0, is_locked: false },
-  // Accountant
-  { id: 3,  full_name: 'Trần Thu Hà',        email: 'ha.tt@isocal.vn',         phone: '0912345678', role: { id: 2, name: 'Accountant' }, role_id: 2, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 4,  full_name: 'Hoàng Minh Châu',    email: 'chau.hm@isocal.vn',       phone: '0912345679', role: { id: 2, name: 'Accountant' }, role_id: 2, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  // Sales
-  { id: 5,  full_name: 'Lê Hoàng Nam',       email: 'nam.lh@isocal.vn',        phone: '0923456789', role: { id: 3, name: 'Sales' },      role_id: 3, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 6,  full_name: 'Bùi Thị Lan',        email: 'lan.bt@isocal.vn',        phone: '0923456790', role: { id: 3, name: 'Sales' },      role_id: 3, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 7,  full_name: 'Vũ Đức Tài',         email: 'tai.vd@isocal.vn',        phone: '0923456791', role: { id: 3, name: 'Sales' },      role_id: 3, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  // Technician
-  { id: 8,  full_name: 'Nguyễn Minh Quân',   email: 'quan.nm@isocal.vn',       phone: '0934567890', role: { id: 4, name: 'Technician' }, role_id: 4, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 5, is_locked: true  },
-  { id: 9,  full_name: 'Đỗ Văn Bình',        email: 'binh.dv@isocal.vn',       phone: null,         role: { id: 4, name: 'Technician' }, role_id: 4, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 5, is_locked: true  },
-  { id: 10, full_name: 'Trịnh Công Sơn',     email: 'son.tc@isocal.vn',        phone: '0934567892', role: { id: 4, name: 'Technician' }, role_id: 4, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 11, full_name: 'Phan Văn Đức',       email: 'duc.pv@isocal.vn',        phone: '0934567893', role: { id: 4, name: 'Technician' }, role_id: 4, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 12, full_name: 'Lý Thị Hoa',         email: 'hoa.lt@isocal.vn',        phone: '0934567894', role: { id: 4, name: 'Technician' }, role_id: 4, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  // Reviewer (Head of Tech)
-  { id: 13, full_name: 'Cao Minh Trí',       email: 'tri.cm@isocal.vn',        phone: '0945678901', role: { id: 5, name: 'Reviewer' },   role_id: 5, customer_id: null, customer_name: null,             is_2fa_enabled: true,  failed_login_attempts: 0, is_locked: false },
-  { id: 14, full_name: 'Đinh Thị Liên',      email: 'lien.dt@isocal.vn',       phone: '0945678902', role: { id: 5, name: 'Reviewer' },   role_id: 5, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  // Warehouse
-  { id: 15, full_name: 'Phùng Văn Thắng',    email: 'thang.pv@isocal.vn',      phone: '0956789012', role: { id: 6, name: 'Warehouse' },  role_id: 6, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 16, full_name: 'Đặng Thị Yến',       email: 'yen.dt@isocal.vn',        phone: '0956789013', role: { id: 6, name: 'Warehouse' },  role_id: 6, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 17, full_name: 'Mai Thanh Long',      email: 'long.mt@isocal.vn',       phone: '0956789014', role: { id: 6, name: 'Warehouse' },  role_id: 6, customer_id: null, customer_name: null,             is_2fa_enabled: false, failed_login_attempts: 5, is_locked: true  },
-  // Signatory
-  { id: 18, full_name: 'Ngô Quý Lâm',        email: 'lam.nq@isocal.vn',        phone: '0967890123', role: { id: 7, name: 'Signatory' },  role_id: 7, customer_id: null, customer_name: null,             is_2fa_enabled: true,  failed_login_attempts: 0, is_locked: false },
-  { id: 19, full_name: 'Vương Thị Hương',    email: 'huong.vt@isocal.vn',      phone: '0967890124', role: { id: 7, name: 'Signatory' },  role_id: 7, customer_id: null, customer_name: null,             is_2fa_enabled: true,  failed_login_attempts: 0, is_locked: false },
-  // Customer
-  { id: 20, full_name: 'Nguyễn Thu Hằng',    email: 'hang.nt@minhlong.vn',     phone: '0978901234', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 1,  customer_name: 'Công ty Minh Long',is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 21, full_name: 'Võ Thanh Tùng',      email: 'tung.vt@anphat.vn',       phone: '0978901235', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 2,  customer_name: 'Công ty An Phát', is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 22, full_name: 'Lê Quang Vinh',      email: 'vinh.lq@techco.vn',       phone: '0978901236', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 3,  customer_name: 'TechCo VN',       is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 23, full_name: 'Đỗ Thị Lan Anh',     email: 'lananh.dt@fpt.vn',        phone: '0978901237', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 4,  customer_name: 'FPT Software',    is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 24, full_name: 'Trương Văn Khoa',    email: 'khoa.tv@viettel.vn',      phone: '0978901238', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 5,  customer_name: 'Viettel Group',   is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 25, full_name: 'Phan Thị Mai Linh',  email: 'mailinh.pt@vingroup.vn',  phone: '0978901239', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 6,  customer_name: 'Vingroup',        is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 26, full_name: 'Hoàng Văn Tân',      email: 'tan.hv@samsung.vn',       phone: null,         role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 7,  customer_name: 'Samsung Việt Nam',is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-  { id: 27, full_name: 'Nguyễn Thị Bích',    email: 'bich.nt@hoa-phat.vn',     phone: '0978901241', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 8,  customer_name: 'Hoà Phát Group',  is_2fa_enabled: false, failed_login_attempts: 5, is_locked: true  },
-  { id: 28, full_name: 'Đặng Minh Tuấn',     email: 'tuan.dm@masan.vn',        phone: '0978901242', role: { id: 8, name: 'Customer' },   role_id: 8, customer_id: 9,  customer_name: 'Masan Corp',      is_2fa_enabled: false, failed_login_attempts: 0, is_locked: false },
-];
-
-const MOCK_ROLES = [
-  { id: 1, name: 'Admin' },
-  { id: 2, name: 'Accountant' },
-  { id: 3, name: 'Sales' },
-  { id: 4, name: 'Technician' },
-  { id: 5, name: 'Reviewer' },
-  { id: 6, name: 'Warehouse' },
-  { id: 7, name: 'Signatory' },
-  { id: 8, name: 'Customer' },
-];
-
 const PAGE_SIZE = 10;
 
 /* ─── Pagination component ───────────────────────────────────────── */
@@ -139,40 +88,10 @@ function AccountsPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, total_pages: 1 });
 
-  // All-account stats (unfiltered, for stat chips) — computed from full mock or API summary
+  // All-account stats (unfiltered, for stat chips)
   const [stats, setStats] = useState({ total: 0, locked: 0, twoFa: 0, active: 0 });
 
   const notify = (message, tone = 'success') => setToast({ message, tone });
-
-  /* Apply mock filters + pagination locally */
-  const applyMockFilters = useCallback((pg = 1) => {
-    let filtered = MOCK_ACCOUNTS;
-    if (filterType === 'internal') filtered = filtered.filter((a) => !a.customer_id);
-    else if (filterType === 'customer') filtered = filtered.filter((a) => a.customer_id);
-    if (filterRole) filtered = filtered.filter((a) => String(a.role_id) === filterRole);
-    if (filterLocked === 'true') filtered = filtered.filter((a) => a.is_locked);
-    else if (filterLocked === 'false') filtered = filtered.filter((a) => !a.is_locked);
-    const q = searchRef.current.toLowerCase().trim();
-    if (q) filtered = filtered.filter((a) =>
-      a.full_name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q),
-    );
-
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const safePage = Math.min(pg, totalPages);
-    const sliced = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-    setAccounts(sliced);
-    setPagination({ total, total_pages: totalPages });
-    setPage(safePage);
-
-    // Stats from unfiltered mock
-    setStats({
-      total: MOCK_ACCOUNTS.length,
-      locked: MOCK_ACCOUNTS.filter((a) => a.is_locked).length,
-      twoFa: MOCK_ACCOUNTS.filter((a) => a.is_2fa_enabled).length,
-      active: MOCK_ACCOUNTS.filter((a) => !a.is_locked).length,
-    });
-  }, [filterType, filterLocked, filterRole]);
 
   const load = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -188,25 +107,23 @@ function AccountsPage() {
         }),
         listRoles(),
       ]);
-      setAccounts(data.accounts ?? []);
+      const accs = data.accounts ?? [];
+      setAccounts(accs);
       setPagination(data.pagination ?? { total: 0, total_pages: 1 });
       setPage(pg);
       setRoles(rls);
-      // Stats from all accounts (no filter) — could call a separate /stats endpoint
       setStats({
-        total: data.pagination?.total ?? data.accounts?.length ?? 0,
-        locked: (data.accounts ?? []).filter((a) => a.is_locked).length,
-        twoFa: (data.accounts ?? []).filter((a) => a.is_2fa_enabled).length,
-        active: (data.accounts ?? []).filter((a) => !a.is_locked).length,
+        total: data.pagination?.total ?? accs.length,
+        locked: accs.filter((a) => a.is_locked).length,
+        twoFa: accs.filter((a) => a.is_2fa_enabled).length,
+        active: accs.filter((a) => !a.is_locked).length,
       });
-    } catch {
-      // Demo fallback
-      setRoles(MOCK_ROLES);
-      applyMockFilters(pg);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải dữ liệu từ server.', 'danger');
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterLocked, filterRole, applyMockFilters]);
+  }, [filterType, filterLocked, filterRole]);
 
   useEffect(() => { load(1); }, [filterType, filterLocked, filterRole]); // reset to page 1 on filter change
   // eslint-disable-next-line react-hooks/exhaustive-deps
