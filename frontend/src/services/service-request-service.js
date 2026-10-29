@@ -1,6 +1,22 @@
 import apiClient from './api-client.js';
 
 /**
+ * Lấy thông tin hồ sơ người dùng đang đăng nhập kèm thông tin công ty (customer)
+ */
+export const getMyProfileApi = async () => {
+  const response = await apiClient.get('/profile');
+  return response.data?.data ?? null;
+};
+
+/**
+ * Tạo hoặc cập nhật thông tin doanh nghiệp liên kết với tài khoản khách hàng hiện tại
+ */
+export const upsertMyCompanyApi = async (payload) => {
+  const response = await apiClient.put('/profile/company', payload);
+  return response.data?.data ?? null;
+};
+
+/**
  * Lấy danh sách khách hàng (id, company_name)
  */
 export const getCustomersApi = async () => {

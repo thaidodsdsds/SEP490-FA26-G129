@@ -6,6 +6,7 @@ import AdminLayout from '../layouts/AdminLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
+import CustomerServiceRequestCreatePage from '../features/customer/service-requests/CustomerServiceRequestCreatePage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
@@ -72,6 +73,8 @@ const customerRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'service-requests', element: <CustomerServiceRequestCreatePage /> },
+      { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
