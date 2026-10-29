@@ -286,6 +286,14 @@ function ServiceRequestCreatePage() {
               Khách hàng: <b>{createdRequest.customer}</b> · Hình thức: <b>{createdRequest.locationType}</b> ·{' '}
               {createdRequest.devices} thiết bị · {createdRequest.items} hạng mục dịch vụ.
             </p>
+            <div style={{ marginTop: '0.5rem' }}>
+              <Link
+                className="button button-primary"
+                to={`/internal/sales/quotations/new?requestId=${encodeURIComponent(createdRequest.id)}`}
+              >
+                Lập báo giá cho phiếu {createdRequest.id} →
+              </Link>
+            </div>
           </div>
           <button
             aria-label="Đóng thông báo"

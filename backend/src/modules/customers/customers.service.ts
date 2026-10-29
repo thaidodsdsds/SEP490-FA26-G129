@@ -77,6 +77,10 @@ export const listCustomerDevices = async (customerId: number): Promise<CustomerD
       manufacturer: true,
       serial_number: true,
       internal_code: true,
+      measuring_range: true,
+      is_group2: true,
+      next_due_date: true,
+      status: true,
     },
     where: {
       customer_id: customerId,

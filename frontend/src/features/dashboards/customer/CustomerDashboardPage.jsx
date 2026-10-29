@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import StatCard from '../../../components/ui/StatCard.jsx';
 import SectionCard from '../../../components/ui/SectionCard.jsx';
@@ -127,13 +128,12 @@ function CustomerDashboardPage() {
             >
               Xuất báo cáo
             </button>
-            <button
+            <Link
               className="button button-primary"
-              onClick={() => notify('Chức năng tạo yêu cầu dịch vụ sẽ có ở giai đoạn sau (demo).')}
-              type="button"
+              to="/internal/customer/service-requests/new"
             >
-              Tạo yêu cầu dịch vụ
-            </button>
+              + Tạo yêu cầu dịch vụ
+            </Link>
           </>
         )}
         description={`${customerProfile.address} · Tổng quan thiết bị, đơn dịch vụ, báo giá và công nợ.`}

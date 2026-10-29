@@ -12,6 +12,9 @@ function QuotationPricingSummary({
   hasValidLineItems,
   isDiscountValid,
   canSubmit,
+  activeDraftQuotation,
+  lockedQuotation,
+  submittingStatus,
   formError,
   onExtraDiscountChange,
   onTravelFeeChange,
@@ -149,6 +152,14 @@ function QuotationPricingSummary({
           <span aria-hidden="true">{isDiscountValid && Number(travelFee) >= 0 ? '✓' : '○'}</span>
           Thỏa mãn ràng buộc CSDL: <code>discount_amount &lt;= subtotal</code> và <code>travel_fee &gt;= 0</code>
         </li>
+        <li className={!lockedQuotation ? 'passed' : ''}>
+          <span aria-hidden="true">{!lockedQuotation ? '✓' : '✕'}</span>
+          {lockedQuotation
+            ? `Đơn đã có báo giá hiệu lực (${lockedQuotation.quotation_code} · ${lockedQuotation.status}) — không tạo trùng`
+            : activeDraftQuotation
+              ? `Đang chỉnh sửa trực tiếp bản nháp ${activeDraftQuotation.quotation_code} (không sinh bản ghi thừa)`
+              : 'Đơn chưa có báo giá hiệu lực — đủ điều kiện khởi tạo'}
+        </li>
       </ul>
 
       {formError && (
@@ -159,24 +170,45 @@ function QuotationPricingSummary({
 
       <div className="qt-submit-row">
         <span>
-          Báo giá có thể được lưu ở trạng thái <strong>Draft</strong> (nháp) hoặc chuyển sang <strong>Sent</strong> để gửi khách hàng phê duyệt.
+          {lockedQuotation ? (
+            <>
+              Phiếu yêu cầu này đã có báo giá <strong>{lockedQuotation.quotation_code}</strong> ở trạng thái{' '}
+              <strong>{lockedQuotation.status}</strong>. Chỉ được lập báo giá mới khi báo giá cũ bị <strong>Rejected</strong>.
+            </>
+          ) : activeDraftQuotation ? (
+            <>
+              Đang làm việc trên bản nháp <strong>{activeDraftQuotation.quotation_code}</strong>: mọi thay đổi sẽ cập nhật trực tiếp lên bản ghi này.
+            </>
+          ) : (
+            <>
+              Báo giá có thể được lưu ở trạng thái <strong>Draft</strong> (nháp) hoặc chuyển sang <strong>Sent</strong> để gửi khách hàng phê duyệt.
+            </>
+          )}
         </span>
         <div className="qt-submit-actions">
           <button
             className="button button-secondary"
-            disabled={!canSubmit}
+            disabled={!canSubmit || Boolean(submittingStatus) || Boolean(lockedQuotation)}
             onClick={() => onSubmitWithStatus('Draft')}
             type="button"
           >
-            Lưu bản nháp (Draft)
+            {submittingStatus === 'Draft'
+              ? 'Đang lưu bản nháp...'
+              : activeDraftQuotation
+                ? 'Cập nhật bản nháp (Draft)'
+                : 'Lưu bản nháp (Draft)'}
           </button>
           <button
             className="button button-primary"
-            disabled={!canSubmit}
+            disabled={!canSubmit || Boolean(submittingStatus) || Boolean(lockedQuotation)}
             onClick={() => onSubmitWithStatus('Sent')}
             type="button"
           >
-            Tạo & Gửi báo giá (Sent)
+            {submittingStatus === 'Sent'
+              ? 'Đang gửi báo giá...'
+              : activeDraftQuotation
+                ? 'Cập nhật & Gửi báo giá (Sent)'
+                : 'Tạo & Gửi báo giá (Sent)'}
           </button>
         </div>
       </div>

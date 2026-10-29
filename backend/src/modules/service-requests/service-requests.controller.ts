@@ -4,9 +4,12 @@ import { AppError } from '../../common/errors.js';
 import { buildSuccessResponse } from '../../common/response.js';
 import {
   ALLOWED_LOCATION_TYPES,
+  type CreateServiceRequestAttachmentInput,
   type CreateServiceRequestItemInput,
   createServiceRequest,
+  listServiceRequests,
   REQUEST_CODE_REGEX,
+  resolveAccountCustomerId,
   type ServiceRequestLocationType,
 } from './service-requests.service.js';
 
@@ -107,25 +110,125 @@ const parseRequestItems = (rawItems: unknown): CreateServiceRequestItemInput[] =
 };
 
 /**
+ * Chuẩn hóa danh sách tệp đính kèm (attachments) tùy chọn
+ */
+const parseRequestAttachments = (
+  rawAttachments: unknown,
+): CreateServiceRequestAttachmentInput[] => {
+  if (rawAttachments === undefined || rawAttachments === null) {
+    return [];
+  }
+
+  if (!Array.isArray(rawAttachments)) {
+    throw new AppError(
+      'attachments must be an array.',
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  return rawAttachments.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new AppError(
+        'Each attachment must be an object with file_name and file_url.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+    const record = entry as Record<string, unknown>;
+    const fileName = typeof record.file_name === 'string' ? record.file_name.trim() : '';
+    const fileUrl = typeof record.file_url === 'string' ? record.file_url.trim() : '';
+
+    if (!fileName || !fileUrl) {
+      throw new AppError(
+        'Each attachment requires non-empty file_name and file_url.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    return {
+      file_name: fileName.slice(0, 255),
+      file_url: fileUrl,
+    };
+  });
+};
+
+/**
+ * Controller lấy danh sách phiếu yêu cầu dịch vụ kèm thông tin công ty, mã số thuế và địa chỉ (GET /api/v1/service-requests)
+ */
+export const getServiceRequestsHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = isPositiveInteger(tokenCustomerId)
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        return res.status(200).json(buildSuccessResponse([]));
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const serviceRequests = await listServiceRequests(customerIdFilter);
+    return res.status(200).json(buildSuccessResponse(serviceRequests));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
  * Controller tạo mới phiếu yêu cầu dịch vụ (POST /api/v1/service-requests)
+ * Hỗ trợ cả Nhân viên Sales (truyền customer_id) và Khách hàng (tự động lấy customer_id từ tài khoản đăng nhập)
  */
 export const createServiceRequestHandler: RequestHandler = async (req, res, next) => {
   try {
-    const userId =
+    const authUser =
       typeof req.user === 'object' && req.user !== null
-        ? Number((req.user as { id?: unknown }).id)
-        : NaN;
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
 
+    const userId = Number(authUser.id);
     if (!isPositiveInteger(userId)) {
       return next(
         new AppError('Authenticated user ID is missing or invalid.', 401, ERROR_CODES.UNAUTHORIZED),
       );
     }
 
-    const { request_code, customer_id, location_type, items } = (req.body ?? {}) as Record<string, unknown>;
-    const customerId = Number(customer_id);
+    const { request_code, customer_id, location_type, preferred_date, items, attachments } = (req.body ?? {}) as Record<string, unknown>;
+    const isCustomerRole = String(authUser.role || '').toLowerCase() === 'customer';
 
-    if (!isPositiveInteger(customerId)) {
+    let customerId = Number(customer_id);
+    if (isCustomerRole) {
+      const accountCustomerId =
+        (await resolveAccountCustomerId(userId)) ?? Number(authUser.customer_id);
+      if (!isPositiveInteger(accountCustomerId)) {
+        return next(
+          new AppError(
+            'Tài khoản khách hàng chưa được liên kết với thông tin doanh nghiệp. Vui lòng cập nhật thông tin công ty trước khi tạo yêu cầu.',
+            400,
+            ERROR_CODES.VALIDATION_ERROR,
+          ),
+        );
+      }
+      if (isPositiveInteger(customerId) && customerId !== accountCustomerId) {
+        return next(
+          new AppError(
+            'Bạn chỉ có thể tạo phiếu yêu cầu cho doanh nghiệp của mình.',
+            403,
+            ERROR_CODES.FORBIDDEN,
+          ),
+        );
+      }
+      customerId = accountCustomerId;
+    } else if (!isPositiveInteger(customerId)) {
       return next(
         new AppError('Invalid customer ID.', 400, ERROR_CODES.BAD_REQUEST),
       );
@@ -158,14 +261,31 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
       );
     }
 
+    let normalizedPreferredDate: string | null = null;
+    if (preferred_date !== undefined && preferred_date !== null && String(preferred_date).trim() !== '') {
+      normalizedPreferredDate = String(preferred_date).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedPreferredDate) || Number.isNaN(Date.parse(normalizedPreferredDate))) {
+        return next(
+          new AppError(
+            'Invalid preferred_date format. Expected format: YYYY-MM-DD.',
+            400,
+            ERROR_CODES.BAD_REQUEST,
+          ),
+        );
+      }
+    }
+
     const normalizedItems = parseRequestItems(items);
+    const normalizedAttachments = parseRequestAttachments(attachments);
 
     const created = await createServiceRequest({
       request_code: normalizedRequestCode,
       customer_id: customerId,
       created_by: userId,
       location_type: location_type as ServiceRequestLocationType,
+      preferred_date: normalizedPreferredDate,
       items: normalizedItems,
+      attachments: normalizedAttachments,
     });
 
     return res.status(201).json(buildSuccessResponse(created));
@@ -173,4 +293,3 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
     return next(error);
   }
 };
-

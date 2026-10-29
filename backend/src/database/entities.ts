@@ -175,7 +175,6 @@ export class ServiceType {
   unique: true,
   where: `"serial_number" IS NOT NULL AND "serial_number" <> ''`,
 })
-@Index('IDX_devices_device_type_id', ['device_type_id'])
 @Check(
   'devices_status_check',
   `"status" IN ('Active', 'ExpiringSoon', 'Expired', 'InRepair')`,
@@ -193,12 +192,6 @@ export class Device {
 
   @Column({ type: 'integer' })
   customer_id!: number;
-
-
- 
-
-  @Column({ type: 'integer', nullable: true })
-  device_type_id!: number | null;
 
   @Column({ type: 'varchar', length: 150 })
   name!: string;
@@ -333,6 +326,9 @@ export class ServiceRequest {
 
   @Column({ type: 'varchar', length: 20 })
   location_type!: string;
+
+  @Column({ type: 'date', nullable: true })
+  preferred_date!: string | null;
 
   @Column({ type: 'varchar', length: 20, default: 'New' })
   status!: string;
