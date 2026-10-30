@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dataSource from '../database/dataSource.js';
-import { Account } from '../database/entities.js';
+import { Account, Customer, Role } from '../database/entities.js';
 import { buildSuccessResponse, buildErrorResponse } from '../common/response.js';
 import env from '../config/env.js';
 
@@ -74,51 +74,103 @@ router.post('/login', async (req, res) => {
 
 /**
  * POST /api/v1/auth/register
- * Body: { full_name, email, password }
- * Creates a customer account (role_id = 7)
+ * Body: { full_name, email, password, phone?, company_name, address, industry, tax_code? }
+ * Creates a customer row and a linked customer account.
  */
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, email, password } = req.body as {
+    const {
+      full_name,
+      email,
+      password,
+      phone,
+      company_name,
+      address,
+      industry,
+      tax_code,
+    } = req.body as {
       full_name?: string;
       email?: string;
       password?: string;
+      phone?: string;
+      company_name?: string;
+      address?: string;
+      industry?: string;
+      tax_code?: string;
     };
 
-    if (!full_name || !email || !password) {
+    if (!full_name?.trim() || !email?.trim() || !password) {
       return res.status(400).json(buildErrorResponse('Full name, email, and password are required.', 'BAD_REQUEST'));
+    }
+
+    if (!company_name?.trim() || !address?.trim() || !industry?.trim()) {
+      return res.status(400).json(
+        buildErrorResponse('Company name, industry, and address are required.', 'BAD_REQUEST'),
+      );
     }
 
     if (password.length < 6) {
       return res.status(400).json(buildErrorResponse('Password must be at least 6 characters.', 'BAD_REQUEST'));
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     const accountRepo = dataSource.getRepository(Account);
-    const existing = await accountRepo.findOne({ where: { email: email.trim().toLowerCase() } });
+    const existing = await accountRepo.findOne({ where: { email: normalizedEmail } });
     if (existing) {
       return res.status(409).json(buildErrorResponse('An account with this email already exists.', 'CONFLICT'));
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const account = accountRepo.create({
-      full_name: full_name.trim(),
-      email: email.trim().toLowerCase(),
-      password_hash: passwordHash,
-      role_id: 7, // Customer role
-      customer_id: null,
-      is_2fa_enabled: false,
-      failed_login_attempts: 0,
-    });
+    const customerRole = await dataSource.getRepository(Role).findOne({ where: { name: 'Customer' } });
+    if (!customerRole) {
+      return res.status(500).json(buildErrorResponse('Customer role is not configured.', 'INTERNAL_ERROR'));
+    }
 
-    await accountRepo.save(account);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const trimmedPhone = phone?.trim() || null;
+    const trimmedTaxCode = tax_code?.trim() || null;
+
+    if (trimmedTaxCode) {
+      const existingCustomer = await dataSource.getRepository(Customer).findOne({
+        where: { tax_code: trimmedTaxCode },
+      });
+      if (existingCustomer) {
+        return res.status(409).json(
+          buildErrorResponse('This tax code is already registered to another company.', 'CONFLICT'),
+        );
+      }
+    }
+
+    const savedAccount = await dataSource.transaction(async (manager) => {
+      const customer = manager.create(Customer, {
+        company_name: company_name.trim(),
+        tax_code: trimmedTaxCode,
+        address: address.trim(),
+        industry: industry.trim(),
+      });
+      const savedCustomer = await manager.save(customer);
+
+      const account = manager.create(Account, {
+        full_name: full_name.trim(),
+        email: normalizedEmail,
+        phone: trimmedPhone,
+        password_hash: passwordHash,
+        role_id: customerRole.id,
+        customer_id: savedCustomer.id,
+        is_2fa_enabled: false,
+        failed_login_attempts: 0,
+      });
+      return manager.save(account);
+    });
 
     return res.status(201).json(
       buildSuccessResponse({
         message: 'Account created successfully.',
         account: {
-          id: account.id,
-          full_name: account.full_name,
-          email: account.email,
+          id: savedAccount.id,
+          full_name: savedAccount.full_name,
+          email: savedAccount.email,
+          phone: savedAccount.phone,
+          customer_id: savedAccount.customer_id,
         },
       }),
     );

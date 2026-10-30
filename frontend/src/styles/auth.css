@@ -30,6 +30,15 @@
   align-items: start;
 }
 
+.auth-container--register {
+  max-width: 980px;
+}
+
+.auth-container--register .auth-card {
+  max-height: calc(100svh - 64px);
+  overflow-y: auto;
+}
+
 /* ── Left panel (brand side) ─────────────────────── */
 .auth-brand {
   padding: 8px 0;
@@ -153,6 +162,15 @@
   gap: 14px;
 }
 
+.auth-section-label {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b83a5;
+}
+
 .auth-input-wrapper {
   position: relative;
 }
@@ -192,6 +210,26 @@
   border-color: #3b6bc8;
   background: #fff;
   box-shadow: 0 0 0 3px rgba(59, 107, 200, 0.12);
+}
+
+.auth-select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 14px;
+}
+
+.auth-textarea {
+  height: auto;
+  min-height: 88px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.auth-input-wrapper--textarea .auth-input-icon--top {
+  top: 14px;
+  transform: none;
 }
 
 .auth-input.error {

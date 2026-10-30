@@ -3,10 +3,31 @@ import { Link, useNavigate } from 'react-router-dom';
 import { registerApi } from '../../services/auth-service.js';
 import '../../styles/auth.css';
 
+const INDUSTRY_OPTIONS = [
+  'Manufacturing',
+  'Mechanical Engineering',
+  'Food Processing',
+  'Environmental Services',
+  'Medical Equipment',
+  'Other',
+];
+
+const EMPTY_FORM = {
+  full_name: '',
+  email: '',
+  phone: '',
+  password: '',
+  confirmPassword: '',
+  company_name: '',
+  tax_code: '',
+  industry: '',
+  address: '',
+};
+
 export function RegisterPage() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,6 +39,10 @@ export function RegisterPage() {
     e.preventDefault();
     setError('');
 
+    if (!form.full_name.trim() || !form.email.trim()) {
+      setError('Full name and email are required.');
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -26,11 +51,24 @@ export function RegisterPage() {
       setError('Password must be at least 6 characters.');
       return;
     }
+    if (!form.company_name.trim() || !form.address.trim() || !form.industry) {
+      setError('Company name, industry, and address are required.');
+      return;
+    }
 
     setLoading(true);
     try {
-      await registerApi(form.full_name.trim(), form.email.trim(), form.password);
-      navigate('/login', { state: { registered: true } });
+      await registerApi({
+        full_name: form.full_name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        phone: form.phone.trim() || undefined,
+        company_name: form.company_name.trim(),
+        tax_code: form.tax_code.trim() || undefined,
+        industry: form.industry,
+        address: form.address.trim(),
+      });
+      navigate('/login', { replace: true, state: { registered: true } });
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Registration failed. Please try again.';
       setError(msg);
@@ -41,7 +79,7 @@ export function RegisterPage() {
 
   return (
     <div className="auth-shell">
-      <div className="auth-container">
+      <div className="auth-container auth-container--register">
         {/* Left brand panel */}
         <div className="auth-brand">
           <h1 className="auth-brand__logo">ISOCAL</h1>
@@ -55,7 +93,6 @@ export function RegisterPage() {
 
         {/* Right form card */}
         <div className="auth-card">
-          {/* Tabs */}
           <div className="auth-tabs">
             <Link className="auth-tab" to="/login">Customer Login</Link>
             <button className="auth-tab active" type="button">Register</button>
@@ -71,7 +108,8 @@ export function RegisterPage() {
           )}
 
           <form className="auth-form" onSubmit={handleSubmit} noValidate>
-            {/* Full name */}
+            <p className="auth-section-label">Account</p>
+
             <div className="auth-input-wrapper">
               <span className="auth-input-icon">👤</span>
               <input
@@ -86,7 +124,6 @@ export function RegisterPage() {
               />
             </div>
 
-            {/* Email */}
             <div className="auth-input-wrapper">
               <span className="auth-input-icon">✉</span>
               <input
@@ -101,7 +138,19 @@ export function RegisterPage() {
               />
             </div>
 
-            {/* Password */}
+            <div className="auth-input-wrapper">
+              <span className="auth-input-icon">📞</span>
+              <input
+                id="register-phone"
+                type="tel"
+                className="auth-input"
+                placeholder="Phone (optional)"
+                value={form.phone}
+                onChange={handleChange('phone')}
+                autoComplete="tel"
+              />
+            </div>
+
             <div className="auth-input-wrapper">
               <span className="auth-input-icon">🔒</span>
               <input
@@ -124,7 +173,6 @@ export function RegisterPage() {
               </button>
             </div>
 
-            {/* Confirm password */}
             <div className="auth-input-wrapper">
               <span className="auth-input-icon">🔒</span>
               <input
@@ -141,13 +189,70 @@ export function RegisterPage() {
                 type="button"
                 className="auth-password-toggle"
                 onClick={() => setShowConfirm((v) => !v)}
-                aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'}
+                aria-label={showConfirm ? 'Hide confirm password' : 'Show password'}
               >
                 {showConfirm ? '🙈' : '👁'}
               </button>
             </div>
 
-            {/* Register button */}
+            <p className="auth-section-label">Company information</p>
+
+            <div className="auth-input-wrapper">
+              <span className="auth-input-icon">🏢</span>
+              <input
+                id="register-company-name"
+                type="text"
+                className="auth-input"
+                placeholder="Company name"
+                value={form.company_name}
+                onChange={handleChange('company_name')}
+                required
+                autoComplete="organization"
+              />
+            </div>
+
+            <div className="auth-input-wrapper">
+              <span className="auth-input-icon">#</span>
+              <input
+                id="register-tax-code"
+                type="text"
+                className="auth-input"
+                placeholder="Tax code (optional)"
+                value={form.tax_code}
+                onChange={handleChange('tax_code')}
+              />
+            </div>
+
+            <div className="auth-input-wrapper">
+              <span className="auth-input-icon">▾</span>
+              <select
+                id="register-industry"
+                className="auth-input auth-select"
+                value={form.industry}
+                onChange={handleChange('industry')}
+                required
+              >
+                <option value="">Select industry</option>
+                {INDUSTRY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="auth-input-wrapper auth-input-wrapper--textarea">
+              <span className="auth-input-icon auth-input-icon--top">📍</span>
+              <textarea
+                id="register-address"
+                className="auth-input auth-textarea"
+                placeholder="Address"
+                value={form.address}
+                onChange={handleChange('address')}
+                required
+                rows={3}
+                autoComplete="street-address"
+              />
+            </div>
+
             <button
               id="register-submit-btn"
               type="submit"

@@ -13,8 +13,8 @@ export const loginApi = async (email, password) => {
  * Register a new customer account.
  * Returns { message, account } on success.
  */
-export const registerApi = async (full_name, email, password) => {
-  const response = await apiClient.post('/auth/register', { full_name, email, password });
+export const registerApi = async (payload) => {
+  const response = await apiClient.post('/auth/register', payload);
   return response.data.data;
 };
 

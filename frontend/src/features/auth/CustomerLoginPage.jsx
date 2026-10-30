@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi } from '../../services/auth-service.js';
 import { isCustomerAccount } from '../../app/role-routing.js';
@@ -19,6 +19,8 @@ function AuthBrandPanel({ headline, desc }) {
 export function CustomerLoginPage() {
   const { startSession } = useAppContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  const registered = Boolean(location.state?.registered);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,6 +76,12 @@ export function CustomerLoginPage() {
 
           <h2 className="auth-title">Welcome back</h2>
           <p className="auth-subtitle">Sign in to your ISOCAL customer account</p>
+
+          {registered && (
+            <div className="auth-success" style={{ marginBottom: 16 }}>
+              <span>✓</span> Account created successfully. You can log in now.
+            </div>
+          )}
 
           {error && (
             <div className="auth-error" id="customer-login-error" style={{ marginBottom: 16 }}>
