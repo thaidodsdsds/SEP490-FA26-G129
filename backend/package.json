@@ -8,13 +8,16 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
+    "seed": "tsx ./src/database/seeds/seed.ts",
     "lint": "eslint . --ext .ts",
     "test": "vitest run --passWithNoTests",
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d ./src/database/dataSource.ts",
-"migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d ./src/database/dataSource.ts",
-"migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate ./src/database/migrations/AutoMigration -d ./src/database/dataSource.ts"
+    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d ./src/database/dataSource.ts",
+    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate ./src/database/migrations/AutoMigration -d ./src/database/dataSource.ts"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",

@@ -1,14 +1,22 @@
-import { Link, Navigate, RouterProvider, createBrowserRouter, useLocation } from 'react-router-dom';
+import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout.jsx';
 import CustomerLayout from '../layouts/CustomerLayout.jsx';
 import AccountantLayout from '../layouts/AccountantLayout.jsx';
 import AdminLayout from '../layouts/AdminLayout.jsx';
-import InternalLayout from '../layouts/InternalLayout.jsx';
 import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
+import CustomerServiceRequestCreatePage from '../features/customer/service-requests/CustomerServiceRequestCreatePage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
+import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
+import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
+import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
+import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
+import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
+import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
+import SalesLayout from '../layouts/SalesLayout.jsx';
+import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
 
 import ReviewerWorkspaceProvider from '../features/reviewer/ReviewerWorkspaceProvider.jsx';
@@ -32,13 +40,24 @@ import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
 import RoleDashboardGate from './RoleDashboardGate.jsx';
 
+// Auth pages
+import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
+import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
+import { RegisterPage } from '../features/auth/RegisterPage.jsx';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+import ProfilePage from '../features/profile/ProfilePage.jsx';
+
 const publicRoutes = [
+  // Standalone auth pages — no wrapping layout, each manages its own shell
+  { path: '/login', element: <CustomerLoginPage /> },
+  { path: '/staff-login', element: <StaffLoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
     path: '/',
     element: <PublicLayout />,
     children: [
       { index: true, element: <PublicLandingPage /> },
-      { path: 'login', element: <LoginPage /> },
     ],
   },
 ];
@@ -56,6 +75,9 @@ const customerRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'service-requests', element: <CustomerServiceRequestCreatePage /> },
+      { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -73,6 +95,7 @@ const accountantRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -90,6 +113,48 @@ const adminRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'accounts', element: <AccountsPage /> },
+      { path: 'roles', element: <RolesPage /> },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
+  },
+];
+
+const salesRoutes = [
+  {
+    path: '/internal/sales',
+    element: <SalesLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/sales">
+            <SalesDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+      { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
+      { path: 'quotations', element: <QuotationCreatePage /> },
+      { path: 'quotations/new', element: <QuotationCreatePage /> },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
+  },
+];
+
+const warehouseRoutes = [
+  {
+    path: '/internal/warehouse',
+    element: <WarehouseLayout />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/warehouse">
+            <WarehouseDashboardPage />
+          </RoleDashboardGate>
+        ),
+      },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ];
@@ -101,51 +166,53 @@ const legacyRoutes = [
 const internalRoutes = [
   {
     path: '/internal',
-    element: <InternalLayout />,
-    children: [
-      { index: true, element: <InternalDashboardLanding /> },
-      { path: 'settings', element: <InternalSettingsPage /> },
-    ],
+    element: <InternalDashboardLanding />,
   },
   {
     path: '/internal/head-of-tech',
     element: <HeadOfTechLayout />,
-    children: [{
-      element: (
-        <RoleDashboardGate dashboardPath="/internal/head-of-tech">
-          <ReviewerWorkspaceProvider />
-        </RoleDashboardGate>
-      ),
-      children: [
-        { index: true, element: <ReviewerDashboardPage /> },
-        { path: 'work-orders', element: <WorkOrdersPage /> },
-        { path: 'assignments', element: <AssignmentsPage /> },
-        { path: 'service-types', element: <ServiceTypesPage /> },
-        { path: 'procedures', element: <ProceduresPage /> },
-        { path: 'standards', element: <StandardsPage /> },
-        { path: 'review-queue', element: <ReviewQueuePage /> },
-        { path: 'drift', element: <DriftPage /> },
-        { path: 'certificates', element: <CertificatesPage /> },
-        { path: 'seals', element: <SealsPage /> },
-        { path: 'verification-logs', element: <VerificationLogsPage /> },
-        { path: 'signatures', element: <SignaturesPage /> },
-        { path: 'chat', element: <ChatPage /> },
-        { path: 'notifications', element: <NotificationsPage /> },
-        { path: 'warehouse', element: <WarehousePage /> },
-      ],
-    }],
+    children: [
+      {
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+            <ReviewerWorkspaceProvider />
+          </RoleDashboardGate>
+        ),
+        children: [
+          { index: true, element: <ReviewerDashboardPage /> },
+          { path: 'work-orders', element: <WorkOrdersPage /> },
+          { path: 'assignments', element: <AssignmentsPage /> },
+          { path: 'service-types', element: <ServiceTypesPage /> },
+          { path: 'procedures', element: <ProceduresPage /> },
+          { path: 'standards', element: <StandardsPage /> },
+          { path: 'review-queue', element: <ReviewQueuePage /> },
+          { path: 'drift', element: <DriftPage /> },
+          { path: 'certificates', element: <CertificatesPage /> },
+          { path: 'seals', element: <SealsPage /> },
+          { path: 'verification-logs', element: <VerificationLogsPage /> },
+          { path: 'signatures', element: <SignaturesPage /> },
+          { path: 'chat', element: <ChatPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
+          { path: 'warehouse', element: <WarehousePage /> },
+        ],
+      },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
   },
   {
     path: '/internal/technician',
     element: <TechnicianLayout />,
-    children: [{
-      index: true,
-      element: (
-        <RoleDashboardGate dashboardPath="/internal/technician">
-          <TechnicianPage />
-        </RoleDashboardGate>
-      ),
-    }],
+    children: [
+      {
+        index: true,
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/technician">
+            <TechnicianPage />
+          </RoleDashboardGate>
+        ),
+      },
+      { path: 'profile', element: <ProfilePage /> },
+    ],
   },
 ];
 
@@ -155,6 +222,8 @@ const router = createBrowserRouter([
   ...customerRoutes,
   ...accountantRoutes,
   ...adminRoutes,
+  ...salesRoutes,
+  ...warehouseRoutes,
   ...internalRoutes,
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
@@ -162,15 +231,15 @@ const router = createBrowserRouter([
 function PublicLandingPage() {
   const { session } = useAppContext();
   const destination = getRoleDashboardPath(session.user);
-  return destination ? <Navigate replace to={destination} /> : <HomePage />;
+  // If logged in, go to dashboard; otherwise redirect to login page
+  return destination ? <Navigate replace to={destination} /> : <Navigate replace to="/login" />;
 }
 
 function InternalDashboardLanding() {
   const { session } = useAppContext();
   const destination = getRoleDashboardPath(session.user);
-  return destination && destination !== '/internal'
-    ? <Navigate replace to={destination} />
-    : <InternalDashboardPage />;
+  const dashboardPath = destination && destination !== '/internal' ? destination : '/login';
+  return <Navigate replace to={dashboardPath} />;
 }
 
 function HomePage() {
@@ -183,77 +252,7 @@ function HomePage() {
   );
 }
 
-function LoginPage() {
-  const { session } = useAppContext();
-  const location = useLocation();
-  const destination = getRoleDashboardPath(session.user);
-  if (destination) return <Navigate replace to={destination} />;
-
-  return (
-    <section className="page-panel">
-      <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
-      <h2>Đăng nhập ISOCAL</h2>
-      <p>
-        Luồng xác thực đang chờ tích hợp. Khi API đăng nhập trả về tài khoản kèm Role,
-        gọi <code>startSession(account)</code> rồi điều hướng theo Role; dashboard sẽ được chọn tự động.
-      </p>
-      {location.state?.from?.pathname && (
-        <p className="login-return-note">
-          Sau khi đăng nhập, bạn sẽ quay lại khu vực phù hợp với quyền tài khoản.
-        </p>
-      )}
-    </section>
-  );
-}
-
-function InternalDashboardPage() {
-  return (
-    <div className="internal-home">
-      <section className="page-panel internal-welcome">
-        <p className="eyebrow">KHU VỰC NỘI BỘ</p>
-        <h1>Xin chào!</h1>
-        <p>Chọn không gian làm việc để bắt đầu quản lý hoạt động hiệu chuẩn và kiểm định.</p>
-      </section>
-      <div className="internal-shortcuts">
-        <Link className="shortcut-card" to="/internal/head-of-tech">
-          <span className="shortcut-icon" aria-hidden="true">↗</span>
-          <strong>Reviewer (Head of Tech)</strong>
-          <span>Dashboard Reviewer: quản lý Work Order, quy trình, soát xét và vận hành phòng kỹ thuật.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/technician">
-          <span className="shortcut-icon" aria-hidden="true">⌁</span>
-          <strong>Công việc kỹ thuật viên</strong>
-          <span>Thực hiện kiểm tra, nhập kết quả đo và trình hồ sơ soát xét.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/customer">
-          <span className="shortcut-icon" aria-hidden="true">◎</span>
-          <strong>Tổng quan khách hàng</strong>
-          <span>Theo dõi thiết bị, đơn dịch vụ, báo giá, chứng nhận và công nợ.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/accountant">
-          <span className="shortcut-icon" aria-hidden="true">₫</span>
-          <strong>Tổng quan kế toán</strong>
-          <span>Theo dõi doanh thu, hoá đơn, thanh toán và công nợ khách hàng.</span>
-        </Link>
-        <Link className="shortcut-card" to="/internal/admin">
-          <span className="shortcut-icon" aria-hidden="true">⚙</span>
-          <strong>Tổng quan quản trị</strong>
-          <span>Tài khoản, vai trò, danh mục và tình trạng vận hành hệ thống.</span>
-        </Link>
-      </div>
-      <p className="home-demo-note">Các màn hình nghiệp vụ hiện dùng dữ liệu mẫu, chưa kết nối backend.</p>
-    </div>
-  );
-}
-
-function InternalSettingsPage() {
-  return (
-    <section className="page-panel">
-      <h2>System Settings</h2>
-      <p>Placeholder for configuration and administration pages.</p>
-    </section>
-  );
-}
+// LoginPage removed — replaced by CustomerLoginPage at /login route
 
 export function AppRouter() {
   return <RouterProvider router={router} />;

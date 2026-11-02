@@ -16,8 +16,6 @@ const links = [
   { to: '/internal/head-of-tech/chat', label: 'Trao đổi kỹ thuật', icon: '◌' },
   { to: '/internal/head-of-tech/notifications', label: 'Thông báo', icon: '♧' },
   { to: '/internal/head-of-tech/warehouse', label: 'Lịch sử kho', icon: '▣' },
-  { to: '/internal/technician', label: 'Dashboard kỹ thuật viên', icon: '⌁' },
-  { to: '/internal', label: 'Khu vực nội bộ', icon: '⌂' },
 ];
 
 function HeadOfTechLayout() {
@@ -27,6 +25,7 @@ function HeadOfTechLayout() {
       initials="HT"
       links={links}
       name="Nguyễn Thu Hương"
+      profilePath="/internal/head-of-tech/profile"
       role="Reviewer · Head of Tech"
     />
   );

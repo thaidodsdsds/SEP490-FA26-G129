@@ -15,6 +15,7 @@ function AccountantLayout() {
       initials="KT"
       links={links}
       name="Kế toán"
+      profilePath="/internal/accountant/profile"
       role="Accountant"
     />
   );
