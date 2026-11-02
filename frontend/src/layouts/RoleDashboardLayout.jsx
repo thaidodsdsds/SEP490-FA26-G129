@@ -1,36 +1,83 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, useOutlet } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { useAppContext } from '../app/providers.jsx';
 import { getUserInitials } from '../app/role-routing.js';
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function RoleDashboardLayout({ role, description, links, initials, name }) {
   const { session } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const toggleRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const location = useLocation();
+  const outlet = useOutlet();
   const displayName = session.user?.full_name || session.user?.name || name;
   const displayInitials = getUserInitials(session.user, initials);
 
   useEffect(() => {
     if (!isNavOpen) return undefined;
 
+    const sidebar = sidebarRef.current;
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusFirstItem = () => {
+      const focusable = sidebar?.querySelectorAll(FOCUSABLE_SELECTOR);
+      if (focusable?.length) focusable[0].focus();
+      else sidebar?.focus();
+    };
+    const frame = requestAnimationFrame(focusFirstItem);
+
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setIsNavOpen(false);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsNavOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !sidebar) return;
+
+      const focusable = Array.from(sidebar.querySelectorAll(FOCUSABLE_SELECTOR))
+        .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || active === sidebar)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
   }, [isNavOpen]);
 
   const closeNav = () => setIsNavOpen(false);
 
   return (
     <div className="role-dashboard-shell">
+      <a className="skip-link" href="#main-content">Bỏ qua điều hướng</a>
       <header className="role-dashboard-topbar">
         <button
           aria-controls="role-dashboard-nav"
           aria-expanded={isNavOpen}
-          aria-label="Mở menu điều hướng"
+          aria-label={isNavOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'}
           className="role-menu-toggle"
-          onClick={() => setIsNavOpen(true)}
+          onClick={() => setIsNavOpen((open) => !open)}
+          ref={toggleRef}
           type="button"
         >
           <span aria-hidden="true">☰</span>
@@ -63,7 +110,13 @@ function RoleDashboardLayout({ role, description, links, initials, name }) {
           tabIndex={isNavOpen ? 0 : -1}
           type="button"
         />
-        <aside aria-label={`Điều hướng ${role}`} className="role-dashboard-sidebar" id="role-dashboard-nav">
+        <aside
+          aria-label={`Điều hướng ${role}`}
+          className="role-dashboard-sidebar"
+          id="role-dashboard-nav"
+          ref={sidebarRef}
+          tabIndex={-1}
+        >
           <button
             aria-label="Đóng menu"
             className="role-nav-close"
@@ -105,8 +158,19 @@ function RoleDashboardLayout({ role, description, links, initials, name }) {
             Demo · Dữ liệu mẫu
           </div>
         </aside>
-        <main className="role-dashboard-content">
-          <Outlet />
+        <main className="role-dashboard-content" id="main-content" tabIndex={-1}>
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              animate={{ opacity: 1, y: 0 }}
+              className="role-page-transition"
+              exit={{ opacity: 0, y: -4, transition: { duration: 0.12, ease: [0.2, 0.8, 0.2, 1] } }}
+              initial={{ opacity: 0, y: 6 }}
+              key={location.pathname}
+              transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
+            >
+              {outlet}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

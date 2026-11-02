@@ -23,9 +23,13 @@ function ReviewerWorkspaceProvider() {
   const [alerts, setAlerts] = useState(initialNotifications);
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(null);
-  const [feedback, setFeedback] = useState('');
+  const [feedback, setFeedbackState] = useState(null);
   const [selectedChat, setSelectedChat] = useState(initialChats[0]);
   const [sentMessages, setSentMessages] = useState({});
+
+  const setFeedback = (message, tone = 'success') => {
+    setFeedbackState(message ? { message, tone } : null);
+  };
 
   const normalizedQuery = query.trim().toLocaleLowerCase('vi-VN');
   const matches = (value) => !normalizedQuery || String(value).toLocaleLowerCase('vi-VN').includes(normalizedQuery);
@@ -104,7 +108,7 @@ function ReviewerWorkspaceProvider() {
     };
     if (!procedure.steps.length || !procedure.parameters[0].name || !testPoints.length
       || testPoints.some((point) => !point.nominalValue || !point.tolerance || !point.maxUncertainty)) {
-      setFeedback('Quy trình cần có bước thao tác và điểm đo đủ giá trị danh định, dung sai, độ không đảm bảo tối đa.');
+      setFeedback('Quy trình cần có bước thao tác và điểm đo đủ giá trị danh định, dung sai, độ không đảm bảo tối đa.', 'error');
       return;
     }
     setProcedures((current) => modal.procedure?.id && modal.procedure.status === 'Draft'
@@ -117,7 +121,7 @@ function ReviewerWorkspaceProvider() {
   const publishProcedure = (procedure) => {
     if (!procedure.steps.length || !procedure.parameters.length
       || procedure.parameters.some((item) => (Array.isArray(item.points) ? !item.points.length : item.points < 1))) {
-      setFeedback('Không thể phát hành: quy trình cần có bước, thông số và điểm đo.');
+      setFeedback('Không thể phát hành: quy trình cần có bước, thông số và điểm đo.', 'error');
       return;
     }
     setProcedures((current) => current.map((item) => {
@@ -151,7 +155,7 @@ function ReviewerWorkspaceProvider() {
     const form = new FormData(event.currentTarget);
     const reason = form.get('reason')?.toString().trim();
     if (!reason) {
-      setFeedback('Cần nhập lý do yêu cầu thu hồi Seal.');
+      setFeedback('Cần nhập lý do yêu cầu thu hồi Seal.', 'error');
       return;
     }
     const seal = modal.seal;
