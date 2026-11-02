@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi } from '../../services/auth-service.js';
 import { isStaffAccount } from '../../app/role-routing.js';
+import isocalLogo from '../../assets/isocal_logo.png';
+import calibrationIllustration from '../../assets/calibration_illustration.png';
 import '../../styles/auth.css';
 
 export function StaffLoginPage() {
@@ -52,12 +54,14 @@ export function StaffLoginPage() {
       <div className="auth-container">
         {/* Left brand panel */}
         <div className="auth-brand">
-          <h1 className="auth-brand__logo">ISOCAL</h1>
+          <img src={isocalLogo} alt="ISOCAL" className="auth-brand__logo" />
           <h2 className="auth-brand__headline">Calibration &amp; Verification for a More Accurate World</h2>
           <p className="auth-brand__desc">
             Manage calibration and verification services with trust and transparency.
           </p>
-          <div className="auth-illustration">Calibration equipment illustration</div>
+          <div className="auth-illustration">
+            <img src={calibrationIllustration} alt="Calibration equipment" />
+          </div>
         </div>
 
         {/* Right form card */}

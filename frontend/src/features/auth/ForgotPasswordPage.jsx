@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPasswordApi } from '../../services/auth-service.js';
+import isocalLogo from '../../assets/isocal_logo.png';
+import calibrationIllustration from '../../assets/calibration_illustration.png';
 import '../../styles/auth.css';
 
 export function ForgotPasswordPage() {
@@ -29,13 +31,15 @@ export function ForgotPasswordPage() {
       <div className="auth-container">
         {/* Left brand panel */}
         <div className="auth-brand">
-          <h1 className="auth-brand__logo">ISOCAL</h1>
+          <img src={isocalLogo} alt="ISOCAL" className="auth-brand__logo" />
           <h2 className="auth-brand__headline">Calibration &amp; Verification for a More Accurate World</h2>
           <p className="auth-brand__desc">
             Manage calibration and verification services from request to certificate,
             with trust and transparency.
           </p>
-          <div className="auth-illustration">Calibration equipment illustration</div>
+          <div className="auth-illustration">
+            <img src={calibrationIllustration} alt="Calibration equipment" />
+          </div>
         </div>
 
         {/* Right form card */}

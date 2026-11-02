@@ -3,15 +3,19 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi } from '../../services/auth-service.js';
 import { isCustomerAccount } from '../../app/role-routing.js';
+import isocalLogo from '../../assets/isocal_logo.png';
+import calibrationIllustration from '../../assets/calibration_illustration.png';
 import '../../styles/auth.css';
 
 function AuthBrandPanel({ headline, desc }) {
   return (
     <div className="auth-brand">
-      <h1 className="auth-brand__logo">ISOCAL</h1>
+      <img src={isocalLogo} alt="ISOCAL" className="auth-brand__logo" />
       <h2 className="auth-brand__headline">{headline}</h2>
       <p className="auth-brand__desc">{desc}</p>
-      <div className="auth-illustration">Calibration equipment illustration</div>
+      <div className="auth-illustration">
+        <img src={calibrationIllustration} alt="Calibration equipment" />
+      </div>
     </div>
   );
 }
