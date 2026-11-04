@@ -271,6 +271,8 @@ function CustomerServiceRequestCreatePage() {
         customer_id: Number(companyInfo.id),
         location_type: locationType,
         preferred_date: preferredDate ? preferredDate.trim() : null,
+        special_notes: specialNotes ? specialNotes.trim() : null,
+        accessories_note: accessoriesNote ? accessoriesNote.trim() : null,
         items: selectedDevices.map((device) => ({
           device_id: Number(device.id),
           service_type_ids: (selectedServicesByDevice[device.id] || []).map((id) => Number(id)),

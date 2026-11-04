@@ -3,9 +3,10 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 const links = [
   { to: '/internal/sales', label: 'Tổng quan kinh doanh', icon: '▦' },
   { to: '/internal/sales/customers', label: 'Khách hàng', icon: '◎', soon: true },
-  { to: '/internal/sales/service-requests/new', label: 'Tạo yêu cầu dịch vụ', icon: '▤' },
+  { to: '/internal/sales/service-requests', label: 'Đơn dịch vụ', icon: '⌁' },
+  { to: '/internal/sales/service-requests/new', label: 'Tạo yêu cầu dịch vụ', icon: '＋' },
   { to: '/internal/sales/quotations', label: 'Báo giá (Quotations)', icon: '₫' },
-  { to: '/internal/sales/contracts', label: 'Hợp đồng cam kết', icon: '⌁', soon: true },
+  { to: '/internal/sales/contracts', label: 'Hợp đồng cam kết', icon: '▤', soon: true },
   { to: '/internal/sales/devices', label: 'Thiết bị & Sở hữu', icon: '◫', soon: true },
   { to: '/internal/sales/chat', label: 'Tin nhắn & Trao đổi', icon: '◌', soon: true },
 ];

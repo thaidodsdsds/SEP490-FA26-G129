@@ -25,5 +25,37 @@ export const sendDraftQuotationApi = async (quotationId) => {
   return response.data?.data;
 };
 
+/**
+ * Lấy chi tiết báo giá theo quotationId
+ */
+export const getQuotationDetailApi = async (quotationId) => {
+  const response = await apiClient.get(`/quotations/${quotationId}`);
+  return response.data?.data;
+};
+
+/**
+ * Khách hàng chấp thuận báo giá
+ */
+export const approveQuotationApi = async (quotationId) => {
+  const response = await apiClient.patch(`/quotations/${quotationId}/approve`);
+  return response.data?.data;
+};
+
+/**
+ * Khách hàng từ chối báo giá kèm lý do
+ */
+export const rejectQuotationApi = async (quotationId, reason) => {
+  const response = await apiClient.patch(`/quotations/${quotationId}/reject`, { reason });
+  return response.data?.data;
+};
+
+/**
+ * Lấy danh sách báo giá
+ */
+export const listQuotationsApi = async () => {
+  const response = await apiClient.get('/quotations');
+  return response.data?.data ?? [];
+};
+
 export { extractApiErrorMessage };
 
