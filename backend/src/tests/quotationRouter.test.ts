@@ -3,6 +3,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import {
+  Account,
   Quotation,
   QuotationLineItem,
   ServiceRequest,
@@ -44,8 +45,8 @@ vi.mock('../database/dataSource.js', () => ({
 
 import app from '../app.js';
 
-const createToken = (role = 'Sales', id = 8) =>
-  jwt.sign({ id, role }, env.jwt.secret, { expiresIn: '5m' });
+const createToken = (role = 'Sales', id = 8, customer_id?: number) =>
+  jwt.sign({ id, role, ...(customer_id ? { customer_id } : {}) }, env.jwt.secret, { expiresIn: '5m' });
 
 describe('Quotations Module API', () => {
   beforeEach(() => {
@@ -61,6 +62,11 @@ describe('Quotations Module API', () => {
     deleteQuotationLineItemMock.mockReset().mockResolvedValue({ affected: 1 });
 
     getRepository.mockReset().mockImplementation((entity) => {
+      if (entity === Account) {
+        return {
+          findOne: vi.fn().mockResolvedValue({ id: 8, customer_id: 1 }),
+        };
+      }
       if (entity === ServiceRequest) {
         return {
           findOne: findOneServiceRequestMock,
@@ -514,6 +520,153 @@ describe('Quotations Module API', () => {
         status: 'Sent',
         total_amount: 2600000,
       });
+    });
+  });
+
+  describe('GET /api/v1/quotations/:quotationId', () => {
+    it('returns 400 when quotationId is not a positive integer', async () => {
+      const response = await request(app)
+        .get('/api/v1/quotations/invalid-id')
+        .set('Authorization', `Bearer ${createToken()}`);
+
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 404 when quotation is not found', async () => {
+      findOneQuotationMock.mockResolvedValue(null);
+
+      const response = await request(app)
+        .get('/api/v1/quotations/999')
+        .set('Authorization', `Bearer ${createToken()}`);
+
+      expect(response.status).toBe(404);
+    });
+
+    it('returns quotation detail with customer and device info for Sales', async () => {
+      const mockQuotation = {
+        id: 15,
+        service_request_id: 88,
+        subtotal: '2500000.00',
+        discount_amount: '200000.00',
+        travel_fee: '300000.00',
+        total_amount: '2600000.00',
+        estimated_completion_date: '2026-11-05',
+        status: 'Sent',
+        service_request: {
+          id: 88,
+          request_code: 'SR-2026-088',
+          location_type: 'In-lab',
+          customer_id: 1,
+          status: 'Quoted',
+          customer: {
+            id: 1,
+            company_name: 'ABC Calibration',
+            tax_code: '0312345678',
+            address: '123 Nguyen Trai',
+          },
+        },
+        line_items: [
+          {
+            id: 900,
+            quotation_id: 15,
+            service_request_item_id: 500,
+            description: 'Hiệu chuẩn đồng hồ',
+            unit_price: '1000000.00',
+            discount_amount: '100000.00',
+            service_request_item: {
+              device: { name: 'Đồng hồ vạn năng', model: 'Fluke 87V' },
+              service_type: { name: 'Hiệu chuẩn điện', kind: 'Calibration' },
+            },
+          },
+        ],
+      };
+      findOneQuotationMock.mockResolvedValue(mockQuotation);
+
+      const response = await request(app)
+        .get('/api/v1/quotations/15')
+        .set('Authorization', `Bearer ${createToken('Sales', 8)}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({
+        id: 15,
+        quotation_code: 'QT-2026-015',
+        total_amount: 2600000,
+        customer: { company_name: 'ABC Calibration' },
+        line_items: [
+          {
+            id: 900,
+            unit_price: 1000000,
+            discount_amount: 100000,
+            final_price: 900000,
+            device: { name: 'Đồng hồ vạn năng' },
+          },
+        ],
+      });
+    });
+  });
+
+  describe('PATCH /api/v1/quotations/:quotationId/approve', () => {
+    it('approves a Sent quotation and updates ServiceRequest to Confirmed', async () => {
+      const mockQuotation = {
+        id: 15,
+        service_request_id: 88,
+        status: 'Sent',
+        subtotal: '1000000.00',
+        discount_amount: '0.00',
+        travel_fee: '0.00',
+        total_amount: '1000000.00',
+        service_request: {
+          id: 88,
+          customer_id: 1,
+          status: 'Quoted',
+          customer: { id: 1, company_name: 'ABC' },
+        },
+        line_items: [],
+      };
+      findOneQuotationMock
+        .mockResolvedValueOnce(mockQuotation)
+        .mockResolvedValueOnce({ ...mockQuotation, status: 'Approved' });
+      saveQuotationMock.mockImplementation(async (q) => q);
+
+      const response = await request(app)
+        .patch('/api/v1/quotations/15/approve')
+        .set('Authorization', `Bearer ${createToken('Customer', 8)}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe('Approved');
+    });
+  });
+
+  describe('PATCH /api/v1/quotations/:quotationId/reject', () => {
+    it('rejects a Sent quotation', async () => {
+      const mockQuotation = {
+        id: 15,
+        service_request_id: 88,
+        status: 'Sent',
+        subtotal: '1000000.00',
+        discount_amount: '0.00',
+        travel_fee: '0.00',
+        total_amount: '1000000.00',
+        service_request: {
+          id: 88,
+          customer_id: 1,
+          status: 'Quoted',
+          customer: { id: 1, company_name: 'ABC' },
+        },
+        line_items: [],
+      };
+      findOneQuotationMock
+        .mockResolvedValueOnce(mockQuotation)
+        .mockResolvedValueOnce({ ...mockQuotation, status: 'Rejected' });
+      saveQuotationMock.mockImplementation(async (q) => q);
+
+      const response = await request(app)
+        .patch('/api/v1/quotations/15/reject')
+        .set('Authorization', `Bearer ${createToken('Customer', 8)}`)
+        .send({ reason: 'Chi phí vượt ngân sách dự kiến' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe('Rejected');
     });
   });
 });

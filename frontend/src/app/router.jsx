@@ -7,6 +7,8 @@ import HeadOfTechLayout from '../layouts/HeadOfTechLayout.jsx';
 import TechnicianLayout from '../layouts/TechnicianLayout.jsx';
 import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashboardPage.jsx';
 import CustomerServiceRequestCreatePage from '../features/customer/service-requests/CustomerServiceRequestCreatePage.jsx';
+import CustomerServiceRequestListPage from '../features/customer/service-requests/CustomerServiceRequestListPage.jsx';
+import CustomerServiceRequestDetailPage from '../features/customer/service-requests/CustomerServiceRequestDetailPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
@@ -14,6 +16,7 @@ import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
+import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -75,7 +78,9 @@ const customerRoutes = [
           </RoleDashboardGate>
         ),
       },
-      { path: 'service-requests', element: <CustomerServiceRequestCreatePage /> },
+      { path: 'service-requests', element: <CustomerServiceRequestListPage role="customer" /> },
+      { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="customer" /> },
+      { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
@@ -133,9 +138,12 @@ const salesRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'service-requests', element: <CustomerServiceRequestListPage role="sales" /> },
       { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
+      { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="sales" /> },
       { path: 'quotations', element: <QuotationCreatePage /> },
       { path: 'quotations/new', element: <QuotationCreatePage /> },
+      { path: 'quotations/:id', element: <QuotationDetailPage role="sales" /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },

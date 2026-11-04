@@ -4,11 +4,16 @@ import { AppError } from '../../common/errors.js';
 import { buildSuccessResponse } from '../../common/response.js';
 import {
   ALLOWED_CREATE_QUOTATION_STATUSES,
+  approveQuotation,
   createQuotation,
+  getQuotationDetail,
+  listQuotations,
+  rejectQuotation,
   sendDraftQuotation,
   type CreateQuotationLineItemInput,
   type CreateQuotationStatus,
 } from './quotations.service.js';
+import { resolveAccountCustomerId } from '../service-requests/service-requests.service.js';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -286,6 +291,175 @@ export const sendQuotationHandler = async (
 
     const sentQuotation = await sendDraftQuotation(quotationId);
     res.status(200).json(buildSuccessResponse(sentQuotation));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/quotations/:quotationId
+ * Xem chi tiết báo giá (line_items, thiết bị, dịch vụ, khách hàng, thông tin thanh toán)
+ */
+export const getQuotationDetailHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const quotationId = Number(req.params.quotationId);
+    if (!Number.isInteger(quotationId) || quotationId <= 0) {
+      throw new AppError(
+        'Invalid quotationId parameter. Must be a positive integer.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = Number.isInteger(tokenCustomerId) && tokenCustomerId > 0
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        throw new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND);
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const quotation = await getQuotationDetail(quotationId, customerIdFilter);
+    res.status(200).json(buildSuccessResponse(quotation));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/v1/quotations/:quotationId/approve
+ * Khách hàng chấp thuận báo giá
+ */
+export const approveQuotationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const quotationId = Number(req.params.quotationId);
+    if (!Number.isInteger(quotationId) || quotationId <= 0) {
+      throw new AppError(
+        'Invalid quotationId parameter. Must be a positive integer.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = Number.isInteger(tokenCustomerId) && tokenCustomerId > 0
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        throw new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND);
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const approved = await approveQuotation(quotationId, customerIdFilter);
+    res.status(200).json(buildSuccessResponse(approved));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/v1/quotations/:quotationId/reject
+ * Khách hàng từ chối báo giá
+ */
+export const rejectQuotationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const quotationId = Number(req.params.quotationId);
+    if (!Number.isInteger(quotationId) || quotationId <= 0) {
+      throw new AppError(
+        'Invalid quotationId parameter. Must be a positive integer.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = Number.isInteger(tokenCustomerId) && tokenCustomerId > 0
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        throw new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND);
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const { reason } = (req.body ?? {}) as { reason?: string };
+    const rejected = await rejectQuotation(quotationId, reason, customerIdFilter);
+    res.status(200).json(buildSuccessResponse(rejected));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/v1/quotations
+ * Lấy danh sách báo giá (khách hàng chỉ xem báo giá đã gửi, sales xem tất cả)
+ */
+export const listQuotationsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = Number.isInteger(tokenCustomerId) && tokenCustomerId > 0
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        res.status(200).json(buildSuccessResponse([]));
+        return;
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const list = await listQuotations(customerIdFilter);
+    res.status(200).json(buildSuccessResponse(list));
   } catch (error) {
     next(error);
   }
