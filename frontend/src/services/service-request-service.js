@@ -57,6 +57,38 @@ export const createServiceRequestApi = async (payload) => {
 };
 
 /**
+ * Lấy danh sách phiếu yêu cầu dịch vụ (Service Requests)
+ */
+export const getServiceRequestsApi = async () => {
+  const response = await apiClient.get('/service-requests');
+  return response.data?.data ?? [];
+};
+
+/**
+ * Lấy chi tiết phiếu yêu cầu dịch vụ theo ID
+ */
+export const getServiceRequestDetailApi = async (id) => {
+  const response = await apiClient.get(`/service-requests/${id}`);
+  return response.data?.data;
+};
+
+/**
+ * Cập nhật thông tin phiếu yêu cầu dịch vụ
+ */
+export const updateServiceRequestApi = async (id, payload) => {
+  const response = await apiClient.put(`/service-requests/${id}`, payload);
+  return response.data?.data;
+};
+
+/**
+ * Hủy phiếu yêu cầu dịch vụ
+ */
+export const cancelServiceRequestApi = async (id, reason) => {
+  const response = await apiClient.patch(`/service-requests/${id}/cancel`, { reason });
+  return response.data?.data;
+};
+
+/**
  * Trích xuất thông báo lỗi dễ đọc từ phản hồi API
  */
 export const extractApiErrorMessage = (error, fallbackMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu.') => {

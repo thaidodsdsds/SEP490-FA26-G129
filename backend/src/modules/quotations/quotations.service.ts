@@ -60,6 +60,62 @@ export interface QuotationResult {
   line_items: QuotationLineItemResult[];
 }
 
+export interface QuotationLineItemDetailResult {
+  id: number;
+  quotation_id: number;
+  service_request_item_id: number;
+  description: string;
+  unit_price: number;
+  discount_amount: number;
+  final_price: number;
+  device?: {
+    id: number;
+    name: string;
+    manufacturer: string | null;
+    model: string | null;
+    serial_number: string | null;
+    internal_code: string | null;
+  };
+  service_type?: {
+    id: number;
+    name: string;
+    kind: string;
+    standard_code: string | null;
+  };
+}
+
+export interface QuotationDetailResult {
+  id: number;
+  quotation_code: string;
+  service_request_id: number;
+  service_request_status: string;
+  subtotal: number;
+  discount_amount: number;
+  travel_fee: number;
+  total_amount: number;
+  estimated_completion_date: string | null;
+  status: string;
+  customer: {
+    id: number;
+    company_name: string;
+    tax_code: string | null;
+    address: string;
+  };
+  service_request: {
+    id: number;
+    request_code: string;
+    location_type: string;
+    preferred_date: string | null;
+    special_notes: string | null;
+    accessories_note: string | null;
+    status: string;
+  };
+  line_items: QuotationLineItemDetailResult[];
+  can_send: boolean;
+  can_approve: boolean;
+  can_reject: boolean;
+}
+
 export const formatQuotationCode = (
   id: number,
   date: Date = new Date(),
@@ -470,4 +526,331 @@ export const sendDraftQuotation = async (
   }
 
   return persistSend(dataSource.getRepository.bind(dataSource));
+};
+
+/**
+ * Lấy chi tiết báo giá (Quotation Detail) theo quotationId
+ */
+export const getQuotationDetail = async (
+  quotationId: number,
+  customerIdFilter?: number,
+): Promise<QuotationDetailResult> => {
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotation = await quotationRepo.findOne({
+    where: { id: quotationId },
+    relations: {
+      service_request: {
+        customer: true,
+      },
+      line_items: {
+        service_request_item: {
+          device: true,
+          service_type: true,
+        },
+      },
+    },
+  });
+
+  if (!quotation) {
+    throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (customerIdFilter !== undefined) {
+    if (quotation.service_request?.customer_id !== customerIdFilter) {
+      throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+    }
+    if (quotation.status === 'Draft') {
+      throw new AppError('Báo giá này đang được biên soạn bản nháp, chưa gửi cho khách hàng.', 404, ERROR_CODES.NOT_FOUND);
+    }
+  }
+
+  const sr = quotation.service_request;
+  const customer = sr?.customer;
+
+  const lineItemsDetail: QuotationLineItemDetailResult[] = (quotation.line_items ?? []).map((li) => {
+    const unitPrice = Number(li.unit_price);
+    const discountAmount = Number(li.discount_amount);
+    const finalPrice = Math.max(0, unitPrice - discountAmount);
+    const sri = li.service_request_item;
+
+    return {
+      id: li.id,
+      quotation_id: li.quotation_id,
+      service_request_item_id: li.service_request_item_id,
+      description: li.description,
+      unit_price: unitPrice,
+      discount_amount: discountAmount,
+      final_price: finalPrice,
+      device: sri?.device
+        ? {
+            id: sri.device.id,
+            name: sri.device.name,
+            manufacturer: sri.device.manufacturer ?? null,
+            model: sri.device.model ?? null,
+            serial_number: sri.device.serial_number ?? null,
+            internal_code: sri.device.internal_code ?? null,
+          }
+        : undefined,
+      service_type: sri?.service_type
+        ? {
+            id: sri.service_type.id,
+            name: sri.service_type.name,
+            kind: sri.service_type.kind,
+            standard_code: sri.service_type.standard_code ?? null,
+          }
+        : undefined,
+    };
+  });
+
+  return {
+    id: quotation.id,
+    quotation_code: formatQuotationCode(quotation.id),
+    service_request_id: quotation.service_request_id,
+    service_request_status: sr?.status ?? 'New',
+    subtotal: Number(quotation.subtotal),
+    discount_amount: Number(quotation.discount_amount),
+    travel_fee: Number(quotation.travel_fee),
+    total_amount: Number(quotation.total_amount),
+    estimated_completion_date: quotation.estimated_completion_date ?? null,
+    status: quotation.status,
+    customer: {
+      id: customer?.id ?? sr?.customer_id ?? 0,
+      company_name: customer?.company_name ?? '—',
+      tax_code: customer?.tax_code ?? null,
+      address: customer?.address ?? '—',
+    },
+    service_request: {
+      id: sr?.id ?? quotation.service_request_id,
+      request_code: sr?.request_code || `SR-${sr?.id ?? quotation.service_request_id}`,
+      location_type: sr?.location_type ?? 'In-lab',
+      preferred_date: sr?.preferred_date ? String(sr.preferred_date).slice(0, 10) : null,
+      special_notes: sr?.special_notes ?? null,
+      accessories_note: sr?.accessories_note ?? null,
+      status: sr?.status ?? 'New',
+    },
+    line_items: lineItemsDetail,
+    can_send: quotation.status === 'Draft',
+    can_approve: quotation.status === 'Sent',
+    can_reject: quotation.status === 'Sent',
+  };
+};
+
+/**
+ * Khách hàng chấp thuận báo giá (status: 'Sent' -> 'Approved')
+ * và tự động chuyển ServiceRequest status sang 'Confirmed'
+ */
+export const approveQuotation = async (
+  quotationId: number,
+  customerIdFilter?: number,
+): Promise<QuotationDetailResult> => {
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotation = await quotationRepo.findOne({
+    where: { id: quotationId },
+    relations: { service_request: true },
+  });
+
+  if (!quotation) {
+    throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (customerIdFilter !== undefined && quotation.service_request?.customer_id !== customerIdFilter) {
+    throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (quotation.status !== 'Sent') {
+    throw new AppError(
+      `Không thể chấp thuận báo giá ở trạng thái "${quotation.status}". Báo giá phải ở trạng thái "Sent".`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  const persistApprove = async (
+    getRepository: typeof dataSource.getRepository,
+  ): Promise<void> => {
+    const qRepo = getRepository(Quotation);
+    const srRepo = getRepository(ServiceRequest);
+
+    quotation.status = 'Approved';
+    await qRepo.save(quotation);
+
+    if (quotation.service_request) {
+      quotation.service_request.status = 'Confirmed';
+      await srRepo.save(quotation.service_request);
+    }
+  };
+
+  if (typeof dataSource.transaction === 'function') {
+    await dataSource.transaction(async (manager) =>
+      persistApprove(manager.getRepository.bind(manager)),
+    );
+  } else {
+    await persistApprove(dataSource.getRepository.bind(dataSource));
+  }
+
+  return getQuotationDetail(quotationId, customerIdFilter);
+};
+
+/**
+ * Khách hàng từ chối báo giá (status: 'Sent' -> 'Rejected')
+ */
+export const rejectQuotation = async (
+  quotationId: number,
+  reason?: string,
+  customerIdFilter?: number,
+): Promise<QuotationDetailResult> => {
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotation = await quotationRepo.findOne({
+    where: { id: quotationId },
+    relations: { service_request: true },
+  });
+
+  if (!quotation) {
+    throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (customerIdFilter !== undefined && quotation.service_request?.customer_id !== customerIdFilter) {
+    throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (quotation.status !== 'Sent') {
+    throw new AppError(
+      `Không thể từ chối báo giá ở trạng thái "${quotation.status}". Báo giá phải ở trạng thái "Sent".`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  const persistReject = async (
+    getRepository: typeof dataSource.getRepository,
+  ): Promise<void> => {
+    const qRepo = getRepository(Quotation);
+    const srRepo = getRepository(ServiceRequest);
+
+    quotation.status = 'Rejected';
+    await qRepo.save(quotation);
+
+    if (quotation.service_request && reason && reason.trim()) {
+      const rejectNote = `[Khách từ chối báo giá ${formatQuotationCode(quotation.id)}: ${reason.trim()}]`;
+      quotation.service_request.special_notes = quotation.service_request.special_notes
+        ? `${quotation.service_request.special_notes}\n${rejectNote}`
+        : rejectNote;
+      await srRepo.save(quotation.service_request);
+    }
+  };
+
+  if (typeof dataSource.transaction === 'function') {
+    await dataSource.transaction(async (manager) =>
+      persistReject(manager.getRepository.bind(manager)),
+    );
+  } else {
+    await persistReject(dataSource.getRepository.bind(dataSource));
+  }
+
+  return getQuotationDetail(quotationId, customerIdFilter);
+};
+
+/**
+ * Lấy danh sách các báo giá
+ */
+export const listQuotations = async (
+  customerIdFilter?: number,
+): Promise<QuotationDetailResult[]> => {
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotations = await quotationRepo.find({
+    relations: {
+      service_request: {
+        customer: true,
+      },
+      line_items: {
+        service_request_item: {
+          device: true,
+          service_type: true,
+        },
+      },
+    },
+    order: {
+      id: 'DESC',
+    },
+  });
+
+  const filtered = quotations.filter((q) => {
+    if (customerIdFilter !== undefined) {
+      if (q.service_request?.customer_id !== customerIdFilter) return false;
+      if (q.status === 'Draft') return false;
+    }
+    return true;
+  });
+
+  return filtered.map((quotation) => {
+    const sr = quotation.service_request;
+    const customer = sr?.customer;
+
+    const lineItemsDetail: QuotationLineItemDetailResult[] = (quotation.line_items ?? []).map((li) => {
+      const unitPrice = Number(li.unit_price);
+      const discountAmount = Number(li.discount_amount);
+      const finalPrice = Math.max(0, unitPrice - discountAmount);
+      const sri = li.service_request_item;
+
+      return {
+        id: li.id,
+        quotation_id: li.quotation_id,
+        service_request_item_id: li.service_request_item_id,
+        description: li.description,
+        unit_price: unitPrice,
+        discount_amount: discountAmount,
+        final_price: finalPrice,
+        device: sri?.device
+          ? {
+              id: sri.device.id,
+              name: sri.device.name,
+              manufacturer: sri.device.manufacturer ?? null,
+              model: sri.device.model ?? null,
+              serial_number: sri.device.serial_number ?? null,
+              internal_code: sri.device.internal_code ?? null,
+            }
+          : undefined,
+        service_type: sri?.service_type
+          ? {
+              id: sri.service_type.id,
+              name: sri.service_type.name,
+              kind: sri.service_type.kind,
+              standard_code: sri.service_type.standard_code ?? null,
+            }
+          : undefined,
+      };
+    });
+
+    return {
+      id: quotation.id,
+      quotation_code: formatQuotationCode(quotation.id),
+      service_request_id: quotation.service_request_id,
+      service_request_status: sr?.status ?? 'New',
+      subtotal: Number(quotation.subtotal),
+      discount_amount: Number(quotation.discount_amount),
+      travel_fee: Number(quotation.travel_fee),
+      total_amount: Number(quotation.total_amount),
+      estimated_completion_date: quotation.estimated_completion_date ?? null,
+      status: quotation.status,
+      customer: {
+        id: customer?.id ?? sr?.customer_id ?? 0,
+        company_name: customer?.company_name ?? '—',
+        tax_code: customer?.tax_code ?? null,
+        address: customer?.address ?? '—',
+      },
+      service_request: {
+        id: sr?.id ?? quotation.service_request_id,
+        request_code: sr?.request_code || `SR-${sr?.id ?? quotation.service_request_id}`,
+        location_type: sr?.location_type ?? 'In-lab',
+        preferred_date: sr?.preferred_date ? String(sr.preferred_date).slice(0, 10) : null,
+        special_notes: sr?.special_notes ?? null,
+        accessories_note: sr?.accessories_note ?? null,
+        status: sr?.status ?? 'New',
+      },
+      line_items: lineItemsDetail,
+      can_send: quotation.status === 'Draft',
+      can_approve: quotation.status === 'Sent',
+      can_reject: quotation.status === 'Sent',
+    };
+  });
 };

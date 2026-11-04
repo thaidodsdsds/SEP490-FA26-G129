@@ -330,6 +330,12 @@ export class ServiceRequest {
   @Column({ type: 'date', nullable: true })
   preferred_date!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  special_notes!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  accessories_note!: string | null;
+
   @Column({ type: 'varchar', length: 20, default: 'New' })
   status!: string;
 
