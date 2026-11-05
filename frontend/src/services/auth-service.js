@@ -25,3 +25,21 @@ export const forgotPasswordApi = async (email) => {
   const response = await apiClient.post('/auth/forgot-password', { email });
   return response.data.data;
 };
+
+/**
+ * Verify a reset token.
+ */
+export const verifyResetTokenApi = async (token) => {
+  const response = await apiClient.get('/auth/verify-reset-token', {
+    params: { token },
+  });
+  return response.data.data;
+};
+
+/**
+ * Reset password using token and new password.
+ */
+export const resetPasswordApi = async ({ token, password }) => {
+  const response = await apiClient.post('/auth/reset-password', { token, password });
+  return response.data.data;
+};
