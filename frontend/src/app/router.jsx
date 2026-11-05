@@ -48,6 +48,7 @@ import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
 import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
 
 const publicRoutes = [
@@ -56,6 +57,7 @@ const publicRoutes = [
   { path: '/staff-login', element: <StaffLoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',
     element: <PublicLayout />,

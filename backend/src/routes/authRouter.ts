@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import dataSource from '../database/dataSource.js';
 import { Account, Customer, Role } from '../database/entities.js';
 import { buildSuccessResponse, buildErrorResponse } from '../common/response.js';
+import { sendPasswordResetEmail } from '../common/emailService.js';
 import env from '../config/env.js';
 
 const router = Router();
@@ -183,24 +184,167 @@ router.post('/register', async (req, res) => {
 /**
  * POST /api/v1/auth/forgot-password
  * Body: { email: string }
- * In a real app this would send a reset email. Here it just acknowledges the request.
+ * Sends a real password reset link to user's email if the account exists.
  */
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body as { email?: string };
 
-    if (!email) {
+    if (!email || !email.trim()) {
       return res.status(400).json(buildErrorResponse('Email is required.', 'BAD_REQUEST'));
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (account) {
+      // Create a secure single-use reset token containing password_hash slice so it becomes invalid once password is reset
+      const resetToken = jwt.sign(
+        {
+          id: account.id,
+          email: account.email,
+          type: 'password_reset',
+          v: account.password_hash.slice(-10),
+        },
+        env.jwt.secret,
+        { expiresIn: '15m' },
+      );
+
+      const resetUrl = `${env.frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+      try {
+        await sendPasswordResetEmail({
+          to: account.email,
+          resetUrl,
+          fullName: account.full_name,
+        });
+      } catch (mailError) {
+        console.error('[Auth] Error sending reset email:', mailError);
+        return res.status(500).json(
+          buildErrorResponse(
+            'Hệ thống không thể gửi email lúc này. Vui lòng kiểm tra lại cấu hình email máy chủ.',
+            'MAIL_SEND_FAILED',
+          ),
+        );
+      }
     }
 
     // Always respond with success to avoid user enumeration
     return res.status(200).json(
       buildSuccessResponse({
-        message: 'If that email exists in our system, a reset link has been sent.',
+        message: 'Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hòm thư của bạn.',
       }),
     );
   } catch (error) {
     console.error('[Auth] Forgot-password error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * GET /api/v1/auth/verify-reset-token?token=...
+ * Verifies if the reset token is valid and not expired/already used.
+ */
+router.get('/verify-reset-token', async (req, res) => {
+  try {
+    const token = req.query.token as string | undefined;
+
+    if (!token) {
+      return res.status(400).json(buildErrorResponse('Mã xác thực là bắt buộc.', 'BAD_REQUEST'));
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.jwt.secret);
+    } catch {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 'TOKEN_INVALID'),
+      );
+    }
+
+    if (decoded?.type !== 'password_reset' || !decoded?.id || !decoded?.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ.', 'TOKEN_INVALID'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: decoded.id } });
+
+    if (!account || account.password_hash.slice(-10) !== decoded.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu này đã được sử dụng hoặc không còn hiệu lực.', 'TOKEN_EXPIRED'),
+      );
+    }
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        valid: true,
+        email: account.email,
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Verify reset token error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Body: { token: string, password: string }
+ * Resets user's password with the new password.
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body as { token?: string; password?: string };
+
+    if (!token || !password) {
+      return res.status(400).json(buildErrorResponse('Token và mật khẩu mới là bắt buộc.', 'BAD_REQUEST'));
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json(buildErrorResponse('Mật khẩu mới phải có ít nhất 6 ký tự.', 'BAD_REQUEST'));
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.jwt.secret);
+    } catch {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 'TOKEN_INVALID'),
+      );
+    }
+
+    if (decoded?.type !== 'password_reset' || !decoded?.id || !decoded?.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ.', 'TOKEN_INVALID'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: decoded.id } });
+
+    if (!account || account.password_hash.slice(-10) !== decoded.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu này đã được sử dụng hoặc không còn hiệu lực.', 'TOKEN_EXPIRED'),
+      );
+    }
+
+    const newPasswordHash = await bcrypt.hash(password, 10);
+    account.password_hash = newPasswordHash;
+    account.failed_login_attempts = 0;
+    await accountRepo.save(account);
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới.',
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Reset-password error:', error);
     return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
   }
 });

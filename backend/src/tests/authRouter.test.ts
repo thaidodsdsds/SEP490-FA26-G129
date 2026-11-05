@@ -1,23 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { Account, Customer, Role } from '../database/entities.js';
+import env from '../config/env.js';
 
 const {
   findOneAccount,
   findOneRole,
   findOneCustomer,
+  saveAccount,
   managerCreate,
   managerSave,
   getRepository,
   transaction,
+  sendPasswordResetEmailMock,
 } = vi.hoisted(() => ({
   findOneAccount: vi.fn(),
   findOneRole: vi.fn(),
   findOneCustomer: vi.fn(),
+  saveAccount: vi.fn(),
   managerCreate: vi.fn(),
   managerSave: vi.fn(),
   getRepository: vi.fn(),
   transaction: vi.fn(),
+  sendPasswordResetEmailMock: vi.fn(),
 }));
 
 vi.mock('../database/dataSource.js', () => ({
@@ -25,6 +32,10 @@ vi.mock('../database/dataSource.js', () => ({
     getRepository,
     transaction,
   },
+}));
+
+vi.mock('../common/emailService.js', () => ({
+  sendPasswordResetEmail: sendPasswordResetEmailMock,
 }));
 
 import app from '../app.js';
@@ -45,6 +56,7 @@ describe('Auth register API', () => {
     findOneAccount.mockReset().mockResolvedValue(null);
     findOneRole.mockReset().mockResolvedValue({ id: 7, name: 'Customer' });
     findOneCustomer.mockReset().mockResolvedValue(null);
+    saveAccount.mockReset().mockResolvedValue({});
     managerCreate.mockReset().mockImplementation((_entity, payload) => ({ ...payload }));
     managerSave.mockReset().mockImplementation(async (entity) => {
       if ('company_name' in entity) {
@@ -58,7 +70,7 @@ describe('Auth register API', () => {
     }));
     getRepository.mockReset().mockImplementation((entity) => {
       if (entity === Account) {
-        return { findOne: findOneAccount };
+        return { findOne: findOneAccount, save: saveAccount };
       }
       if (entity === Role) {
         return { findOne: findOneRole };
@@ -169,5 +181,154 @@ describe('Auth register API', () => {
         customer_id: 11,
       }),
     );
+  });
+});
+
+describe('Forgot and Reset Password API', () => {
+  const dummyPasswordHash = '$2a$10$abcdefghijklmnopqrstuvwxyz123456';
+
+  beforeEach(() => {
+    findOneAccount.mockReset();
+    saveAccount.mockReset();
+    sendPasswordResetEmailMock.mockReset().mockResolvedValue({ sent: true });
+    getRepository.mockReset().mockImplementation((entity) => {
+      if (entity === Account) {
+        return { findOne: findOneAccount, save: saveAccount };
+      }
+      return {};
+    });
+  });
+
+  it('returns 400 if email is missing on forgot-password', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('BAD_REQUEST');
+  });
+
+  it('sends reset email when account exists', async () => {
+    findOneAccount.mockResolvedValue({
+      id: 5,
+      email: 'user@example.com',
+      full_name: 'Nguyen User',
+      password_hash: dummyPasswordHash,
+    });
+
+    const response = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'user@example.com' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(sendPasswordResetEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendPasswordResetEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'user@example.com',
+        fullName: 'Nguyen User',
+        resetUrl: expect.stringContaining('/reset-password?token='),
+      }),
+    );
+  });
+
+  it('returns success even if account does not exist (prevents enumeration)', async () => {
+    findOneAccount.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'nonexistent@example.com' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('verifies valid reset token successfully', async () => {
+    const validToken = jwt.sign(
+      {
+        id: 5,
+        email: 'user@example.com',
+        type: 'password_reset',
+        v: dummyPasswordHash.slice(-10),
+      },
+      env.jwt.secret,
+      { expiresIn: '15m' },
+    );
+
+    findOneAccount.mockResolvedValue({
+      id: 5,
+      email: 'user@example.com',
+      password_hash: dummyPasswordHash,
+    });
+
+    const response = await request(app)
+      .get(`/api/v1/auth/verify-reset-token?token=${validToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.valid).toBe(true);
+    expect(response.body.data.email).toBe('user@example.com');
+  });
+
+  it('rejects invalid or expired reset token on verify', async () => {
+    const invalidToken = 'invalid.jwt.token';
+
+    const response = await request(app)
+      .get(`/api/v1/auth/verify-reset-token?token=${invalidToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('TOKEN_INVALID');
+  });
+
+  it('successfully resets password with valid token', async () => {
+    const validToken = jwt.sign(
+      {
+        id: 5,
+        email: 'user@example.com',
+        type: 'password_reset',
+        v: dummyPasswordHash.slice(-10),
+      },
+      env.jwt.secret,
+      { expiresIn: '15m' },
+    );
+
+    const mockAccount = {
+      id: 5,
+      email: 'user@example.com',
+      password_hash: dummyPasswordHash,
+      failed_login_attempts: 3,
+    };
+    findOneAccount.mockResolvedValue(mockAccount);
+    saveAccount.mockImplementation(async (acc) => acc);
+
+    const response = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({
+        token: validToken,
+        password: 'newSecretPassword123',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(saveAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failed_login_attempts: 0,
+      }),
+    );
+    const updatedAccount = saveAccount.mock.calls[0][0];
+    const isNewPasswordValid = await bcrypt.compare('newSecretPassword123', updatedAccount.password_hash);
+    expect(isNewPasswordValid).toBe(true);
+  });
+
+  it('rejects password reset if new password is too short', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({
+        token: 'some.token',
+        password: '123',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('BAD_REQUEST');
   });
 });
