@@ -92,10 +92,39 @@ export const cancelServiceRequestApi = async (id, reason) => {
  * Trích xuất thông báo lỗi dễ đọc từ phản hồi API
  */
 export const extractApiErrorMessage = (error, fallbackMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu.') => {
+  const status = error?.response?.status;
   const serverMessage = error?.response?.data?.error?.message;
-  if (typeof serverMessage === 'string' && serverMessage.trim()) {
-    return serverMessage;
+
+  // 1. Xử lý lỗi xác thực và phân quyền (401 Unauthorized / 403 Forbidden)
+  if (status === 401) {
+    if (typeof serverMessage === 'string' && serverMessage.toLowerCase().includes('expired')) {
+      return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.';
+    }
+    return 'Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
   }
+
+  if (status === 403) {
+    return 'Tài khoản của bạn không có quyền truy cập hoặc thực hiện thao tác này.';
+  }
+
+  // 2. Chuyển hóa các thông điệp hệ thống tiếng Anh sang tiếng Việt thân thiện
+  if (typeof serverMessage === 'string' && serverMessage.trim()) {
+    const trimmed = serverMessage.trim();
+    if (trimmed === 'Authentication token missing or invalid.') {
+      return 'Bạn chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.';
+    }
+    if (trimmed === 'Authentication token is invalid or expired.') {
+      return 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.';
+    }
+    if (trimmed === 'Permission denied.') {
+      return 'Tài khoản của bạn không có quyền thực hiện thao tác này.';
+    }
+    if (trimmed === 'User context is missing.') {
+      return 'Không tìm thấy thông tin phiên đăng nhập. Vui lòng đăng nhập lại.';
+    }
+    return trimmed;
+  }
+
   if (typeof error?.message === 'string' && error.message.trim()) {
     return error.message;
   }
