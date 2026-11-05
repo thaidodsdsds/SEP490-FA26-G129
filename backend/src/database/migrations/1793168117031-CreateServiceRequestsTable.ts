@@ -11,6 +11,7 @@ export class CreateServiceRequestsTable1793168117031
       CREATE TABLE "service_requests" (
         "id" SERIAL PRIMARY KEY,
 
+
         "customer_id" INTEGER NOT NULL,
 
         "created_by" INTEGER NOT NULL,

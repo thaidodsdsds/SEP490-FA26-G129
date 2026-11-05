@@ -6,6 +6,7 @@ import { isCustomerAccount } from '../../app/role-routing.js';
 import isocalLogo from '../../assets/isocal_logo.png';
 import calibrationIllustration from '../../assets/calibration_illustration.png';
 import '../../styles/auth.css';
+import '../../styles/auth-status.css';
 
 function AuthBrandPanel({ headline, desc }) {
   return (
@@ -25,6 +26,10 @@ export function CustomerLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const registered = Boolean(location.state?.registered);
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get('redirect');
+  const reasonParam = searchParams.get('reason') || location.state?.reason;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +59,8 @@ export function CustomerLoginPage() {
 
       localStorage.setItem('isocal_token', token);
       const dashboardPath = startSession(account);
-      navigate(dashboardPath, { replace: true });
+      const targetDestination = redirectParam || location.state?.from || dashboardPath;
+      navigate(targetDestination, { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.error?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
       setError(msg);
@@ -80,6 +86,26 @@ export function CustomerLoginPage() {
 
           <h2 className="auth-title">Welcome back</h2>
           <p className="auth-subtitle">Sign in to your ISOCAL customer account</p>
+
+          {reasonParam === 'session_expired' && (
+            <div className="auth-notice-banner auth-notice-banner--warning">
+              <span className="auth-notice-banner-icon" aria-hidden="true">⌛</span>
+              <div className="auth-notice-banner-body">
+                <strong>Phiên đăng nhập đã hết hạn</strong>
+                Phiên làm việc trước đó của bạn đã kết thúc để đảm bảo an toàn bảo mật. Vui lòng đăng nhập lại để tiếp tục.
+              </div>
+            </div>
+          )}
+
+          {reasonParam === 'unauthenticated' && (
+            <div className="auth-notice-banner auth-notice-banner--info">
+              <span className="auth-notice-banner-icon" aria-hidden="true">🔒</span>
+              <div className="auth-notice-banner-body">
+                <strong>Yêu cầu đăng nhập</strong>
+                Vui lòng đăng nhập tài khoản Khách hàng để truy cập trang bạn vừa yêu cầu.
+              </div>
+            </div>
+          )}
 
           {registered && (
             <div className="auth-success" style={{ marginBottom: 16 }}>

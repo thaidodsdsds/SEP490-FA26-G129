@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { getAccountRole, getRoleDashboardPath } from './role-routing.js';
+import SessionExpiredModal from '../components/auth/SessionExpiredModal.jsx';
 
 const AppContext = createContext(null);
 
@@ -18,23 +19,40 @@ function decodeJwtPayload(token) {
 
 /**
  * Try to restore a user session from a stored JWT token.
- * Returns the decoded account payload, or null if invalid/expired.
+ * Returns { user, expiredOnLoad }
  */
 function restoreSessionFromStorage() {
   const token = localStorage.getItem('isocal_token');
-  if (!token) return null;
+  if (!token) return { user: null, expiredOnLoad: false };
   const payload = decodeJwtPayload(token);
-  if (!payload) return null;
+  if (!payload) {
+    localStorage.removeItem('isocal_token');
+    return { user: null, expiredOnLoad: false };
+  }
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) {
     localStorage.removeItem('isocal_token');
-    return null;
+    return { user: null, expiredOnLoad: true };
   }
-  return payload; // { id, email, role, customer_id }
+  return { user: payload, expiredOnLoad: false };
 }
 
 export function AppProviders({ children }) {
-  const [user, setUser] = useState(() => restoreSessionFromStorage());
+  const [initialState] = useState(() => restoreSessionFromStorage());
+  const [user, setUser] = useState(initialState.user);
+  const [isSessionExpired, setIsSessionExpired] = useState(initialState.expiredOnLoad);
+
+  useEffect(() => {
+    const handleExpiredEvent = () => {
+      setIsSessionExpired(true);
+      setUser(null);
+    };
+
+    window.addEventListener('isocal:session-expired', handleExpiredEvent);
+    return () => {
+      window.removeEventListener('isocal:session-expired', handleExpiredEvent);
+    };
+  }, []);
 
   const startSession = (account) => {
     if (!account || typeof account !== 'object') {
@@ -47,6 +65,7 @@ export function AppProviders({ children }) {
     if (!dashboardPath) {
       throw new Error(`Chưa cấu hình dashboard cho Role "${getAccountRole(account)}".`);
     }
+    setIsSessionExpired(false);
     setUser(account);
     return dashboardPath;
   };
@@ -54,17 +73,35 @@ export function AppProviders({ children }) {
   const endSession = () => {
     localStorage.removeItem('isocal_token');
     setUser(null);
+    setIsSessionExpired(false);
+  };
+
+  const clearExpiredModal = () => {
+    setIsSessionExpired(false);
   };
 
   const session = useMemo(() => ({
     user,
-    isAuthenticated: Boolean(user),
+    isAuthenticated: Boolean(user) && !isSessionExpired,
+    isExpired: isSessionExpired,
     role: getAccountRole(user) || 'public',
-  }), [user]);
-  const value = useMemo(() => ({ session, startSession, endSession }), [session]);
+  }), [user, isSessionExpired]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  const value = useMemo(
+    () => ({ session, startSession, endSession, clearExpiredModal }),
+    [session],
+  );
+
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <SessionExpiredModal
+        isOpen={isSessionExpired}
+        onConfirm={clearExpiredModal}
+        user={user}
+      />
+    </AppContext.Provider>
+  );
 }
 
 export const useAppContext = () => useContext(AppContext);
-

@@ -42,6 +42,7 @@ import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
 import RoleDashboardGate from './RoleDashboardGate.jsx';
+import ProtectedRoute from '../components/auth/ProtectedRoute.jsx';
 
 // Auth pages
 import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
@@ -68,7 +69,11 @@ const publicRoutes = [
 const customerRoutes = [
   {
     path: '/internal/customer',
-    element: <CustomerLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['customer']} portalType="customer">
+        <CustomerLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -90,7 +95,11 @@ const customerRoutes = [
 const accountantRoutes = [
   {
     path: '/internal/accountant',
-    element: <AccountantLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['accountant', 'admin']} portalType="staff">
+        <AccountantLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -108,7 +117,11 @@ const accountantRoutes = [
 const adminRoutes = [
   {
     path: '/internal/admin',
-    element: <AdminLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['admin']} portalType="staff">
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -128,7 +141,11 @@ const adminRoutes = [
 const salesRoutes = [
   {
     path: '/internal/sales',
-    element: <SalesLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['sales', 'admin']} portalType="staff">
+        <SalesLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -152,7 +169,11 @@ const salesRoutes = [
 const warehouseRoutes = [
   {
     path: '/internal/warehouse',
-    element: <WarehouseLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin']} portalType="staff">
+        <WarehouseLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -174,11 +195,19 @@ const legacyRoutes = [
 const internalRoutes = [
   {
     path: '/internal',
-    element: <InternalDashboardLanding />,
+    element: (
+      <ProtectedRoute portalType="staff">
+        <InternalDashboardLanding />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/internal/head-of-tech',
-    element: <HeadOfTechLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
+        <HeadOfTechLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         element: (
@@ -209,7 +238,11 @@ const internalRoutes = [
   },
   {
     path: '/internal/technician',
-    element: <TechnicianLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['technician', 'admin']} portalType="staff">
+        <TechnicianLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

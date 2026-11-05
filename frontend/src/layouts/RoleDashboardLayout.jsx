@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../app/providers.jsx';
 import { getRoleDashboardPath, getUserInitials } from '../app/role-routing.js';
+import AuthRequiredState from '../components/auth/AuthRequiredState.jsx';
 
 /* ─── UserDropdown ─────────────────────────────────────────────── */
 function UserDropdown({ displayName, displayInitials, roleName, profilePath, onLogout }) {
@@ -89,6 +90,15 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
   const displayInitials = getUserInitials(session.user, initials);
   const dashboardPath = getRoleDashboardPath(session.user) || '/login';
   const roleName = session.role === 'public' ? role : session.role;
+
+  if (!session.isAuthenticated || !session.user) {
+    return (
+      <AuthRequiredState
+        portalHint={role?.toLowerCase() === 'customer' ? 'customer' : 'staff'}
+        targetPath={window.location.pathname}
+      />
+    );
+  }
 
   useEffect(() => {
     if (!isNavOpen) return undefined;

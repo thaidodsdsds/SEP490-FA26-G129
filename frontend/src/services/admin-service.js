@@ -16,7 +16,26 @@ async function api(path, options = {}) {
     ...options,
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(body?.error?.message || 'Lỗi server');
+  if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('isocal_token');
+      window.dispatchEvent(
+        new CustomEvent('isocal:session-expired', {
+          detail: { message: body?.error?.message || 'Phiên đăng nhập đã hết hạn.' },
+        }),
+      );
+      throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    if (res.status === 403) {
+      window.dispatchEvent(
+        new CustomEvent('isocal:access-denied', {
+          detail: { message: body?.error?.message || 'Bạn không có quyền thực hiện thao tác này.' },
+        }),
+      );
+      throw new Error('Bạn không có quyền thực hiện thao tác này.');
+    }
+    throw new Error(body?.error?.message || 'Lỗi server');
+  }
   return body.data;
 }
 
