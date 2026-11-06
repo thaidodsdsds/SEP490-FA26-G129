@@ -3,7 +3,7 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 const links = [
   { to: '/internal/customer', label: 'Tổng quan', icon: '▦' },
   { to: '/internal/customer/service-requests/new', label: 'Tạo yêu cầu dịch vụ', icon: '＋' },
-  { to: '/internal/customer/devices', label: 'Thiết bị', icon: '▤', soon: true },
+  { to: '/internal/customer/devices', label: 'Hồ sơ thiết bị', icon: '▤' },
   { to: '/internal/customer/service-requests', label: 'Đơn dịch vụ', icon: '⌁' },
   { to: '/internal/customer/certificates', label: 'Chứng nhận & tem', icon: '✓', soon: true },
   { to: '/internal/customer/invoices', label: 'Công nợ', icon: '₫', soon: true },

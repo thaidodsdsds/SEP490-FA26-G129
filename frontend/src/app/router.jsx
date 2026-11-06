@@ -56,6 +56,8 @@ import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
+import DeviceListPage from '../features/devices/DeviceListPage.jsx';
+import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
 
 const publicRoutes = [
   // Standalone auth pages — no wrapping layout, each manages its own shell
@@ -92,6 +94,8 @@ const customerRoutes = [
       },
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="customer" /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="customer" /> },
+      { path: 'devices', element: <DeviceListPage role="customer" basePath="/internal/customer/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
@@ -170,6 +174,8 @@ const salesRoutes = [
       },
       { path: 'customers', element: <SalesCustomerListPage /> },
       { path: 'customers/:id', element: <SalesCustomerDetailPage /> },
+      { path: 'devices', element: <DeviceListPage role="sales" basePath="/internal/sales/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="sales" basePath="/internal/sales/devices" /> },
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="sales" /> },
       { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="sales" /> },
@@ -202,6 +208,8 @@ const warehouseRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'devices', element: <DeviceListPage role="warehouse" basePath="/internal/warehouse/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="warehouse" basePath="/internal/warehouse/devices" /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
