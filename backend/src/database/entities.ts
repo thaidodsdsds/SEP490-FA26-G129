@@ -573,6 +573,342 @@ export class Attachment {
   uploaded_at!: Date;
 }
 
+// ==================== COMPANY PROFILE (Bên B) ====================
+
+@Entity({ name: 'company_profiles' })
+export class CompanyProfile {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  bank_name!: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  is_default!: boolean;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+}
+
+// ==================== CONTRACT ====================
+
+@Entity({ name: 'contracts' })
+@Unique('UQ_contracts_contract_code', ['contract_code'])
+@Index('IDX_contracts_customer_id', ['customer_id'])
+@Index('IDX_contracts_status', ['status'])
+export class Contract {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  contract_code!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Service' })
+  contract_type!: string;
+
+  @ManyToOne(() => Quotation, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'quotation_id',
+    foreignKeyConstraintName: 'FK_contracts_quotation',
+  })
+  quotation!: Quotation | null;
+
+  @Column({ type: 'integer', nullable: true })
+  quotation_id!: number | null;
+
+  @ManyToOne(() => Customer, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'customer_id',
+    foreignKeyConstraintName: 'FK_contracts_customer',
+  })
+  customer!: Customer;
+
+  @Column({ type: 'integer' })
+  customer_id!: number;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  title!: string;
+
+  @Column({ type: 'date', nullable: true })
+  sign_date!: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  start_date!: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  end_date!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  duration_days!: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  location!: string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  subtotal!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  travel_fee!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  tax_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  total_amount!: string;
+
+  @Column({ type: 'text', nullable: true })
+  total_in_words!: string | null;
+
+  @Column({ type: 'integer', default: 30 })
+  payment_term_days!: number;
+
+  @Column({ type: 'text', nullable: true })
+  legal_basis!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Draft' })
+  status!: string;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  party_a_name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  party_a_representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_a_position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  party_a_address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_a_bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  party_a_bank_name!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_budget_code!: string | null;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  party_b_name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  party_b_representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_b_position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  party_b_address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_b_bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  party_b_bank_name!: string | null;
+
+  @Column({ type: 'integer' })
+  created_by!: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  submitted_at!: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  approved_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  approved_at!: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  liquidated_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  liquidated_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  draft_file_url!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  signed_file_url!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  committed_years!: number | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, nullable: true })
+  credit_limit!: string | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+
+  @OneToMany(() => ContractItem, (item) => item.contract)
+  items!: ContractItem[];
+}
+
+// ==================== CONTRACT ITEM ====================
+
+@Entity({ name: 'contract_items' })
+@Index('IDX_contract_items_contract_id', ['contract_id'])
+export class ContractItem {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Contract, (contract) => contract.items, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'contract_id',
+    foreignKeyConstraintName: 'FK_contract_items_contract',
+  })
+  contract!: Contract;
+
+  @Column({ type: 'integer' })
+  contract_id!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  service_request_item_id!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  quotation_line_item_id!: number | null;
+
+  @Column({ type: 'integer', default: 1 })
+  line_no!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  location!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  execution_time!: string | null;
+
+  @Column({ type: 'numeric', precision: 12, scale: 3, default: 1 })
+  quantity!: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  unit!: string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  unit_price!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 5 })
+  tax_rate!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  tax_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  amount!: string;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+}
+
+// ==================== DIGITAL SIGNATURE ====================
+
+@Entity({ name: 'digital_signatures' })
+@Index('IDX_digital_signatures_contract_id', ['contract_id'])
+@Index('IDX_digital_signatures_status', ['status'])
+export class DigitalSignature {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Contract, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'contract_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_contract',
+  })
+  contract!: Contract;
+
+  @Column({ type: 'integer' })
+  contract_id!: number;
+
+  @Column({ type: 'varchar', length: 30 })
+  purpose!: string;
+
+  @Column({ type: 'integer' })
+  signer_id!: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  provider!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  provider_transaction_id!: string | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  document_hash!: string;
+
+  @Column({ type: 'text', nullable: true })
+  signed_file_url!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  signed_at!: Date | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+}
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -588,4 +924,8 @@ export const entities = [
   Quotation,
   QuotationLineItem,
   Attachment,
+  CompanyProfile,
+  Contract,
+  ContractItem,
+  DigitalSignature,
 ];
