@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { initialWorkOrders, technicians } from './mockData.js';
 import './operations.css';
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const standards = [
   'Calibrator Fluke 5522A',
@@ -25,6 +28,54 @@ function HeadOfTechPage() {
   const [filter, setFilter] = useState('all');
   const [assignment, setAssignment] = useState(null);
   const [message, setMessage] = useState('');
+  const assignmentModalRef = useRef(null);
+  const assignmentOpen = Boolean(assignment);
+
+  useEffect(() => {
+    if (!assignmentOpen) return undefined;
+
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    assignmentModalRef.current?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setAssignment(null);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const dialog = assignmentModalRef.current;
+      if (!dialog) return;
+
+      const focusable = Array.from(dialog.querySelectorAll(FOCUSABLE_SELECTOR))
+        .filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+  }, [assignmentOpen]);
 
   const flatItems = useMemo(
     () => workOrders.flatMap((order) => order.items.map((item) => ({ ...item, order }))),
@@ -233,11 +284,30 @@ function HeadOfTechPage() {
         </p>
       </section>
 
-      {assignment && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setAssignment(null);
-        }}>
-          <section aria-labelledby="assignment-modal-title" aria-modal="true" className="assignment-modal" role="dialog">
+      <AnimatePresence>
+        {assignment && (
+        <motion.div
+          animate={{ opacity: 1 }}
+          className="modal-backdrop"
+          exit={{ opacity: 0, transition: { duration: 0.14 } }}
+          initial={{ opacity: 0 }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setAssignment(null);
+          }}
+          transition={{ duration: 0.16 }}
+        >
+          <motion.section
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            aria-labelledby="assignment-modal-title"
+            aria-modal="true"
+            className="assignment-modal"
+            exit={{ opacity: 0, scale: 0.98, y: 6, transition: { duration: 0.14 } }}
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            ref={assignmentModalRef}
+            role="dialog"
+            tabIndex={-1}
+            transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+          >
             <div className="modal-heading">
               <div>
                 <p className="eyebrow">WORK ORDER {assignment.orderId}</p>
@@ -295,9 +365,10 @@ function HeadOfTechPage() {
                 <button className="button button-primary" type="submit">Lưu phân công</button>
               </div>
             </form>
-          </section>
-        </div>
-      )}
+          </motion.section>
+        </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -254,6 +254,15 @@ function QuotationDetailPage({ role = 'sales' }) {
             </button>
           )}
 
+          {isSales && quotation.status === 'Approved' && (
+            <Link
+              className="button button-primary"
+              to={`/internal/sales/contracts/new?quotationId=${quotation.id}`}
+            >
+              ▤ Tạo hợp đồng
+            </Link>
+          )}
+
           {isSales && (quotation.status === 'Draft' || quotation.status === 'Sent') && (
             <Link
               className="button button-secondary"

@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'motion/react';
 import useReviewerWorkspace from '../useReviewerWorkspace.js';
 import ProcedureModal from '../features/procedures/ProcedureModal.jsx';
 import ReviewModal from '../features/review-queue/ReviewModal.jsx';
@@ -15,9 +16,10 @@ function ReviewerWorkspaceOverlays() {
     requestRevocation,
   } = useReviewerWorkspace();
   return (
-    <>
+    <AnimatePresence mode="wait">
       {modal?.type === 'review' && (
         <ReviewModal
+          key="review"
           onApprove={() => handleApprove(modal.record)}
           onClose={() => setModal(null)}
           onReject={handleReject}
@@ -25,10 +27,10 @@ function ReviewerWorkspaceOverlays() {
           record={modal.record}
         />
       )}
-      {modal?.type === 'procedure' && <ProcedureModal onClose={() => setModal(null)} onSave={saveProcedure} procedure={modal.procedure} />}
-      {modal?.type === 'standard' && <StandardModal onClose={() => setModal(null)} onSave={saveStandard} standard={modal.standard} />}
-      {modal?.type === 'revocation' && <RevocationModal onClose={() => setModal(null)} onSubmit={requestRevocation} seal={modal.seal} />}
-    </>
+      {modal?.type === 'procedure' && <ProcedureModal key="procedure" onClose={() => setModal(null)} onSave={saveProcedure} procedure={modal.procedure} />}
+      {modal?.type === 'standard' && <StandardModal key="standard" onClose={() => setModal(null)} onSave={saveStandard} standard={modal.standard} />}
+      {modal?.type === 'revocation' && <RevocationModal key="revocation" onClose={() => setModal(null)} onSubmit={requestRevocation} seal={modal.seal} />}
+    </AnimatePresence>
   );
 }
 

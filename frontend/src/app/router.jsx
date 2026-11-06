@@ -17,6 +17,9 @@ import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
+import ContractListPage from '../features/contracts/ContractListPage.jsx';
+import ContractFormPage from '../features/contracts/ContractFormPage.jsx';
+import ContractDetailPage from '../features/contracts/ContractDetailPage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -112,6 +115,8 @@ const accountantRoutes = [
         ),
       },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/accountant/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/accountant/contracts" /> },
     ],
   },
 ];
@@ -135,6 +140,10 @@ const adminRoutes = [
       },
       { path: 'accounts', element: <AccountsPage /> },
       { path: 'roles', element: <RolesPage /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/admin/contracts" canCreate /> },
+      { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
+      { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -163,6 +172,10 @@ const salesRoutes = [
       { path: 'quotations', element: <QuotationCreatePage /> },
       { path: 'quotations/new', element: <QuotationCreatePage /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="sales" /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/sales/contracts" canCreate /> },
+      { path: 'contracts/new', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/sales/contracts" /> },
+      { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },

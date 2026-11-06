@@ -1,11 +1,14 @@
+import { MotionConfig } from 'motion/react';
 import { AppProviders } from './app/providers.jsx';
 import { AppRouter } from './app/router.jsx';
 
 function App() {
   return (
-    <AppProviders>
-      <AppRouter />
-    </AppProviders>
+    <MotionConfig reducedMotion="user">
+      <AppProviders>
+        <AppRouter />
+      </AppProviders>
+    </MotionConfig>
   );
 }
 
