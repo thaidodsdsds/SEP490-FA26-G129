@@ -14,6 +14,8 @@ import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
 import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
+import SalesCustomerListPage from '../features/sales/customers/SalesCustomerListPage.jsx';
+import SalesCustomerDetailPage from '../features/sales/customers/SalesCustomerDetailPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
@@ -166,6 +168,8 @@ const salesRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'customers', element: <SalesCustomerListPage /> },
+      { path: 'customers/:id', element: <SalesCustomerDetailPage /> },
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="sales" /> },
       { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="sales" /> },
