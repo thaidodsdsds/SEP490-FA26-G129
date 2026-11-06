@@ -7,7 +7,7 @@ const links = [
   { to: '/internal/sales/service-requests/new', label: 'Tạo yêu cầu dịch vụ', icon: '＋' },
   { to: '/internal/sales/quotations', label: 'Báo giá (Quotations)', icon: '₫' },
   { to: '/internal/sales/contracts', label: 'Hợp đồng', icon: '▤' },
-  { to: '/internal/sales/devices', label: 'Thiết bị & Sở hữu', icon: '◫', soon: true },
+  { to: '/internal/sales/devices', label: 'Thiết bị & Sở hữu', icon: '◫' },
   { to: '/internal/sales/chat', label: 'Tin nhắn & Trao đổi', icon: '◌', soon: true },
 ];
 
