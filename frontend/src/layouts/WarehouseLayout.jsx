@@ -2,11 +2,9 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/warehouse', label: 'Tổng quan kho', icon: '▦' },
-  { to: '/internal/warehouse/devices', label: 'Quản lý thiết bị', icon: '◫' },
-  { to: '/internal/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)', icon: '↓', soon: true },
-  { to: '/internal/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)', icon: '↑', soon: true },
-  { to: '/internal/warehouse/ready-return', label: 'Thiết bị sẵn sàng trả', icon: '✓', soon: true },
-  { to: '/internal/warehouse/transactions', label: 'Lịch sử phiếu kho', icon: '≡', soon: true },
+  { to: '/internal/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)', icon: '↓' },
+  { to: '/internal/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)', icon: '↑' },
+  { to: '/internal/warehouse/transactions', label: 'Lịch sử phiếu kho', icon: '≡' },
 ];
 
 function WarehouseLayout() {

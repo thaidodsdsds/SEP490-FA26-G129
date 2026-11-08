@@ -909,6 +909,59 @@ export class DigitalSignature {
   created_at!: Date;
 }
 
+// ==================== WAREHOUSE TRANSACTION ====================
+
+@Entity({ name: 'warehouse_transactions' })
+@Index('IDX_warehouse_transactions_device_id', ['device_id'])
+@Index('IDX_warehouse_transactions_service_request_item_id', ['service_request_item_id'])
+@Check('CHK_warehouse_transactions_type', "type" IN ('Inbound', 'Outbound'))
+export class WarehouseTransaction {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Device, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'device_id',
+    foreignKeyConstraintName: 'FK_warehouse_transactions_device_id',
+  })
+  device!: Device;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @ManyToOne(() => ServiceRequestItem, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'service_request_item_id',
+    foreignKeyConstraintName: 'FK_warehouse_transactions_service_request_item_id',
+  })
+  service_request_item!: ServiceRequestItem | null;
+
+  @Column({ type: 'integer', nullable: true })
+  service_request_item_id!: number | null;
+
+  @Column({ type: 'varchar', length: 20 })
+  type!: string;
+
+  @Column({ type: 'text', nullable: true })
+  condition_note!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  photo_url!: string | null;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'handled_by',
+    foreignKeyConstraintName: 'FK_warehouse_transactions_handled_by',
+  })
+  handler!: Account;
+
+  @Column({ type: 'integer' })
+  handled_by!: number;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  transaction_at!: Date;
+}
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -928,4 +981,5 @@ export const entities = [
   Contract,
   ContractItem,
   DigitalSignature,
+  WarehouseTransaction,
 ];
