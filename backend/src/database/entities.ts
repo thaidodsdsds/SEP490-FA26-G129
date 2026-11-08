@@ -909,6 +909,48 @@ export class DigitalSignature {
   created_at!: Date;
 }
 
+// ==================== NOTIFICATION ====================
+
+@Entity({ name: 'notifications' })
+@Index('IDX_notifications_account_id', ['account_id'])
+@Index('IDX_notifications_is_read', ['is_read'])
+@Check(
+  'CHK_notifications_type',
+  "type" IN ('InspectionFail', 'Quotation', 'Payment', 'DueDate', 'ChatMessage', 'System', 'StandardExpiry', 'ProcedurePublished', 'Procedure', 'InboundWarehouse', 'OutboundWarehouse', 'ReviewApproved', 'Alert'),
+)
+export class Notification {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'account_id',
+    foreignKeyConstraintName: 'FK_notifications_account_id',
+  })
+  account!: Account;
+
+  @Column({ type: 'integer' })
+  account_id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  type!: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  title!: string;
+
+  @Column({ type: 'text' })
+  content!: string;
+
+  @Column({ type: 'boolean', default: false })
+  is_read!: boolean;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  read_at!: Date | null;
+}
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -928,4 +970,5 @@ export const entities = [
   Contract,
   ContractItem,
   DigitalSignature,
+  Notification,
 ];
