@@ -1,3 +1,4 @@
+import ChatWidget from '../components/chat/ChatWidget.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
@@ -269,6 +270,7 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
           </AnimatePresence>
         </main>
       </div>
+      <ChatWidget />
     </div>
   );
 }

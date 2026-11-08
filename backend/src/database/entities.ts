@@ -909,6 +909,151 @@ export class DigitalSignature {
   created_at!: Date;
 }
 
+// ==================== CHAT THREAD ====================
+
+@Entity({ name: 'chat_threads' })
+@Index('IDX_chat_threads_service_request_id', ['service_request_id'])
+@Index('IDX_chat_threads_customer_id', ['customer_id'])
+@Check(
+  'CHK_chat_threads_type',
+  "thread_type" IN ('CustomerSupport', 'ServiceRequestDiscussion', 'CalibrationDispute'),
+)
+@Check('CHK_chat_threads_status', "status" IN ('Open', 'Closed'))
+export class ChatThread {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  thread_type!: string;
+
+  @ManyToOne(() => ServiceRequest, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'service_request_id',
+    foreignKeyConstraintName: 'FK_chat_threads_service_request_id',
+  })
+  service_request!: ServiceRequest | null;
+
+  @Column({ type: 'integer', nullable: true })
+  service_request_id!: number | null;
+
+  @ManyToOne(() => Customer, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'customer_id',
+    foreignKeyConstraintName: 'FK_chat_threads_customer_id',
+  })
+  customer!: Customer | null;
+
+  @Column({ type: 'integer', nullable: true })
+  customer_id!: number | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  title!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Open' })
+  status!: string;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'created_by',
+    foreignKeyConstraintName: 'FK_chat_threads_created_by',
+  })
+  creator!: Account;
+
+  @Column({ type: 'integer' })
+  created_by!: number;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  closed_at!: Date | null;
+
+  @OneToMany(() => ChatParticipant, (p) => p.chat_thread)
+  participants!: ChatParticipant[];
+
+  @OneToMany(() => ChatMessage, (m) => m.chat_thread)
+  messages!: ChatMessage[];
+}
+
+// ==================== CHAT PARTICIPANT ====================
+
+@Entity({ name: 'chat_participants' })
+@Unique('UQ_chat_participants_thread_account', ['chat_thread_id', 'account_id'])
+export class ChatParticipant {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => ChatThread, (thread) => thread.participants, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'chat_thread_id',
+    foreignKeyConstraintName: 'FK_chat_participants_chat_thread_id',
+  })
+  chat_thread!: ChatThread;
+
+  @Column({ type: 'integer' })
+  chat_thread_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'account_id',
+    foreignKeyConstraintName: 'FK_chat_participants_account_id',
+  })
+  account!: Account;
+
+  @Column({ type: 'integer' })
+  account_id!: number;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  last_read_at!: Date;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  joined_at!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  left_at!: Date | null;
+}
+
+// ==================== CHAT MESSAGE ====================
+
+@Entity({ name: 'chat_messages' })
+@Index('IDX_chat_messages_chat_thread_id', ['chat_thread_id'])
+export class ChatMessage {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => ChatThread, (thread) => thread.messages, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'chat_thread_id',
+    foreignKeyConstraintName: 'FK_chat_messages_chat_thread_id',
+  })
+  chat_thread!: ChatThread;
+
+  @Column({ type: 'integer' })
+  chat_thread_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'sender_account_id',
+    foreignKeyConstraintName: 'FK_chat_messages_sender_account_id',
+  })
+  sender!: Account;
+
+  @Column({ type: 'integer' })
+  sender_account_id!: number;
+
+  @Column({ type: 'text' })
+  content!: string;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  sent_at!: Date;
+}
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -928,4 +1073,7 @@ export const entities = [
   Contract,
   ContractItem,
   DigitalSignature,
+  ChatThread,
+  ChatParticipant,
+  ChatMessage,
 ];
