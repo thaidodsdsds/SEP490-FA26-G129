@@ -225,6 +225,75 @@ export class Device {
     (item) => item.device,
   )
   service_request_items!: ServiceRequestItem[];
+
+  @OneToMany(
+    () => DeviceOwnershipHistory,
+    (history) => history.device,
+  )
+  ownership_histories!: DeviceOwnershipHistory[];
+}
+
+// ==================== DEVICE OWNERSHIP HISTORY ====================
+
+@Entity({ name: 'device_ownership_histories' })
+@Index('IDX_device_ownership_histories_device_id', ['device_id'])
+@Index('IDX_device_ownership_histories_prev_customer', ['previous_customer_id'])
+@Index('IDX_device_ownership_histories_new_customer', ['new_customer_id'])
+export class DeviceOwnershipHistory {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @ManyToOne(() => Device, (device) => device.ownership_histories, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'device_id', foreignKeyConstraintName: 'FK_device_ownership_histories_device' })
+  device!: Device;
+
+  @Column({ type: 'integer', nullable: true })
+  previous_customer_id!: number | null;
+
+  @ManyToOne(() => Customer, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'previous_customer_id',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_prev_customer',
+  })
+  previous_customer!: Customer | null;
+
+  @Column({ type: 'integer' })
+  new_customer_id!: number;
+
+  @ManyToOne(() => Customer, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'new_customer_id',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_new_customer',
+  })
+  new_customer!: Customer;
+
+  @Column({ type: 'integer', nullable: true })
+  transferred_by!: number | null;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'transferred_by',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_transferred_by',
+  })
+  transferred_by_account!: Account | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  transferred_at!: Date;
+
+  @Column({ type: 'text' })
+  transfer_reason!: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
+  @Column({ type: 'varchar', length: 50, default: 'Completed' })
+  status!: string;
 }
 
 // ==================== DEVICE TYPE ====================
@@ -917,6 +986,7 @@ export const entities = [
   Account,
   ServiceType,
   Device,
+  DeviceOwnershipHistory,
 
   CalibrationProcedure,
   ServiceRequest,
