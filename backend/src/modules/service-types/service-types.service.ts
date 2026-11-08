@@ -3,6 +3,19 @@ import { AppError } from '../../common/errors.js';
 import dataSource from '../../database/dataSource.js';
 import { ServiceType } from '../../database/entities.js';
 
+export const ALLOWED_FIELDS = [
+  'DIEN',
+  'KHOILUONG',
+  'DODAI',
+  'APSUAT',
+  'NHIET',
+  'HOA',
+  'QUANG',
+  'DET',
+] as const;
+
+export const ALLOWED_KINDS = ['Calibration', 'Verification', 'Repair'] as const;
+
 export interface ServiceTypeWithValidation {
   id: number;
   name: string;
@@ -14,9 +27,27 @@ export interface ServiceTypeWithValidation {
   status: string;
   active_procedure: boolean;
   procedure_version: string | null;
+  procedures_count: number;
   is_valid: boolean;
   blocked_reason: string | null;
   errors: string[];
+}
+
+export interface ServiceTypeFilter {
+  field?: string;
+  kind?: string;
+  status?: string;
+  search?: string;
+}
+
+export interface CreateServiceTypeInput {
+  name: string;
+  kind: string;
+  field: string;
+  standard_code: string;
+  measuring_range?: string | null;
+  description?: string | null;
+  status?: string;
 }
 
 export const buildServiceTypeValidation = (
@@ -63,6 +94,7 @@ export const buildServiceTypeValidation = (
     status: serviceType.status,
     active_procedure: Boolean(activeProcedure),
     procedure_version: activeProcedure?.version ?? null,
+    procedures_count: procedures.length,
     is_valid: errors.length === 0,
     blocked_reason: errors.length > 0 ? errors[0] : null,
     errors,
@@ -70,41 +102,147 @@ export const buildServiceTypeValidation = (
 };
 
 /**
- * Lấy danh sách toàn bộ ServiceType kèm thông tin kiểm tra tính hợp lệ
- * (trạng thái Active của dịch vụ và quy trình kỹ thuật Active)
+ * Lấy danh sách ServiceType có lọc theo Lĩnh vực, kind, status, tìm kiếm
  */
-export const listServiceTypes = async (): Promise<ServiceTypeWithValidation[]> => {
-  const serviceTypes = await dataSource.getRepository(ServiceType).find({
-    select: {
-      id: true,
-      name: true,
-      kind: true,
-      field: true,
-      standard_code: true,
-      measuring_range: true,
-      description: true,
-      status: true,
-      calibration_procedures: {
-        id: true,
-        version: true,
-        status: true,
-      },
-    },
-    relations: {
-      calibration_procedures: true,
-    },
-    order: {
-      name: 'ASC',
-      id: 'ASC',
-    },
-  });
+export const listServiceTypes = async (
+  filters?: ServiceTypeFilter,
+): Promise<ServiceTypeWithValidation[]> => {
+  const repo = dataSource.getRepository(ServiceType);
+  const qb = repo
+    .createQueryBuilder('st')
+    .leftJoinAndSelect('st.calibration_procedures', 'proc')
+    .orderBy('st.name', 'ASC')
+    .addOrderBy('st.id', 'ASC');
 
+  if (filters?.field && filters.field !== 'all') {
+    qb.andWhere('st.field = :field', { field: filters.field });
+  }
+
+  if (filters?.kind && filters.kind !== 'all') {
+    qb.andWhere('st.kind = :kind', { kind: filters.kind });
+  }
+
+  if (filters?.status && filters.status !== 'all') {
+    qb.andWhere('st.status = :status', { status: filters.status });
+  }
+
+  if (filters?.search && filters.search.trim()) {
+    const term = `%${filters.search.trim().toLowerCase()}%`;
+    qb.andWhere(
+      '(LOWER(st.name) LIKE :term OR LOWER(st.standard_code) LIKE :term OR LOWER(st.field) LIKE :term)',
+      { term },
+    );
+  }
+
+  const serviceTypes = await qb.getMany();
   return serviceTypes.map(buildServiceTypeValidation);
 };
 
-/**
- * Kiểm tra chi tiết một ServiceType theo ID, ném lỗi nếu dịch vụ chưa Active hoặc chưa có quy trình Active
- */
+export const getServiceTypeById = async (
+  id: number,
+): Promise<ServiceTypeWithValidation> => {
+  const serviceType = await dataSource.getRepository(ServiceType).findOne({
+    where: { id },
+    relations: {
+      calibration_procedures: true,
+    },
+  });
+
+  if (!serviceType) {
+    throw new AppError('Service type not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  return buildServiceTypeValidation(serviceType);
+};
+
+export const createServiceType = async (
+  input: CreateServiceTypeInput,
+): Promise<ServiceType> => {
+  const repo = dataSource.getRepository(ServiceType);
+
+  if (!input.name || !input.name.trim()) {
+    throw new AppError('Service type name is required.', 400, ERROR_CODES.BAD_REQUEST);
+  }
+  if (!input.standard_code || !input.standard_code.trim()) {
+    throw new AppError('Standard code is required.', 400, ERROR_CODES.BAD_REQUEST);
+  }
+  if (!ALLOWED_FIELDS.includes(input.field as (typeof ALLOWED_FIELDS)[number])) {
+    throw new AppError(
+      `Invalid field. Allowed values: ${ALLOWED_FIELDS.join(', ')}`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+  if (!ALLOWED_KINDS.includes(input.kind as (typeof ALLOWED_KINDS)[number])) {
+    throw new AppError(
+      `Invalid kind. Allowed values: ${ALLOWED_KINDS.join(', ')}`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  const existingCode = await repo.findOne({
+    where: { standard_code: input.standard_code.trim() },
+  });
+  if (existingCode) {
+    throw new AppError(
+      `Standard code "${input.standard_code}" already exists.`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  const newServiceType = repo.create({
+    name: input.name.trim(),
+    kind: input.kind,
+    field: input.field,
+    standard_code: input.standard_code.trim(),
+    measuring_range: input.measuring_range?.trim() || null,
+    description: input.description?.trim() || null,
+    status: input.status === 'Inactive' ? 'Inactive' : 'Active',
+  });
+
+  return await repo.save(newServiceType);
+};
+
+export const updateServiceType = async (
+  id: number,
+  input: Partial<CreateServiceTypeInput>,
+): Promise<ServiceType> => {
+  const repo = dataSource.getRepository(ServiceType);
+  const existing = await repo.findOne({ where: { id } });
+
+  if (!existing) {
+    throw new AppError('Service type not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (input.field && !ALLOWED_FIELDS.includes(input.field as (typeof ALLOWED_FIELDS)[number])) {
+    throw new AppError(`Invalid field.`, 400, ERROR_CODES.BAD_REQUEST);
+  }
+  if (input.kind && !ALLOWED_KINDS.includes(input.kind as (typeof ALLOWED_KINDS)[number])) {
+    throw new AppError(`Invalid kind.`, 400, ERROR_CODES.BAD_REQUEST);
+  }
+
+  if (input.standard_code && input.standard_code.trim() !== existing.standard_code) {
+    const duplicate = await repo.findOne({
+      where: { standard_code: input.standard_code.trim() },
+    });
+    if (duplicate && duplicate.id !== id) {
+      throw new AppError('Standard code already exists.', 400, ERROR_CODES.BAD_REQUEST);
+    }
+    existing.standard_code = input.standard_code.trim();
+  }
+
+  if (input.name) existing.name = input.name.trim();
+  if (input.kind) existing.kind = input.kind;
+  if (input.field) existing.field = input.field;
+  if (input.measuring_range !== undefined) existing.measuring_range = input.measuring_range;
+  if (input.description !== undefined) existing.description = input.description;
+  if (input.status) existing.status = input.status;
+
+  return await repo.save(existing);
+};
+
 export const validateServiceTypeById = async (
   serviceTypeId: number,
 ): Promise<ServiceTypeWithValidation> => {
@@ -147,4 +285,3 @@ export const validateServiceTypeById = async (
 
   return validated;
 };
-

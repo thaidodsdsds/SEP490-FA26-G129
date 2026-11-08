@@ -33,6 +33,11 @@ import WorkOrdersPage from '../features/reviewer/features/work-orders/WorkOrders
 import AssignmentsPage from '../features/reviewer/features/assignments/AssignmentsPage.jsx';
 import ServiceTypesPage from '../features/reviewer/features/service-types/ServiceTypesPage.jsx';
 import ProceduresPage from '../features/reviewer/features/procedures/ProceduresPage.jsx';
+import ProcedureHeaderPage from '../features/reviewer/features/procedures/ProcedureHeaderPage.jsx';
+import ProcedureStepsPage from '../features/reviewer/features/procedures/ProcedureStepsPage.jsx';
+import ProcedureParametersPage from '../features/reviewer/features/procedures/ProcedureParametersPage.jsx';
+import ProcedurePreviewPage from '../features/reviewer/features/procedures/ProcedurePreviewPage.jsx';
+import ProcedureDetailPage from '../features/reviewer/features/procedures/ProcedureDetailPage.jsx';
 import StandardsPage from '../features/reviewer/features/standards/StandardsPage.jsx';
 import ReviewQueuePage from '../features/reviewer/features/review-queue/ReviewQueuePage.jsx';
 import DriftPage from '../features/reviewer/features/drift/DriftPage.jsx';
@@ -146,6 +151,7 @@ const adminRoutes = [
       },
       { path: 'accounts', element: <AccountsPage /> },
       { path: 'roles', element: <RolesPage /> },
+      { path: 'service-types', element: <ServiceTypesPage /> },
       { path: 'contracts', element: <ContractListPage basePath="/internal/admin/contracts" canCreate /> },
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
@@ -248,6 +254,12 @@ const internalRoutes = [
           { path: 'assignments', element: <AssignmentsPage /> },
           { path: 'service-types', element: <ServiceTypesPage /> },
           { path: 'procedures', element: <ProceduresPage /> },
+          { path: 'procedures/new', element: <ProcedureHeaderPage /> },
+          { path: 'procedures/:id', element: <ProcedureDetailPage /> },
+          { path: 'procedures/:id/edit', element: <ProcedureHeaderPage /> },
+          { path: 'procedures/:id/steps', element: <ProcedureStepsPage /> },
+          { path: 'procedures/:id/parameters', element: <ProcedureParametersPage /> },
+          { path: 'procedures/:id/preview', element: <ProcedurePreviewPage /> },
           { path: 'standards', element: <StandardsPage /> },
           { path: 'review-queue', element: <ReviewQueuePage /> },
           { path: 'drift', element: <DriftPage /> },

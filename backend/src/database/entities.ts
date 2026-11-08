@@ -281,6 +281,11 @@ export class CalibrationProcedure {
   @Column({ type: 'varchar', length: 20, default: 'Draft' })
   status!: string;
 
+  @OneToMany(() => ProcedureStep, (step) => step.procedure)
+  steps!: ProcedureStep[];
+
+  @OneToMany(() => ProcedureParameter, (param) => param.procedure)
+  parameters!: ProcedureParameter[];
 }
 
 // ==================== SERVICE REQUEST ====================
@@ -909,6 +914,140 @@ export class DigitalSignature {
   created_at!: Date;
 }
 
+// ==================== PROCEDURE STEP ====================
+
+@Entity({ name: 'procedure_steps' })
+@Index('IDX_procedure_steps_procedure_id', ['procedure_id'])
+@Unique('UQ_procedure_steps_proc_step_no', ['procedure_id', 'step_no'])
+export class ProcedureStep {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => CalibrationProcedure,
+    (proc) => proc.steps,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
+  @JoinColumn({
+    name: 'procedure_id',
+    foreignKeyConstraintName: 'FK_procedure_steps_procedure_id',
+  })
+  procedure!: CalibrationProcedure;
+
+  @Column({ type: 'integer' })
+  procedure_id!: number;
+
+  @Column({ type: 'integer' })
+  step_no!: number;
+
+  @Column({ type: 'text' })
+  instruction!: string;
+
+  @Column({ type: 'boolean', default: false })
+  requires_evidence!: boolean;
+}
+
+// ==================== PROCEDURE PARAMETER ====================
+
+@Entity({ name: 'procedure_parameters' })
+@Index('IDX_procedure_parameters_procedure_id', ['procedure_id'])
+export class ProcedureParameter {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => CalibrationProcedure,
+    (proc) => proc.parameters,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
+  @JoinColumn({
+    name: 'procedure_id',
+    foreignKeyConstraintName: 'FK_procedure_parameters_procedure_id',
+  })
+  procedure!: CalibrationProcedure;
+
+  @Column({ type: 'integer' })
+  procedure_id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 50 })
+  unit!: string;
+
+  @Column({ type: 'integer', default: 1 })
+  repeat_count!: number;
+
+  @Column({ type: 'varchar', length: 255, default: 'mean' })
+  calculation_method!: string;
+
+  @OneToMany(() => ProcedureTestPoint, (tp) => tp.parameter)
+  test_points!: ProcedureTestPoint[];
+}
+
+// ==================== PROCEDURE TEST POINT ====================
+
+@Entity({ name: 'procedure_test_points' })
+@Index('IDX_procedure_test_points_parameter_id', ['parameter_id'])
+@Unique('UQ_procedure_test_points_param_point_no', ['parameter_id', 'point_no'])
+export class ProcedureTestPoint {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => ProcedureParameter,
+    (param) => param.test_points,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
+  @JoinColumn({
+    name: 'parameter_id',
+    foreignKeyConstraintName: 'FK_procedure_test_points_parameter_id',
+  })
+  parameter!: ProcedureParameter;
+
+  @Column({ type: 'integer' })
+  parameter_id!: number;
+
+  @Column({ type: 'integer' })
+  point_no!: number;
+
+  @Column({ type: 'numeric', precision: 15, scale: 4 })
+  nominal_value!: number | string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 4, nullable: true })
+  tolerance!: number | string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 4, nullable: true })
+  max_uncertainty!: number | string | null;
+}
+
+// ==================== MASTER STANDARD ====================
+
+@Entity({ name: 'master_standards' })
+@Index('IDX_master_standards_status', ['status'])
+@Index('IDX_master_standards_calibration_expiry', ['calibration_expiry'])
+@Unique('UQ_master_standards_serial_number', ['serial_number'])
+@Check('CHK_master_standards_status', "status" IN ('Active', 'Inactive', 'Expired'))
+export class MasterStandard {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 100, unique: true })
+  serial_number!: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  accuracy_class!: string | null;
+
+  @Column({ type: 'date' })
+  calibration_expiry!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Active' })
+  status!: string;
+}
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -928,4 +1067,8 @@ export const entities = [
   Contract,
   ContractItem,
   DigitalSignature,
+  ProcedureStep,
+  ProcedureParameter,
+  ProcedureTestPoint,
+  MasterStandard,
 ];
