@@ -11,6 +11,7 @@ import CustomerServiceRequestListPage from '../features/customer/service-request
 import CustomerServiceRequestDetailPage from '../features/customer/service-requests/CustomerServiceRequestDetailPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
+import GeneralDashboardPage from '../features/dashboards/general/GeneralDashboardPage.jsx';
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
 import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
@@ -146,6 +147,7 @@ const adminRoutes = [
       },
       { path: 'accounts', element: <AccountsPage /> },
       { path: 'roles', element: <RolesPage /> },
+      { path: 'general-dashboard', element: <GeneralDashboardPage /> },
       { path: 'contracts', element: <ContractListPage basePath="/internal/admin/contracts" canCreate /> },
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
@@ -244,6 +246,7 @@ const internalRoutes = [
         ),
         children: [
           { index: true, element: <ReviewerDashboardPage /> },
+          { path: 'general-dashboard', element: <GeneralDashboardPage /> },
           { path: 'work-orders', element: <WorkOrdersPage /> },
           { path: 'assignments', element: <AssignmentsPage /> },
           { path: 'service-types', element: <ServiceTypesPage /> },

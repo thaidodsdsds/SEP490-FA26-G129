@@ -2,6 +2,7 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/head-of-tech', label: 'Dashboard Reviewer', icon: '▦' },
+  { to: '/internal/head-of-tech/general-dashboard', label: 'Dashboard điều hành', icon: '★' },
   { to: '/internal/head-of-tech/work-orders', label: 'Work Order', icon: '▤' },
   { to: '/internal/head-of-tech/assignments', label: 'Phân công thiết bị', icon: '↗' },
   { to: '/internal/head-of-tech/service-types', label: 'Danh mục dịch vụ', icon: '◫' },
