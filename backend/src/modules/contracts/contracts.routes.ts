@@ -4,10 +4,12 @@ import {
   approveContractHandler,
   cancelContractHandler,
   createContractHandler,
+  customerSignContractHandler,
   getCompanyProfileHandler,
   getContractDetailHandler,
   getContractPrefillHandler,
   getNextContractCodeHandler,
+  getSignedContractFileHandler,
   liquidateContractHandler,
   listAvailableQuotationsHandler,
   listContractsHandler,
@@ -29,9 +31,11 @@ contractsRoutes.get('/', listContractsHandler);
 contractsRoutes.post('/', authorize('Sales', 'Admin'), createContractHandler);
 
 contractsRoutes.get('/:contractId', getContractDetailHandler);
+contractsRoutes.get('/:contractId/signed-file', getSignedContractFileHandler);
 contractsRoutes.patch('/:contractId', updateContractHandler);
 contractsRoutes.post('/:contractId/submit', authorize('Sales', 'Admin'), submitContractHandler);
 contractsRoutes.post('/:contractId/approve', authorize('Admin', 'CEO'), approveContractHandler);
+contractsRoutes.post('/:contractId/customer-sign', authorize('Customer'), customerSignContractHandler);
 contractsRoutes.post('/:contractId/cancel', authorize('Sales', 'Admin'), cancelContractHandler);
 contractsRoutes.post('/:contractId/liquidate', authorize('Accountant', 'Admin'), liquidateContractHandler);
 

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import fs from 'node:fs';
 import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import { buildSuccessResponse } from '../../common/response.js';
@@ -13,12 +14,14 @@ import {
   liquidateContract,
   listAvailableQuotations,
   listContracts,
+  signContractAsCustomer,
   submitContract,
   updateContract,
   type ContractActor,
   type CreateContractInput,
   type UpdateContractInput,
 } from './contracts.service.js';
+import { getSignedContractAbsolutePath } from './contract-pdf.service.js';
 import { resolveAccountCustomerId } from '../service-requests/service-requests.service.js';
 
 const getActor = (req: Request): ContractActor => {
@@ -259,3 +262,62 @@ export const liquidateContractHandler = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => runTransition(req, res, next, liquidateContract);
+
+export const customerSignContractHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const contractId = Number(req.params.contractId);
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      throw new AppError('contractId không hợp lệ.', 400, ERROR_CODES.VALIDATION_ERROR);
+    }
+
+    const actor = getActor(req);
+    const customerFilter = await resolveCustomerFilter(req);
+    const contract = await signContractAsCustomer(contractId, actor, customerFilter);
+    res.status(200).json(buildSuccessResponse(contract));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSignedContractFileHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const contractId = Number(req.params.contractId);
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      throw new AppError('contractId không hợp lệ.', 400, ERROR_CODES.VALIDATION_ERROR);
+    }
+
+    const actor = getActor(req);
+    const customerFilter = await resolveCustomerFilter(req);
+    const contract = await getContractDetail(contractId, actor, customerFilter);
+
+    if (!contract.signed_file_url) {
+      throw new AppError(
+        'Hợp đồng chưa có file PDF đã ký. Vui lòng hoàn tất ký hai bên trước.',
+        404,
+        ERROR_CODES.NOT_FOUND,
+      );
+    }
+
+    const filePath = getSignedContractAbsolutePath(contract.signed_file_url);
+    if (!fs.existsSync(filePath)) {
+      throw new AppError('File PDF đã ký không tồn tại trên máy chủ.', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="contract-${contractId}-signed.pdf"`,
+    );
+    res.sendFile(filePath);
+  } catch (error) {
+    next(error);
+  }
+};

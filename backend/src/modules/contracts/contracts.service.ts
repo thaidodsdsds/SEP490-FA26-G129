@@ -10,6 +10,15 @@ import {
   Quotation,
 } from '../../database/entities.js';
 import { formatQuotationCode } from '../quotations/quotations.service.js';
+import { ensureWorkOrderForContract } from '../work-orders/work-orders.service.js';
+import {
+  COMPANY_SIGNATURE_PURPOSE,
+  CUSTOMER_SIGNATURE_PURPOSE,
+  createSignatureRecord,
+  finalizeSignedContract,
+  listContractSignatures,
+  type ContractSignatureInfo,
+} from './contract-signature.service.js';
 
 export const CONTRACT_STATUSES = [
   'Draft',
@@ -133,9 +142,11 @@ export interface ContractDetail extends ContractSummary {
   draft_file_url: string | null;
   signed_file_url: string | null;
   items: ContractItemResult[];
+  signatures: ContractSignatureInfo[];
   can_edit: boolean;
   can_submit: boolean;
   can_approve: boolean;
+  can_sign_customer: boolean;
   can_cancel: boolean;
   can_liquidate: boolean;
 }
@@ -302,7 +313,11 @@ const mapItem = (item: ContractItem): ContractItemResult => ({
   quotation_line_item_id: item.quotation_line_item_id ?? null,
 });
 
-const mapContract = (contract: Contract, actor?: ContractActor): ContractDetail => {
+const mapContract = (
+  contract: Contract,
+  actor?: ContractActor,
+  signatures: ContractSignatureInfo[] = [],
+): ContractDetail => {
   const status = contract.status;
   const isAdmin = actor?.role === 'Admin';
   const isSales = actor?.role === 'Sales';
@@ -366,12 +381,17 @@ const mapContract = (contract: Contract, actor?: ContractActor): ContractDetail 
     items: [...(contract.items ?? [])]
       .sort((left, right) => left.line_no - right.line_no)
       .map(mapItem),
+    signatures,
     can_edit:
       status !== 'Cancelled' &&
       (isAdmin ? ['Draft', 'PendingApproval'].includes(status) : isSales && isOwner && status === 'Draft'),
     can_submit:
       status === 'Draft' && ((isSales && isOwner) || isAdmin),
     can_approve: status === 'PendingApproval' && (isAdmin || actor?.role === 'CEO'),
+    can_sign_customer:
+      status === 'Approved' &&
+      actor?.role === 'Customer' &&
+      !signatures.some((signature) => signature.purpose === CUSTOMER_SIGNATURE_PURPOSE),
     can_cancel:
       !['Cancelled', 'Liquidated'].includes(status) &&
       (isAdmin || (isSales && isOwner && ['Draft', 'PendingApproval'].includes(status))),
@@ -708,7 +728,8 @@ export const getContractDetail = async (
   customerIdFilter?: number,
 ): Promise<ContractDetail> => {
   const contract = await findContractOrFail(id, customerIdFilter);
-  return mapContract(contract, actor);
+  const signatures = await listContractSignatures(id);
+  return mapContract(contract, actor, signatures);
 };
 
 const assertCodeAvailable = async (code: string, excludeId?: number): Promise<void> => {
@@ -1042,16 +1063,93 @@ export const submitContract = async (
 export const approveContract = async (
   id: number,
   actor: ContractActor,
-): Promise<ContractDetail> =>
-  transition(
-    id,
-    actor,
-    ['Admin', 'CEO'],
-    ['PendingApproval'],
-    'Approved',
-    false,
-    { approved_by: actor.id, approved_at: new Date() },
-  );
+): Promise<ContractDetail> => {
+  if (!['Admin', 'CEO'].includes(actor.role)) {
+    throw new AppError('Bạn không có quyền thực hiện thao tác này.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const contract = await findContractOrFail(id);
+
+  if (contract.status !== 'PendingApproval') {
+    throw new AppError(
+      `Không thể duyệt hợp đồng ở trạng thái "${contract.status}".`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  const now = new Date();
+
+  await dataSource.transaction(async (manager) => {
+    await createSignatureRecord(manager, contract, COMPANY_SIGNATURE_PURPOSE, actor.id);
+
+    contract.status = 'Approved';
+    contract.approved_by = actor.id;
+    contract.approved_at = now;
+    contract.updated_at = now;
+
+    await manager.getRepository(Contract).save(contract);
+  });
+
+  return getContractDetail(id, actor);
+};
+
+export const signContractAsCustomer = async (
+  id: number,
+  actor: ContractActor,
+  customerIdFilter?: number,
+): Promise<ContractDetail> => {
+  if (actor.role !== 'Customer') {
+    throw new AppError('Chỉ khách hàng của hợp đồng mới được ký.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const contract = await findContractOrFail(id, customerIdFilter);
+
+  if (contract.status !== 'Approved') {
+    throw new AppError(
+      `Chỉ có thể ký hợp đồng đã được Bên B duyệt. Trạng thái hiện tại: "${contract.status}".`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  const signatures = await listContractSignatures(id);
+  if (!signatures.some((signature) => signature.purpose === COMPANY_SIGNATURE_PURPOSE)) {
+    throw new AppError(
+      'Hợp đồng chưa có chữ ký của Bên B.',
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  if (signatures.some((signature) => signature.purpose === CUSTOMER_SIGNATURE_PURPOSE)) {
+    throw new AppError(
+      'Hợp đồng đã có chữ ký của Bên A.',
+      409,
+      ERROR_CODES.CONFLICT,
+    );
+  }
+
+  const now = new Date();
+
+  await dataSource.transaction(async (manager) => {
+    await createSignatureRecord(manager, contract, CUSTOMER_SIGNATURE_PURPOSE, actor.id);
+
+    contract.status = 'Signed';
+    contract.updated_at = now;
+
+    await manager.getRepository(Contract).save(contract);
+    await ensureWorkOrderForContract(manager, contract);
+  });
+
+  try {
+    await finalizeSignedContract(id);
+  } catch (error) {
+    console.error('[Contract] Không thể tạo file PDF đã ký:', error);
+  }
+
+  return getContractDetail(id, actor, customerIdFilter);
+};
 
 export const cancelContract = async (
   id: number,
