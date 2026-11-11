@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAppContext } from '../../../app/providers.jsx';
+import { isHeadSalesAccount } from '../../../app/role-routing.js';
 import {
   approveQuotationApi,
   extractApiErrorMessage,
   getQuotationDetailApi,
+  headSalesReviewQuotationApi,
   rejectQuotationApi,
   sendDraftQuotationApi,
 } from '../../../services/quotation-service.js';
@@ -83,6 +86,8 @@ const convertNumberToWords = (num) => {
 };
 
 function QuotationDetailPage({ role = 'sales' }) {
+  const { session } = useAppContext() || {};
+  const isHeadSales = isHeadSalesAccount(session?.user);
   const { id } = useParams();
   const navigate = useNavigate();
   const isSales = role === 'sales';
@@ -94,6 +99,10 @@ function QuotationDetailPage({ role = 'sales' }) {
 
   // Modals
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState('');
+  const [recallConfirmOpen, setRecallConfirmOpen] = useState(false);
+  const [headSalesModal, setHeadSalesModal] = useState(null); // 'approve' | 'reject' | null
+  const [headSalesNote, setHeadSalesNote] = useState('');
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -125,15 +134,71 @@ function QuotationDetailPage({ role = 'sales' }) {
 
   // Actions
   const handleSendDraft = async () => {
+    if (quotation.head_sales_decision === 'Rejected') {
+      if (!submissionNote.trim() || submissionNote.trim().length < 5) {
+        setActionError('Vui lòng nhập ghi chú giải trình (tối thiểu 5 ký tự) nêu rõ các thay đổi bạn đã thực hiện theo yêu cầu của Trưởng phòng.');
+        return;
+      }
+    }
     setActionLoading(true);
     setActionError('');
     try {
-      const updated = await sendDraftQuotationApi(quotation.id);
-      setQuotation((prev) => ({ ...prev, ...updated, status: 'Sent' }));
+      const updated = await sendDraftQuotationApi(quotation.id, {
+        sales_submission_note: submissionNote.trim() || undefined,
+      });
+      setQuotation((prev) => ({ ...prev, ...updated, status: updated.status || 'PendingApproval' }));
       setSendConfirmOpen(false);
-      showToast('Đã phát hành và gửi báo giá chính thức cho khách hàng.');
+      setSubmissionNote('');
+      showToast(
+        updated.status === 'Sent'
+          ? 'Đã phê duyệt và phát hành gửi báo giá chính thức cho khách hàng.'
+          : 'Đã trình báo giá lên Trưởng phòng Kinh doanh (HeadSales) phê duyệt.',
+      );
     } catch (err) {
       setActionError(extractApiErrorMessage(err, 'Không thể gửi báo giá.'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRecall = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      const updated = await recallQuotationApi(quotation.id);
+      setQuotation(updated);
+      setRecallConfirmOpen(false);
+      showToast('Đã thu hồi báo giá về trạng thái Nháp (Draft). Bạn có thể tiếp tục chỉnh sửa.');
+    } catch (err) {
+      setActionError(extractApiErrorMessage(err, 'Không thể thu hồi báo giá.'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleHeadSalesReview = async () => {
+    if (!headSalesModal) return;
+    if (headSalesModal === 'reject' && !headSalesNote.trim()) {
+      setActionError('Vui lòng nhập lý do từ chối hoặc yêu cầu chỉnh sửa cho nhân viên Sales.');
+      return;
+    }
+    setActionLoading(true);
+    setActionError('');
+    try {
+      const updated = await headSalesReviewQuotationApi(quotation.id, {
+        decision: headSalesModal,
+        note: headSalesNote.trim() || undefined,
+      });
+      setQuotation(updated);
+      setHeadSalesModal(null);
+      setHeadSalesNote('');
+      showToast(
+        headSalesModal === 'approve'
+          ? 'HeadSales đã đồng ý duyệt! Báo giá đã được phát hành tới tay khách hàng (Sent).'
+          : 'Đã trả báo giá về trạng thái Nháp (Draft) để nhân viên Sales chỉnh sửa lại.',
+      );
+    } catch (err) {
+      setActionError(extractApiErrorMessage(err, 'Không thể thực hiện phê duyệt báo giá.'));
     } finally {
       setActionLoading(false);
     }
@@ -201,6 +266,7 @@ function QuotationDetailPage({ role = 'sales' }) {
   const lineItems = Array.isArray(quotation.line_items) ? quotation.line_items : [];
   const statusClass = {
     Draft: 'qd-status-ribbon--draft',
+    PendingApproval: 'qd-status-ribbon--draft',
     Sent: 'qd-status-ribbon--sent',
     Approved: 'qd-status-ribbon--approved',
     Rejected: 'qd-status-ribbon--rejected',
@@ -208,7 +274,8 @@ function QuotationDetailPage({ role = 'sales' }) {
 
   const statusLabel = {
     Draft: 'Bản nháp (Draft)',
-    Sent: 'Đã gửi khách hàng (Sent)',
+    PendingApproval: 'Chờ HeadSales duyệt (PendingApproval)',
+    Sent: 'Đã duyệt & Gửi khách hàng (Sent)',
     Approved: 'Khách hàng chấp thuận (Approved)',
     Rejected: 'Khách hàng từ chối (Rejected)',
   }[quotation.status] || quotation.status;
@@ -241,7 +308,7 @@ function QuotationDetailPage({ role = 'sales' }) {
           </button>
 
           {/* Sales actions */}
-          {isSales && quotation.can_send && (
+          {isSales && !isHeadSales && quotation.status === 'Draft' && (
             <button
               className="button button-primary"
               onClick={() => {
@@ -250,8 +317,52 @@ function QuotationDetailPage({ role = 'sales' }) {
               }}
               type="button"
             >
-              ✉ Gửi báo giá cho khách hàng
+              📤 Trình HeadSales phê duyệt
             </button>
+          )}
+
+          {isSales && !isHeadSales && quotation.status === 'PendingApproval' && (
+            <button
+              className="button button-secondary"
+              onClick={() => {
+                setActionError('');
+                setRecallConfirmOpen(true);
+              }}
+              style={{ borderColor: '#f59e0b', color: '#b45309' }}
+              type="button"
+            >
+              ↩ Thu hồi về bản nháp
+            </button>
+          )}
+
+          {/* HeadSales approval actions */}
+          {isSales && isHeadSales && (quotation.status === 'PendingApproval' || quotation.status === 'Draft') && (
+            <>
+              <button
+                className="button button-success"
+                onClick={() => {
+                  setActionError('');
+                  setHeadSalesNote(quotation.head_sales_note || '');
+                  setHeadSalesModal('approve');
+                }}
+                type="button"
+              >
+                ✓ Duyệt &amp; Gửi khách hàng
+              </button>
+              {quotation.status === 'PendingApproval' && (
+                <button
+                  className="button button-danger"
+                  onClick={() => {
+                    setActionError('');
+                    setHeadSalesNote('');
+                    setHeadSalesModal('reject');
+                  }}
+                  type="button"
+                >
+                  ✕ Yêu cầu Sales chỉnh sửa
+                </button>
+              )}
+            </>
           )}
 
           {isSales && quotation.status === 'Approved' && (
@@ -263,12 +374,23 @@ function QuotationDetailPage({ role = 'sales' }) {
             </Link>
           )}
 
-          {isSales && (quotation.status === 'Draft' || quotation.status === 'Sent') && (
+          {isSales && (quotation.status === 'Draft' || quotation.status === 'PendingApproval') && (
             <Link
-              className="button button-secondary"
+              className="button button-primary"
               to={`/internal/sales/quotations?requestId=${quotation.service_request_id}`}
             >
-              ✎ Cập nhật báo giá
+              {quotation.head_sales_decision === 'Rejected'
+                ? '✎ Chỉnh sửa theo yêu cầu của HeadSales & Trình duyệt lại'
+                : '✎ Cập nhật & Chỉnh sửa báo giá'}
+            </Link>
+          )}
+
+          {isSales && quotation.status === 'Rejected' && (
+            <Link
+              className="button button-primary"
+              to={`/internal/sales/quotations?requestId=${quotation.service_request_id}`}
+            >
+              ₫ Lập báo giá mới cho đơn này (Báo giá lại)
             </Link>
           )}
 
@@ -310,16 +432,127 @@ function QuotationDetailPage({ role = 'sales' }) {
         </div>
       )}
 
+      {isSales && quotation.status === 'PendingApproval' && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '14px 18px',
+            borderRadius: '10px',
+            background: '#fffbeb',
+            border: '1px solid #fcd34d',
+            color: '#92400e',
+            fontSize: '0.88rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div>
+            <strong>⏳ Đang chờ Trưởng phòng Kinh doanh (HeadSales) phê duyệt:</strong> Báo giá này đã được nhân viên Sales trình duyệt nội bộ
+            {quotation.submission_count > 1 ? ` (Lần trình #${quotation.submission_count})` : ''}. Sau khi HeadSales đồng ý duyệt, báo giá sẽ tự động chuyển sang trạng thái <strong>Sent</strong> và hiển thị bên phía Khách hàng.
+            {quotation.sales_submission_note && (
+              <div style={{ marginTop: '6px', fontStyle: 'italic', color: '#78350f' }}>
+                &ldquo;Giải trình của Sales: {quotation.sales_submission_note}&rdquo;
+              </div>
+            )}
+          </div>
+          {!isHeadSales && (
+            <button
+              className="button button-secondary"
+              onClick={() => {
+                setActionError('');
+                setRecallConfirmOpen(true);
+              }}
+              style={{ flexShrink: 0, fontSize: '0.82rem', padding: '6px 12px', borderColor: '#f59e0b', color: '#b45309' }}
+              type="button"
+            >
+              ↩ Thu hồi về bản nháp
+            </button>
+          )}
+        </div>
+      )}
+
+      {quotation.sales_submission_note && quotation.status !== 'PendingApproval' && quotation.status !== 'Rejected' && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '12px 18px',
+            borderRadius: '10px',
+            background: '#f0fdfa',
+            border: '1px solid #99f6e4',
+            color: '#115e59',
+            fontSize: '0.88rem',
+          }}
+        >
+          <strong>📝 Giải trình của Sales {quotation.submission_count > 1 ? `(Lần nộp #${quotation.submission_count})` : ''}:</strong>{' '}
+          &ldquo;{quotation.sales_submission_note}&rdquo;
+        </div>
+      )}
+
+      {isSales && quotation.status === 'Draft' && quotation.head_sales_decision === 'Rejected' && quotation.head_sales_note && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '16px 20px',
+            borderRadius: '10px',
+            background: '#fef2f2',
+            border: '1.5px solid #f87171',
+            color: '#991b1b',
+            fontSize: '0.88rem',
+            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <strong>⚠ Báo giá bị HeadSales ({quotation.head_sales_reviewer_name || 'Trưởng phòng KD'}) trả về yêu cầu sửa:</strong>
+              <p style={{ margin: '6px 0 0', fontWeight: 600 }}>
+                &ldquo;{quotation.head_sales_note}&rdquo;
+              </p>
+            </div>
+            <Link
+              className="button button-primary"
+              style={{ flexShrink: 0, fontSize: '0.82rem', padding: '7px 14px' }}
+              to={`/internal/sales/quotations?requestId=${quotation.service_request_id}`}
+            >
+              ✎ Chỉnh sửa &amp; Trình duyệt lại
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {quotation.status === 'Rejected' && quotation.customer_reject_reason && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '14px 18px',
+            borderRadius: '10px',
+            background: '#fff1f2',
+            border: '1px solid #fda4af',
+            color: '#9f1239',
+            fontSize: '0.88rem',
+          }}
+        >
+          <strong>✕ Khách hàng đã từ chối báo giá này:</strong>{' '}
+          &ldquo;{quotation.customer_reject_reason}&rdquo;
+          {quotation.customer_responded_at && (
+            <span style={{ fontSize: '0.8rem', color: '#be123c', marginLeft: '8px' }}>
+              ({formatDate(quotation.customer_responded_at)})
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Formal Document Sheet */}
       <article className="qd-document">
         {/* Document Header */}
         <header className="qd-doc-header">
           <div className="qd-brand-block">
-            <h2>TRUNG TÂM ĐO LƯỜNG & HIỆU CHUẨN ISOCAL</h2>
+            <h2>TRUNG TÂM ĐO LƯỜNG &amp; HIỆU CHUẨN ISOCAL</h2>
             <div className="qd-brand-sub">HỆ THỐNG PHÒNG THỬ NGHIỆM ĐẠT CHUẨN ISO/IEC 17025:2017</div>
             <div className="qd-brand-meta">
-              <div>📍 Tầng 1, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh</div>
-              <div>📞 Hotline: 1900 6868 · ✉ Email: kinhdoanh@isocal.vn · Mã số thuế: 0316889988</div>
+              <div>📍 Trụ sở chính: Tầng 1, Tòa nhà Hoa Sơn, Thôn Đoài, Xã Hoàn Sơn, Huyện Tiên Du, Tỉnh Bắc Ninh</div>
+              <div>📞 Hotline: 1900 6868 · ✉ Email: kinhdoanh@isocal.vn · Mã số thuế: 2301146239</div>
             </div>
           </div>
 
@@ -336,9 +569,8 @@ function QuotationDetailPage({ role = 'sales' }) {
             <h4>ĐƠN VỊ CUNG CẤP DỊCH VỤ (BÊN A)</h4>
             <div className="qd-party-name">CÔNG TY CỔ PHẦN ĐO LƯỜNG ISOCAL</div>
             <div className="qd-party-details">
-              <div>MST: <strong>0316889988</strong></div>
-              <div>Địa chỉ: Khu Công nghệ cao, TP. Thủ Đức, TP.HCM</div>
-              <div>Số tài khoản: <strong>1188.8888.6868</strong> tại Ngân hàng TMCP Quân Đội (MBBank)</div>
+              <div>Mã số thuế: <strong>2301146239</strong></div>
+              <div>Trụ sở chính: Tầng 1, Tòa nhà Hoa Sơn, Thôn Đoài, Xã Hoàn Sơn, Huyện Tiên Du, Tỉnh Bắc Ninh</div>
               <div>Người phụ trách kinh doanh: Bộ phận Dịch vụ khách hàng ISOCAL</div>
             </div>
           </div>
@@ -512,23 +744,51 @@ function QuotationDetailPage({ role = 'sales' }) {
         </footer>
       </article>
 
-      {/* Modal: Sales Send Draft Confirmation */}
+      {/* Modal: Sales Submit Draft to HeadSales Confirmation */}
       {sendConfirmOpen && (
         <div className="sr-modal-overlay" role="dialog" aria-modal="true">
           <div className="sr-modal-box">
             <div className="sr-modal-header">
               <div>
-                <h3>Xác nhận gửi báo giá cho khách hàng</h3>
+                <h3>Trình báo giá cho Trưởng phòng KD (HeadSales) duyệt</h3>
                 <p>Mã báo giá: <strong>{quotation.quotation_code}</strong></p>
               </div>
             </div>
             <div className="sr-modal-body">
               <p className="sr-modal-desc">
-                Báo giá sẽ được chuyển sang trạng thái <strong>Đã gửi (Sent)</strong> và hiển thị tới khách hàng <strong>{quotation.customer?.company_name}</strong> để xem xét và phản hồi.
+                Báo giá sẽ được chuyển sang trạng thái <strong>Chờ HeadSales duyệt (PendingApproval)</strong>. Sau khi Trưởng phòng Kinh doanh đồng ý phê duyệt, hệ thống sẽ chính thức gửi báo giá tới khách hàng <strong>{quotation.customer?.company_name}</strong>.
               </p>
               <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', fontSize: '0.85rem' }}>
                 Tổng giá trị: <strong style={{ color: '#1a56db' }}>{formatCurrency(quotation.total_amount)}</strong>
               </div>
+
+              {quotation.head_sales_decision === 'Rejected' && (
+                <div style={{ marginTop: '12px' }}>
+                  {quotation.last_rejected_total != null && (
+                    <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.82rem', color: '#991b1b', marginBottom: '10px' }}>
+                      <strong>Lần từ chối trước:</strong> Tổng tiền {formatCurrency(quotation.last_rejected_total)} · Chiết khấu: {formatCurrency(quotation.last_rejected_discount || 0)}
+                      {Math.abs(Number(quotation.total_amount) - Number(quotation.last_rejected_total)) < 0.01 &&
+                       Math.abs(Number(quotation.total_discount_amount || 0) - Number(quotation.last_rejected_discount || 0)) < 0.01 && (
+                        <div style={{ marginTop: '4px', fontWeight: 600, color: '#dc2626' }}>
+                          ⚠️ Cảnh báo: Bạn chưa thay đổi tổng tiền hoặc chiết khấu so với lúc bị từ chối! Vui lòng vào Chỉnh sửa báo giá cập nhật lại trước khi trình duyệt.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <label className="csr-field" style={{ display: 'grid', gap: 6 }}>
+                    <span style={{ fontWeight: 600 }}>Ghi chú giải trình chỉnh sửa (Bắt buộc) *</span>
+                    <textarea
+                      disabled={actionLoading}
+                      onChange={(e) => setSubmissionNote(e.target.value)}
+                      placeholder="Nêu rõ các thay đổi bạn đã thực hiện theo yêu cầu của Trưởng phòng..."
+                      rows={3}
+                      value={submissionNote}
+                    />
+                  </label>
+                </div>
+              )}
+
               {actionError && <div className="csr-inline-error" style={{ marginTop: '12px' }}>{actionError}</div>}
             </div>
             <div className="sr-modal-actions">
@@ -542,11 +802,134 @@ function QuotationDetailPage({ role = 'sales' }) {
               </button>
               <button
                 className="button button-primary"
-                disabled={actionLoading}
+                disabled={
+                  actionLoading ||
+                  (quotation.head_sales_decision === 'Rejected' &&
+                   quotation.last_rejected_total != null &&
+                   Math.abs(Number(quotation.total_amount) - Number(quotation.last_rejected_total)) < 0.01 &&
+                   Math.abs(Number(quotation.total_discount_amount || 0) - Number(quotation.last_rejected_discount || 0)) < 0.01)
+                }
                 onClick={handleSendDraft}
                 type="button"
               >
-                {actionLoading ? 'Đang gửi...' : 'Xác nhận gửi'}
+                {actionLoading ? 'Đang trình duyệt...' : '📤 Xác nhận trình HeadSales duyệt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Sales Recall Pending Submission */}
+      {recallConfirmOpen && (
+        <div className="sr-modal-overlay" role="dialog" aria-modal="true">
+          <div className="sr-modal-box">
+            <div className="sr-modal-header">
+              <div>
+                <h3 style={{ color: '#b45309' }}>↩ Thu hồi báo giá về bản nháp</h3>
+                <p>Mã báo giá: <strong>{quotation.quotation_code}</strong></p>
+              </div>
+            </div>
+            <div className="sr-modal-body">
+              <p className="sr-modal-desc">
+                Báo giá đang trong hàng chờ HeadSales duyệt. Bạn có chắc chắn muốn thu hồi về trạng thái <strong>Bản nháp (Draft)</strong> để tiếp tục chỉnh sửa không?
+              </p>
+              {actionError && <div className="csr-inline-error" style={{ marginTop: '12px' }}>{actionError}</div>}
+            </div>
+            <div className="sr-modal-actions">
+              <button
+                className="button button-secondary"
+                disabled={actionLoading}
+                onClick={() => setRecallConfirmOpen(false)}
+                type="button"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                className="button button-secondary"
+                disabled={actionLoading}
+                onClick={handleRecall}
+                style={{ borderColor: '#f59e0b', color: '#b45309', fontWeight: 600 }}
+                type="button"
+              >
+                {actionLoading ? 'Đang thu hồi...' : '↩ Xác nhận thu hồi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: HeadSales Approve / Reject */}
+      {headSalesModal && (
+        <div className="sr-modal-overlay" role="dialog" aria-modal="true">
+          <div className="sr-modal-box">
+            <div className="sr-modal-header">
+              <div>
+                <h3 style={{ color: headSalesModal === 'approve' ? '#065f46' : '#991b1b' }}>
+                  {headSalesModal === 'approve'
+                    ? '✓ Phê duyệt & Gửi báo giá cho Khách hàng'
+                    : '✕ Yêu cầu nhân viên Sales chỉnh sửa lại báo giá'}
+                </h3>
+                <p>Mã báo giá: <strong>{quotation.quotation_code}</strong></p>
+              </div>
+            </div>
+            <div className="sr-modal-body">
+              <p className="sr-modal-desc">
+                {headSalesModal === 'approve'
+                  ? `Xác nhận đồng ý phương án giá cho khách hàng "${quotation.customer?.company_name}". Báo giá sẽ chuyển sang trạng thái Đã gửi (Sent) để khách hàng xem xét và phản hồi.`
+                  : 'Báo giá sẽ được chuyển về trạng thái Nháp (Draft) kèm ghi chú yêu cầu chỉnh sửa để nhân viên Sales điều chỉnh lại.'}
+              </p>
+
+              {quotation.sales_submission_note && (
+                <div style={{ marginBottom: 12, padding: '10px 14px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: '0.85rem' }}>
+                  <strong style={{ color: '#1e40af' }}>
+                    📝 Ghi chú giải trình của Sales {quotation.submission_count > 1 ? `(Lần nộp #${quotation.submission_count})` : ''}:
+                  </strong>
+                  <p style={{ margin: '4px 0 0', color: '#1e3a8a', whiteSpace: 'pre-line' }}>
+                    {quotation.sales_submission_note}
+                  </p>
+                </div>
+              )}
+
+              <label className="csr-field" style={{ display: 'grid', gap: 6, marginTop: 10 }}>
+                <span>
+                  {headSalesModal === 'approve'
+                    ? 'Ghi chú phê duyệt (Tùy chọn)'
+                    : 'Lý do từ chối / Hướng dẫn chỉnh sửa cho Sales *'}
+                </span>
+                <textarea
+                  disabled={actionLoading}
+                  onChange={(e) => setHeadSalesNote(e.target.value)}
+                  placeholder={
+                    headSalesModal === 'approve'
+                      ? 'VD: Đã duyệt đơn giá và chiết khấu...'
+                      : 'VD: Giảm mức chiết khấu dòng 1 xuống tối đa 10%...'
+                  }
+                  rows={3}
+                  value={headSalesNote}
+                />
+              </label>
+              {actionError && <div className="csr-inline-error" style={{ marginTop: '12px' }}>{actionError}</div>}
+            </div>
+            <div className="sr-modal-actions">
+              <button
+                className="button button-secondary"
+                disabled={actionLoading}
+                onClick={() => setHeadSalesModal(null)}
+                type="button"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                className={`button ${headSalesModal === 'approve' ? 'button-success' : 'button-danger'}`}
+                disabled={actionLoading}
+                onClick={handleHeadSalesReview}
+                type="button"
+              >
+                {actionLoading
+                  ? 'Đang xử lý...'
+                  : headSalesModal === 'approve'
+                    ? '✓ Đồng ý duyệt & Gửi khách hàng'
+                    : '✕ Trả về Sales chỉnh sửa'}
               </button>
             </div>
           </div>

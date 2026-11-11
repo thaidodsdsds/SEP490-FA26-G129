@@ -7,6 +7,7 @@ import {
   Attachment,
   Customer,
   Device,
+  InitialInspection,
   ServiceRequest,
   ServiceRequestItem,
   ServiceType,
@@ -32,6 +33,7 @@ export interface CreateServiceRequestInput {
   request_code?: string | null;
   customer_id: number;
   created_by: number;
+  created_by_role?: string | null;
   location_type: ServiceRequestLocationType;
   preferred_date?: string | null;
   special_notes?: string | null;
@@ -76,6 +78,7 @@ export interface ServiceRequestCustomerInfo {
   company_name: string;
   tax_code: string | null;
   address: string;
+  assigned_sales_id?: number | null;
 }
 
 export interface ServiceRequestItemSummary {
@@ -92,6 +95,20 @@ export interface ServiceRequestItemSummary {
   service_kind: string;
   standard_code: string | null;
   status: string;
+  initial_inspection?: {
+    id: number;
+    result: string;
+    defect_note: string | null;
+    photo_url: string | null;
+    customer_written_consent: boolean;
+    customer_consent_status: string | null;
+    customer_consent_note: string | null;
+    customer_consent_file: string | null;
+    customer_consented_at: string | null;
+    customer_consent_signer_name: string | null;
+    customer_consent_method: string | null;
+    inspected_at: string;
+  } | null;
 }
 
 export interface ServiceRequestQuotationSummary {
@@ -103,6 +120,11 @@ export interface ServiceRequestQuotationSummary {
   total_amount: number;
   estimated_completion_date: string | null;
   status: string;
+  customer_reject_reason?: string | null;
+  customer_responded_at?: string | null;
+  head_sales_note?: string | null;
+  head_sales_decision?: string | null;
+  head_sales_reviewed_at?: string | null;
   line_items: Array<{
     id: number;
     service_request_item_id: number;
@@ -170,9 +192,18 @@ export const resolveAccountCustomerId = async (accountId: number): Promise<numbe
  */
 export const listServiceRequests = async (
   customerIdFilter?: number,
+  assignedSalesIdFilter?: number,
 ): Promise<ServiceRequestSummary[]> => {
+  const whereClause: Record<string, unknown> = {};
+  if (customerIdFilter) {
+    whereClause.customer_id = customerIdFilter;
+  }
+  if (assignedSalesIdFilter) {
+    whereClause.customer = { assigned_sales_id: assignedSalesIdFilter };
+  }
+
   const requests = await dataSource.getRepository(ServiceRequest).find({
-    ...(customerIdFilter ? { where: { customer_id: customerIdFilter } } : {}),
+    ...(Object.keys(whereClause).length > 0 ? { where: whereClause } : {}),
     select: {
       id: true,
       request_code: true,
@@ -187,6 +218,7 @@ export const listServiceRequests = async (
         company_name: true,
         tax_code: true,
         address: true,
+        assigned_sales_id: true,
       },
       items: {
         id: true,
@@ -216,6 +248,9 @@ export const listServiceRequests = async (
         total_amount: true,
         estimated_completion_date: true,
         status: true,
+        head_sales_note: true,
+        head_sales_decision: true,
+        head_sales_reviewed_at: true,
         line_items: {
           id: true,
           service_request_item_id: true,
@@ -247,7 +282,9 @@ export const listServiceRequests = async (
       : null;
     const visibleQuotations = sortedQuotations
       ? (customerIdFilter
-          ? sortedQuotations.filter((q) => q.status !== 'Draft')
+          ? sortedQuotations.filter(
+              (q) => q.status !== 'Draft' && q.status !== 'PendingApproval',
+            )
           : sortedQuotations)
       : null;
     const targetQuotation = visibleQuotations
@@ -274,6 +311,7 @@ export const listServiceRequests = async (
         company_name: req.customer.company_name,
         tax_code: req.customer.tax_code ?? null,
         address: req.customer.address,
+        assigned_sales_id: req.customer.assigned_sales_id ?? null,
       },
       ...(Array.isArray(req.items)
         ? {
@@ -317,6 +355,11 @@ export const listServiceRequests = async (
                   total_amount: Number(targetQuotation.total_amount),
                   estimated_completion_date: targetQuotation.estimated_completion_date ?? null,
                   status: targetQuotation.status,
+                  head_sales_note: targetQuotation.head_sales_note ?? null,
+                  head_sales_decision: targetQuotation.head_sales_decision ?? null,
+                  head_sales_reviewed_at: targetQuotation.head_sales_reviewed_at
+                    ? new Date(targetQuotation.head_sales_reviewed_at).toISOString()
+                    : null,
                   line_items: (targetQuotation.line_items ?? []).map((li) => ({
                     id: li.id,
                     service_request_item_id: li.service_request_item_id,
@@ -366,7 +409,9 @@ export const getServiceRequestDetail = async (
     : [];
 
   const visibleQuotations = customerIdFilter
-    ? sortedQuotations.filter((q) => q.status !== 'Draft')
+    ? sortedQuotations.filter(
+        (q) => q.status !== 'Draft' && q.status !== 'PendingApproval',
+      )
     : sortedQuotations;
 
   const targetQuotation = visibleQuotations[0] || null;
@@ -380,6 +425,15 @@ export const getServiceRequestDetail = async (
     total_amount: Number(q.total_amount),
     estimated_completion_date: q.estimated_completion_date ?? null,
     status: q.status,
+    customer_reject_reason: q.customer_reject_reason ?? null,
+    customer_responded_at: q.customer_responded_at
+      ? new Date(q.customer_responded_at).toISOString()
+      : null,
+    head_sales_note: q.head_sales_note ?? null,
+    head_sales_decision: q.head_sales_decision ?? null,
+    head_sales_reviewed_at: q.head_sales_reviewed_at
+      ? new Date(q.head_sales_reviewed_at).toISOString()
+      : null,
     line_items: (q.line_items ?? []).map((li) => ({
       id: li.id,
       service_request_item_id: li.service_request_item_id,
@@ -391,6 +445,20 @@ export const getServiceRequestDetail = async (
 
   const canEdit = req.status === 'New';
   const canCancel = ['New', 'Quoted'].includes(req.status);
+
+  const itemIds = Array.isArray(req.items) ? req.items.map((i) => i.id) : [];
+  let inspectionMap = new Map<number, InitialInspection>();
+  if (itemIds.length > 0) {
+    const inspectionRepo = dataSource.getRepository(InitialInspection);
+    if (typeof inspectionRepo?.find === 'function') {
+      const inspections = await inspectionRepo.find({
+        where: { service_request_item_id: In(itemIds) },
+      });
+      if (Array.isArray(inspections)) {
+        inspectionMap = new Map(inspections.map((insp) => [insp.service_request_item_id, insp]));
+      }
+    }
+  }
 
   return {
     id: req.id,
@@ -415,21 +483,42 @@ export const getServiceRequestDetail = async (
       address: req.customer.address,
     },
     items: Array.isArray(req.items)
-      ? req.items.map((item) => ({
-          id: item.id,
-          service_request_item_id: item.id,
-          device_id: item.device_id,
-          device_name: item.device?.name ?? `Thiết bị #${item.device_id}`,
-          manufacturer: item.device?.manufacturer ?? null,
-          model: item.device?.model ?? null,
-          serial_number: item.device?.serial_number ?? null,
-          internal_code: item.device?.internal_code ?? null,
-          service_type_id: item.service_type_id,
-          service_type_name: item.service_type?.name ?? `Dịch vụ #${item.service_type_id}`,
-          service_kind: item.service_type?.kind ?? 'Calibration',
-          standard_code: item.service_type?.standard_code ?? null,
-          status: item.status,
-        }))
+      ? req.items.map((item) => {
+          const insp = inspectionMap.get(item.id);
+          return {
+            id: item.id,
+            service_request_item_id: item.id,
+            device_id: item.device_id,
+            device_name: item.device?.name ?? `Thiết bị #${item.device_id}`,
+            manufacturer: item.device?.manufacturer ?? null,
+            model: item.device?.model ?? null,
+            serial_number: item.device?.serial_number ?? null,
+            internal_code: item.device?.internal_code ?? null,
+            service_type_id: item.service_type_id,
+            service_type_name: item.service_type?.name ?? `Dịch vụ #${item.service_type_id}`,
+            service_kind: item.service_type?.kind ?? 'Calibration',
+            standard_code: item.service_type?.standard_code ?? null,
+            status: item.status,
+            initial_inspection: insp
+              ? {
+                  id: insp.id,
+                  result: insp.result,
+                  defect_note: insp.defect_note,
+                  photo_url: insp.photo_url,
+                  customer_written_consent: insp.customer_written_consent,
+                  customer_consent_status: insp.customer_consent_status,
+                  customer_consent_note: insp.customer_consent_note,
+                  customer_consent_file: insp.customer_consent_file,
+                  customer_consented_at: insp.customer_consented_at
+                    ? new Date(insp.customer_consented_at).toISOString()
+                    : null,
+                  customer_consent_signer_name: insp.customer_consent_signer_name,
+                  customer_consent_method: insp.customer_consent_method,
+                  inspected_at: insp.inspected_at.toISOString(),
+                }
+              : null,
+          };
+        })
       : [],
     attachments: Array.isArray(req.attachments)
       ? req.attachments.map((att) => ({
@@ -609,6 +698,7 @@ export const createServiceRequest = async (
     request_code: rawRequestCode,
     customer_id: customerId,
     created_by: createdBy,
+    created_by_role: createdByRole,
     location_type: locationType,
     preferred_date: rawPreferredDate,
     special_notes: rawSpecialNotes,
@@ -626,15 +716,24 @@ export const createServiceRequest = async (
     );
   }
 
-  // 1. Kiểm tra khách hàng tồn tại
+  // 1. Kiểm tra khách hàng tồn tại & quyền phụ trách của nhân viên Sales
   const customerRepo = dataSource.getRepository(Customer);
   const customer = await customerRepo.findOne({
-    select: { id: true },
+    select: { id: true, company_name: true, assigned_sales_id: true },
     where: { id: customerId },
   });
 
   if (!customer) {
     throw new AppError('Customer not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  const normalizedRole = String(createdByRole || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalizedRole === 'sales' && customer.assigned_sales_id !== createdBy) {
+    throw new AppError(
+      `Khách hàng "${customer.company_name}" chưa được Trưởng phòng Kinh doanh (HeadSales) phân công cho bạn phụ trách. Nhân viên Sales chỉ được phép tạo yêu cầu cho các khách hàng đã được gán.`,
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
   }
 
   // 2. Kiểm tra tất cả thiết bị tồn tại và thuộc về đúng khách hàng

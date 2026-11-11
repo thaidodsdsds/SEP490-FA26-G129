@@ -23,18 +23,42 @@ function decodeJwtPayload(token) {
  */
 function restoreSessionFromStorage() {
   const token = localStorage.getItem('isocal_token');
-  if (!token) return { user: null, expiredOnLoad: false };
+  const storedUserRaw = localStorage.getItem('isocal_user');
+  let storedUser = null;
+  if (storedUserRaw) {
+    try {
+      storedUser = JSON.parse(storedUserRaw);
+    } catch {
+      storedUser = null;
+    }
+  }
+
+  if (!token) {
+    // Support offline mobile technician session where user authenticated in offline mode
+    if (storedUser && typeof window !== 'undefined' && window.location.pathname.startsWith('/mobile')) {
+      return { user: storedUser, expiredOnLoad: false };
+    }
+    return { user: null, expiredOnLoad: false };
+  }
+
   const payload = decodeJwtPayload(token);
   if (!payload) {
     localStorage.removeItem('isocal_token');
-    return { user: null, expiredOnLoad: false };
+    return { user: storedUser || null, expiredOnLoad: false };
   }
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) {
+    // On mobile offline app, keep user session alive for offline field work
+    if (storedUser && typeof window !== 'undefined' && window.location.pathname.startsWith('/mobile')) {
+      return { user: { ...payload, ...storedUser }, expiredOnLoad: false };
+    }
     localStorage.removeItem('isocal_token');
+    localStorage.removeItem('isocal_user');
     return { user: null, expiredOnLoad: true };
   }
-  return { user: payload, expiredOnLoad: false };
+
+  const fullUser = storedUser ? { ...payload, ...storedUser } : payload;
+  return { user: fullUser, expiredOnLoad: false };
 }
 
 export function AppProviders({ children }) {
@@ -67,11 +91,17 @@ export function AppProviders({ children }) {
     }
     setIsSessionExpired(false);
     setUser(account);
+    try {
+      localStorage.setItem('isocal_user', JSON.stringify(account));
+    } catch {
+      // ignore
+    }
     return dashboardPath;
   };
 
   const endSession = () => {
     localStorage.removeItem('isocal_token');
+    localStorage.removeItem('isocal_user');
     setUser(null);
     setIsSessionExpired(false);
   };

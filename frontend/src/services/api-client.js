@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+const resolveApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  // Use relative '/api/v1' so Vite proxy handles forwarding to backend port 3000
+  // on both desktop (localhost:5173) and mobile devices over LAN (192.168.x.x:5173)
+  if (typeof window !== 'undefined') {
+    return '/api/v1';
+  }
+  return 'http://localhost:3000/api/v1';
+};
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
+  baseURL: resolveApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -23,8 +35,9 @@ apiClient.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const serverMessage = error.response?.data?.error?.message;
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
 
-    if (status === 401) {
+    if (status === 401 && !isLoginRequest) {
       // Clear expired / invalid token
       localStorage.removeItem('isocal_token');
 

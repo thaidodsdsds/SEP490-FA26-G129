@@ -264,7 +264,7 @@ function ServiceRequestCreatePage() {
 
       <div className="sr-stats-strip" aria-label="Thống kê danh mục hiện tại">
         <div className="sr-stat-pill">
-          <span>Khách hàng hệ thống</span>
+          <span>Khách hàng được gán cho bạn</span>
           <strong>{loadingInitial ? '...' : customers.length}</strong>
         </div>
         <div className="sr-stat-pill">

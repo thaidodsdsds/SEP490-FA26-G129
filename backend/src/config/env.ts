@@ -24,7 +24,7 @@ const env = {
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'development_secret_change_me',
-    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -35,6 +35,26 @@ const env = {
     from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@isocal.com',
   },
   wsPath: process.env.WS_PATH || '/ws',
+  cloudinary: {
+    cloudName:
+      process.env.CLOUDINARY_CLOUD_NAME ||
+      process.env.CLOUD_NAME ||
+      process.env.CLOUDINARY_NAME ||
+      '',
+    apiKey:
+      process.env.CLOUDINARY_API_KEY ||
+      process.env.API_KEY ||
+      process.env.CLOUDINARY_KEY ||
+      '',
+    apiSecret:
+      process.env.CLOUDINARY_API_SECRET ||
+      process.env.API_SECRET ||
+      process.env.CLOUDINARY_SECRET ||
+      '',
+    uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || '',
+    folder: process.env.CLOUDINARY_FOLDER || 'isocal',
+    cloudinaryUrl: process.env.CLOUDINARY_URL || '',
+  },
 } as const;
 
 export default env;

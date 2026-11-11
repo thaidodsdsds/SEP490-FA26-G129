@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAppContext } from '../../../app/providers.jsx';
+import { isHeadSalesAccount } from '../../../app/role-routing.js';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import {
   createQuotationApi,
@@ -105,6 +107,8 @@ const buildLineItemsFromRequest = (serviceRequest) => {
 };
 
 function QuotationCreatePage() {
+  const { session } = useAppContext() || {};
+  const isHeadSales = isHeadSalesAccount(session?.user);
   const [searchParams] = useSearchParams();
   const queryRequestId = searchParams.get('requestId');
 
@@ -118,6 +122,7 @@ function QuotationCreatePage() {
 
   const [submittingStatus, setSubmittingStatus] = useState('');
   const [sendingDraft, setSendingDraft] = useState(false);
+  const [salesSubmissionNote, setSalesSubmissionNote] = useState('');
   const [formError, setFormError] = useState('');
   const [createdQuotation, setCreatedQuotation] = useState(null);
 
@@ -208,7 +213,8 @@ function QuotationCreatePage() {
 
   const activeDraftQuotation = useMemo(() => {
     if (!selectedRequest?.latest_quotation) return null;
-    return selectedRequest.latest_quotation.status === 'Draft'
+    const st = selectedRequest.latest_quotation.status;
+    return st === 'Draft' || st === 'PendingApproval'
       ? selectedRequest.latest_quotation
       : null;
   }, [selectedRequest]);
@@ -216,12 +222,17 @@ function QuotationCreatePage() {
   const lockedQuotation = useMemo(() => {
     if (!selectedRequest) return null;
     const latest = selectedRequest.latest_quotation;
+    // Báo giá chỉ bị khóa khi đang có báo giá đã gửi khách (Sent) hoặc khách đã duyệt (Approved)
     if (latest && (latest.status === 'Sent' || latest.status === 'Approved')) {
       return latest;
     }
+    // Nếu đơn hàng đã hoàn tất/xác nhận hoặc đã hủy
     if (
       NON_QUOTABLE_STATUSES.has(selectedRequest.status)
+      && selectedRequest.status !== 'Quoted'
       && latest?.status !== 'Rejected'
+      && latest?.status !== 'Draft'
+      && latest?.status !== 'PendingApproval'
     ) {
       return (
         latest || {
@@ -347,6 +358,18 @@ function QuotationCreatePage() {
       return;
     }
 
+    if (
+      status === 'PendingApproval'
+      && activeDraftQuotation?.head_sales_decision === 'Rejected'
+    ) {
+      if (!salesSubmissionNote.trim() || salesSubmissionNote.trim().length < 5) {
+        setFormError(
+          'Vui lòng nhập ghi chú giải trình chỉnh sửa (tối thiểu 5 ký tự) gửi HeadSales trước khi trình duyệt lại.',
+        );
+        return;
+      }
+    }
+
     setSubmittingStatus(status);
     setFormError('');
 
@@ -358,6 +381,7 @@ function QuotationCreatePage() {
         discount_amount: totalDiscountAmount,
         travel_fee: numericTravelFee,
         estimated_completion_date: estimatedCompletionDate || null,
+        sales_submission_note: salesSubmissionNote.trim() || undefined,
         line_items: lineItems.map((line) => ({
           service_request_item_id: Number(line.service_request_item_id),
           description: line.description.trim(),
@@ -495,8 +519,19 @@ function QuotationCreatePage() {
         <div className="qt-demo-banner" role="note">
           <span aria-hidden="true">✎</span>
           <p>
-            <strong>Đang khôi phục bản nháp {activeDraftQuotation.quotation_code}:</strong>{' '}
-            Mọi chỉnh sửa đơn giá, chiết khấu hoặc gửi báo giá bên dưới sẽ <b>cập nhật trực tiếp</b> trên bản ghi nháp này, không sinh thêm bản ghi thừa trong CSDL.
+            <strong>
+              Đang khôi phục báo giá {activeDraftQuotation.quotation_code} (
+              {activeDraftQuotation.status === 'PendingApproval'
+                ? 'Đang chờ HeadSales phê duyệt'
+                : 'Bản nháp Draft'}
+              ):
+            </strong>{' '}
+            Mọi chỉnh sửa đơn giá, chiết khấu hoặc trình duyệt bên dưới sẽ <b>cập nhật trực tiếp</b> trên bản ghi này, không sinh thêm bản ghi thừa trong CSDL.
+            {activeDraftQuotation.head_sales_decision === 'Rejected' && activeDraftQuotation.head_sales_note && (
+              <span style={{ display: 'block', marginTop: 6, color: '#b91c1c', fontWeight: 700 }}>
+                ⚠ Yêu cầu chỉnh sửa từ HeadSales: &ldquo;{activeDraftQuotation.head_sales_note}&rdquo;
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -519,8 +554,10 @@ function QuotationCreatePage() {
               {createdQuotation.is_updated_draft ? 'Đã cập nhật báo giá' : 'Đã lưu báo giá'}{' '}
               #{createdQuotation.quotation_code} (
               {createdQuotation.status === 'Sent'
-                ? 'Đã gửi khách hàng · Phiếu chuyển sang Quoted'
-                : 'Bản nháp Draft'}
+                ? 'HeadSales đã duyệt & Gửi khách hàng · Phiếu chuyển sang Quoted'
+                : createdQuotation.status === 'PendingApproval'
+                  ? 'Đã trình Trưởng phòng KD (HeadSales) phê duyệt'
+                  : 'Bản nháp Draft'}
               )
             </strong>
             <p>
@@ -539,8 +576,10 @@ function QuotationCreatePage() {
                   type="button"
                 >
                   {sendingDraft
-                    ? 'Đang gửi cho khách hàng...'
-                    : '✉ Gửi ngay bản nháp này cho khách hàng (Chuyển sang Sent)'}
+                    ? 'Đang xử lý...'
+                    : isHeadSales
+                      ? '✓ Duyệt & Gửi ngay bản nháp này cho khách hàng (Chuyển sang Sent)'
+                      : '📤 Trình ngay bản nháp này cho HeadSales phê duyệt (Chuyển sang PendingApproval)'}
                 </button>
               </div>
             )}
@@ -581,10 +620,15 @@ function QuotationCreatePage() {
           formError={formError}
           hasValidLineItems={hasValidLineItems}
           isDiscountValid={isDiscountValid}
+          isHeadSales={isHeadSales}
           lineDiscountTotal={lineDiscountTotal}
           lockedQuotation={lockedQuotation}
           onExtraDiscountChange={(val) => {
             setExtraDiscount(Math.max(0, val));
+            setFormError('');
+          }}
+          onSalesSubmissionNoteChange={(val) => {
+            setSalesSubmissionNote(val);
             setFormError('');
           }}
           onSubmitWithStatus={handleSubmitWithStatus}
@@ -592,6 +636,7 @@ function QuotationCreatePage() {
             setTravelFee(Math.max(0, val));
             setFormError('');
           }}
+          salesSubmissionNote={salesSubmissionNote}
           selectedRequest={selectedRequest}
           submittingStatus={submittingStatus}
           subtotal={subtotal}

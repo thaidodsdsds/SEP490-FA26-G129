@@ -9,6 +9,8 @@ import {
   getQuotationDetail,
   listQuotations,
   rejectQuotation,
+  recallQuotationSubmission,
+  reviewQuotationByHeadSales,
   sendDraftQuotation,
   type CreateQuotationLineItemInput,
   type CreateQuotationStatus,
@@ -144,6 +146,7 @@ export const createQuotationHandler = async (
       travel_fee: rawTravelFee,
       estimated_completion_date: rawCompletionDate,
       status: rawStatus = 'Draft',
+      sales_submission_note: rawSalesSubmissionNote,
       line_items: rawLineItems,
     } = (req.body ?? {}) as Record<string, unknown>;
 
@@ -242,6 +245,11 @@ export const createQuotationHandler = async (
 
     const lineItems = normalizeQuotationLineItems(rawLineItems);
 
+    const actorRole =
+      typeof req.user === 'object' && req.user !== null
+        ? String((req.user as { role?: unknown }).role || '')
+        : '';
+
     const createdQuotation = await createQuotation({
       service_request_id: serviceRequestId,
       discount_amount: explicitDiscountAmount,
@@ -249,6 +257,9 @@ export const createQuotationHandler = async (
       travel_fee: travelFee,
       estimated_completion_date: estimatedCompletionDate,
       status: rawStatus as CreateQuotationStatus,
+      sales_submission_note: typeof rawSalesSubmissionNote === 'string' ? rawSalesSubmissionNote : undefined,
+      actor_id: accountId,
+      actor_role: actorRole,
       line_items: lineItems,
     });
 
@@ -289,8 +300,131 @@ export const sendQuotationHandler = async (
       );
     }
 
-    const sentQuotation = await sendDraftQuotation(quotationId);
+    const actorRole =
+      typeof req.user === 'object' && req.user !== null
+        ? String((req.user as { role?: unknown }).role || '')
+        : '';
+
+    const submissionNote =
+      typeof req.body?.sales_submission_note === 'string'
+        ? req.body.sales_submission_note
+        : typeof req.body?.submission_note === 'string'
+          ? req.body.submission_note
+          : undefined;
+
+    const sentQuotation = await sendDraftQuotation(
+      quotationId,
+      {
+        accountId,
+        role: actorRole,
+      },
+      submissionNote,
+    );
     res.status(200).json(buildSuccessResponse(sentQuotation));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/v1/quotations/:quotationId/recall
+ * Thu hồi báo giá đang ở trạng thái 'PendingApproval' quay về 'Draft'
+ */
+export const recallQuotationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const accountId =
+      typeof req.user === 'object' && req.user !== null
+        ? Number((req.user as { id?: unknown }).id)
+        : NaN;
+    if (!Number.isInteger(accountId) || accountId <= 0) {
+      throw new AppError(
+        'Authenticated account is required.',
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+      );
+    }
+
+    const quotationId = Number(req.params.quotationId);
+    if (!Number.isInteger(quotationId) || quotationId <= 0) {
+      throw new AppError(
+        'Invalid quotationId parameter. Must be a positive integer.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const actorRole =
+      typeof req.user === 'object' && req.user !== null
+        ? String((req.user as { role?: unknown }).role || '')
+        : '';
+
+    const recalled = await recallQuotationSubmission(quotationId, {
+      accountId,
+      role: actorRole,
+    });
+    res.status(200).json(buildSuccessResponse(recalled));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/v1/quotations/:quotationId/head-sales-review
+ * Trưởng phòng Kinh doanh (HeadSales) duyệt hoặc từ chối báo giá nội bộ trước khi tới tay khách hàng
+ */
+export const headSalesReviewQuotationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown })
+        : {};
+    const accountId = Number(authUser.id);
+    if (!Number.isInteger(accountId) || accountId <= 0) {
+      throw new AppError(
+        'Authenticated account is required.',
+        401,
+        ERROR_CODES.UNAUTHORIZED,
+      );
+    }
+
+    const quotationId = Number(req.params.quotationId);
+    if (!Number.isInteger(quotationId) || quotationId <= 0) {
+      throw new AppError(
+        'Invalid quotationId parameter. Must be a positive integer.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const { decision, note } = (req.body ?? {}) as {
+      decision?: string;
+      note?: string;
+    };
+
+    if (decision !== 'approve' && decision !== 'reject') {
+      throw new AppError(
+        'Invalid decision. Allowed values: "approve" or "reject".',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const reviewed = await reviewQuotationByHeadSales(quotationId, {
+      decision,
+      note: typeof note === 'string' ? note : null,
+      reviewerId: accountId,
+      reviewerRole: String(authUser.role || ''),
+    });
+
+    res.status(200).json(buildSuccessResponse(reviewed));
   } catch (error) {
     next(error);
   }
@@ -444,8 +578,11 @@ export const listQuotationsHandler = async (
         ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
         : {};
 
+    const normalizedRole = String(authUser.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     let customerIdFilter: number | undefined;
-    if (String(authUser.role || '').toLowerCase() === 'customer') {
+    let assignedSalesIdFilter: number | undefined;
+
+    if (normalizedRole === 'customer') {
       const tokenCustomerId = Number(authUser.customer_id);
       const resolvedId = Number.isInteger(tokenCustomerId) && tokenCustomerId > 0
         ? tokenCustomerId
@@ -456,9 +593,14 @@ export const listQuotationsHandler = async (
         return;
       }
       customerIdFilter = resolvedId;
+    } else if (normalizedRole === 'sales') {
+      const salesAccountId = Number(authUser.id);
+      if (Number.isInteger(salesAccountId) && salesAccountId > 0) {
+        assignedSalesIdFilter = salesAccountId;
+      }
     }
 
-    const list = await listQuotations(customerIdFilter);
+    const list = await listQuotations(customerIdFilter, assignedSalesIdFilter);
     res.status(200).json(buildSuccessResponse(list));
   } catch (error) {
     next(error);

@@ -20,7 +20,7 @@ function CustomerLocationStep({
 
       <div className="sr-customer-grid">
         <label className="sr-field">
-          <span>Khách hàng <b>*</b></span>
+          <span>Khách hàng được gán phụ trách <b>*</b></span>
           <select
             disabled={loadingCustomers}
             value={customerId}
@@ -28,14 +28,22 @@ function CustomerLocationStep({
             required
           >
             <option value="">
-              {loadingCustomers ? 'Đang tải danh sách khách hàng...' : '-- Chọn khách hàng --'}
+              {loadingCustomers
+                ? 'Đang tải danh sách khách hàng được phân công...'
+                : customers.length === 0
+                  ? '-- Chưa có khách hàng nào được phân công cho bạn --'
+                  : '-- Chọn khách hàng do bạn phụ trách --'}
             </option>
             {customers.map((customer) => (
               <option key={customer.id} value={String(customer.id)}>
                 {customer.company_name}
+                {customer.assigned_sales_name ? ` (Sales: ${customer.assigned_sales_name})` : ''}
               </option>
             ))}
           </select>
+          <small style={{ color: '#64748b', fontSize: '0.78rem', marginTop: 4, display: 'block' }}>
+            ℹ Nhân viên Sales chỉ được phép tạo phiếu yêu cầu cho các khách hàng đã được Trưởng phòng Kinh doanh (HeadSales) phân công.
+          </small>
         </label>
 
         {selectedCustomer ? (
