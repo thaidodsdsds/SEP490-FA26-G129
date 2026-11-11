@@ -866,7 +866,9 @@ export class ContractItem {
 
 @Entity({ name: 'digital_signatures' })
 @Index('IDX_digital_signatures_contract_id', ['contract_id'])
+@Index('IDX_digital_signatures_signer_id', ['signer_id'])
 @Index('IDX_digital_signatures_status', ['status'])
+@Unique('UQ_digital_signatures_contract_purpose', ['contract_id', 'purpose'])
 export class DigitalSignature {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -886,6 +888,13 @@ export class DigitalSignature {
 
   @Column({ type: 'integer' })
   signer_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'signer_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_signer',
+  })
+  signer!: Account;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   provider!: string | null;
@@ -909,6 +918,144 @@ export class DigitalSignature {
   created_at!: Date;
 }
 
+// ==================== WORK ORDER ====================
+
+@Entity({ name: 'work_orders' })
+@Unique('UQ_work_orders_work_order_code', ['work_order_code'])
+@Index('IDX_work_orders_contract_id', ['contract_id'])
+@Index('IDX_work_orders_customer_id', ['customer_id'])
+@Index('IDX_work_orders_status', ['status'])
+@Check(
+  'work_orders_status_check',
+  `"status" IN ('Open', 'Assigned', 'InProgress', 'Done', 'Cancelled')`,
+)
+export class WorkOrder {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  work_order_code!: string;
+
+  @ManyToOne(() => Contract, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'contract_id',
+    foreignKeyConstraintName: 'FK_work_orders_contract',
+  })
+  contract!: Contract;
+
+  @Column({ type: 'integer' })
+  contract_id!: number;
+
+  @ManyToOne(() => Customer, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'customer_id',
+    foreignKeyConstraintName: 'FK_work_orders_customer',
+  })
+  customer!: Customer;
+
+  @Column({ type: 'integer' })
+  customer_id!: number;
+
+  @Column({ type: 'varchar', length: 20, default: 'Open' })
+  status!: string;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+
+  @OneToMany(() => WorkOrderAssignment, (assignment) => assignment.work_order)
+  assignments!: WorkOrderAssignment[];
+}
+
+// ==================== WORK ORDER ASSIGNMENT ====================
+
+@Entity({ name: 'work_order_assignments' })
+@Unique('UQ_work_order_assignments_work_order_item', ['work_order_id', 'contract_item_id'])
+@Index('IDX_work_order_assignments_work_order_id', ['work_order_id'])
+@Index('IDX_work_order_assignments_technician_id', ['technician_id'])
+@Index('IDX_work_order_assignments_status', ['status'])
+@Check(
+  'work_order_assignments_status_check',
+  `"status" IN ('Pending', 'Assigned', 'InProgress', 'Done', 'Cancelled')`,
+)
+export class WorkOrderAssignment {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => WorkOrder, (workOrder) => workOrder.assignments, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'work_order_id',
+    foreignKeyConstraintName: 'FK_work_order_assignments_work_order',
+  })
+  work_order!: WorkOrder;
+
+  @Column({ type: 'integer' })
+  work_order_id!: number;
+
+  @ManyToOne(() => ContractItem, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'contract_item_id',
+    foreignKeyConstraintName: 'FK_work_order_assignments_contract_item',
+  })
+  contract_item!: ContractItem;
+
+  @Column({ type: 'integer' })
+  contract_item_id!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  service_request_item_id!: number | null;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  device_name!: string;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'technician_id',
+    foreignKeyConstraintName: 'FK_work_order_assignments_technician',
+  })
+  technician!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  technician_id!: number | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  standard_name!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  scheduled_start!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  scheduled_end!: Date | null;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'assigned_by',
+    foreignKeyConstraintName: 'FK_work_order_assignments_assigned_by',
+  })
+  assigned_by_account!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  assigned_by!: number | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+}
+
+
 // ==================== ENTITY REGISTRY ====================
 
 export const entities = [
@@ -928,4 +1075,6 @@ export const entities = [
   Contract,
   ContractItem,
   DigitalSignature,
+  WorkOrder,
+  WorkOrderAssignment,
 ];
