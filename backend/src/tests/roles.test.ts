@@ -20,37 +20,37 @@ describe('Roles API', () => {
     getRepository.mockReset().mockReturnValue({ find: findRoles });
   });
 
-  it('returns roles with only public fields, ordered by code', async () => {
+  it('returns roles with public fields and account counts', async () => {
     const roles = [
-      { id: 1, code: 'ADMIN', name: 'Admin' },
-      { id: 2, code: 'CUSTOMER', name: 'Customer' },
+      { id: 1, name: 'Admin', accounts: [{ id: 1 }, { id: 2 }] },
+      { id: 2, name: 'Customer', accounts: [] },
     ];
     findRoles.mockResolvedValue(roles);
 
-    const response = await request(app).get('/api/v1/roles');
+    const response = await request(app).get('/api/v1/admin/roles');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       success: true,
-      data: roles,
+      data: [
+        { id: 1, name: 'Admin', account_count: 2 },
+        { id: 2, name: 'Customer', account_count: 0 },
+      ],
       meta: null,
     });
     expect(getRepository).toHaveBeenCalledOnce();
-    expect(findRoles).toHaveBeenCalledWith({
-      select: { id: true, code: true, name: true },
-      order: { code: 'ASC' },
-    });
+    expect(findRoles).toHaveBeenCalledWith({ relations: ['accounts'] });
   });
 
   it('forwards database errors to the API error handler', async () => {
     findRoles.mockRejectedValue(new Error('Database unavailable'));
 
-    const response = await request(app).get('/api/v1/roles');
+    const response = await request(app).get('/api/v1/admin/roles');
 
     expect(response.status).toBe(500);
     expect(response.body).toMatchObject({
       success: false,
-      error: { message: 'Database unavailable' },
+      error: { message: 'Internal server error.' },
     });
   });
 });

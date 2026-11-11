@@ -101,8 +101,10 @@ describe('ISOCAL TypeORM entities', () => {
     );
   });
 
-  it('keeps the migration directory configured for the CLI', () => {
+  it('keeps the migration directory configured for the CLI and compiled runtime', () => {
     const migrations = configuredDataSource.options.migrations ?? [];
-    expect(JSON.stringify(migrations)).toContain('src/database/migrations/*.ts');
+    const serialized = JSON.stringify(migrations);
+    expect(serialized).toContain('database/migrations');
+    expect(serialized).toContain('*.{ts,js}');
   });
 });
