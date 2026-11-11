@@ -355,6 +355,47 @@
   line-height: 1.5;
 }
 
+.reviewer-card-alert {
+  margin: 0 17px 12px;
+  padding: 9px 12px;
+  border: 1px solid #f0cfcb;
+  border-radius: 8px;
+  background: #fdf5f4;
+  color: #a33a33;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.work-order-assignment-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.work-order-assignment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid #e5ecf1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.work-order-assignment-item strong {
+  display: block;
+  color: #3a5368;
+  font-size: 0.72rem;
+}
+
+.work-order-assignment-item span {
+  display: block;
+  margin-top: 3px;
+  color: #7c8e9c;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
 .procedure-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
