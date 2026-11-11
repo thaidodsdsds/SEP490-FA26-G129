@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchDeviceDetailApi } from '../../services/device-service.js';
 import DeviceModalForm from './DeviceModalForm.jsx';
+import TransferOwnershipModal from './TransferOwnershipModal.jsx';
 import Toast from '../../components/ui/Toast.jsx';
 import './devices.css';
 
@@ -11,12 +12,15 @@ export default function DeviceDetailPage({ role = 'customer', basePath = '' }) {
 
   const isCustomerRole = role?.toLowerCase() === 'customer';
   const isSalesRole = role?.toLowerCase() === 'sales';
+  const isInternalStaff = role?.toLowerCase() !== 'customer';
+  const canTransfer = ['sales', 'admin'].includes(role?.toLowerCase());
 
   const [device, setDevice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('specs'); // 'specs', 'seals', 'calibration', 'measurements', 'certificates'
+  const [activeTab, setActiveTab] = useState('specs'); // 'specs', 'seals', 'calibration', 'measurements', 'certificates', 'ownership'
   const [modalOpen, setModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const loadDetail = async () => {
@@ -149,6 +153,17 @@ export default function DeviceDetailPage({ role = 'customer', basePath = '' }) {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {canTransfer && (
+              <button
+                type="button"
+                className="devices-btn-primary"
+                style={{ background: '#d97706', borderColor: '#d97706' }}
+                onClick={() => setTransferModalOpen(true)}
+              >
+                🔄 Chuyển quyền sở hữu
+              </button>
+            )}
+
             {!isSalesRole ? (
               <button
                 type="button"
@@ -212,6 +227,15 @@ export default function DeviceDetailPage({ role = 'customer', basePath = '' }) {
           >
             📜 Giấy chứng nhận ({device.certificates?.length || 0})
           </button>
+          {isInternalStaff && (
+            <button
+              type="button"
+              className={`device-tab-btn ${activeTab === 'ownership' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ownership')}
+            >
+              🏛 Lịch sử sở hữu ({device.ownership_history?.length || 0})
+            </button>
+          )}
         </div>
 
         {/* Tab 1: Specifications */}
@@ -568,6 +592,128 @@ export default function DeviceDetailPage({ role = 'customer', basePath = '' }) {
             ))}
           </div>
         )}
+        {/* Tab 6: Device Ownership History (Sales & Admin internal) */}
+        {activeTab === 'ownership' && isInternalStaff && (
+          <div className="device-tab-content">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: '#1e293b' }}>
+                  Lịch sử sở hữu thiết bị (Device Ownership History)
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                  Tra cứu quá trình luân chuyển thiết bị qua các khách hàng, lý do chuyển nhượng và người thực hiện.
+                </p>
+              </div>
+
+              {canTransfer && (
+                <button
+                  type="button"
+                  className="devices-btn-primary"
+                  style={{ background: '#d97706', borderColor: '#d97706', padding: '7px 14px', fontSize: '0.84rem' }}
+                  onClick={() => setTransferModalOpen(true)}
+                >
+                  🔄 Chuyển giao sang khách hàng mới
+                </button>
+              )}
+            </div>
+
+            {/* Current Owner Info Card */}
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fef08a',
+                borderRadius: '10px',
+                padding: '16px 20px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+              }}
+            >
+              <div style={{ fontSize: '2rem' }}>🏢</div>
+              <div>
+                <span style={{ fontSize: '0.78rem', color: '#92400e', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Chủ sở hữu hiện tại (Current Owner)
+                </span>
+                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#78350f' }}>
+                  {device.customer?.company_name || `Khách hàng #${device.customer_id}`}
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#a16207', marginTop: '2px' }}>
+                  MST: <strong>{device.customer?.tax_code || 'Chưa cập nhật'}</strong> · Lĩnh vực: <strong>{device.customer?.industry || '—'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Ownership Transfers Table */}
+            {device.ownership_history && device.ownership_history.length > 0 ? (
+              <table className="device-subtable">
+                <thead>
+                  <tr>
+                    <th>Thời gian chuyển</th>
+                    <th>Chủ sở hữu trước</th>
+                    <th>Chủ sở hữu tiếp nhận</th>
+                    <th>Lý do chuyển giao</th>
+                    <th>Người thực hiện</th>
+                    <th>Căn cứ & Ghi chú</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {device.ownership_history.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        {item.transferred_at
+                          ? new Date(item.transferred_at).toLocaleString('vi-VN')
+                          : '—'}
+                      </td>
+                      <td>
+                        {item.previous_customer?.company_name ? (
+                          <div>
+                            <strong style={{ color: '#475569' }}>{item.previous_customer.company_name}</strong>
+                            {item.previous_customer.tax_code && (
+                              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>MST: {item.previous_customer.tax_code}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chủ sở hữu ban đầu</span>
+                        )}
+                      </td>
+                      <td>
+                        <div>
+                          <strong style={{ color: '#0f172a' }}>{item.new_customer?.company_name || `Khách hàng #${item.new_customer_id}`}</strong>
+                          {item.new_customer?.tax_code && (
+                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>MST: {item.new_customer.tax_code}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ maxWidth: '240px' }}>
+                        <span style={{ fontWeight: 500, color: '#1e293b' }}>{item.transfer_reason}</span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.84rem' }}>
+                          {item.transferred_by_account?.full_name || 'Kinh doanh / Quản trị viên'}
+                        </span>
+                      </td>
+                      <td style={{ maxWidth: '200px', fontSize: '0.82rem', color: '#64748b' }}>
+                        {item.notes || '—'}
+                      </td>
+                      <td>
+                        <span className="badge-due-valid">{item.status || 'Hoàn tất'}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', textAlign: 'center', color: '#64748b' }}>
+                <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#334155' }}>Chưa có biến động sở hữu</p>
+                <p style={{ margin: 0, fontSize: '0.84rem' }}>
+                  Thiết bị này được đăng ký trực tiếp và vẫn thuộc về khách hàng sở hữu ban đầu: <strong>{device.customer?.company_name}</strong>.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Edit Modal Form */}
@@ -576,6 +722,17 @@ export default function DeviceDetailPage({ role = 'customer', basePath = '' }) {
         device={device}
         role={role}
         onClose={() => setModalOpen(false)}
+        onSuccess={(updated, msg) => {
+          setToast({ show: true, message: msg, type: 'success' });
+          loadDetail();
+        }}
+      />
+
+      {/* Transfer Ownership Modal Form */}
+      <TransferOwnershipModal
+        isOpen={transferModalOpen}
+        device={device}
+        onClose={() => setTransferModalOpen(false)}
         onSuccess={(updated, msg) => {
           setToast({ show: true, message: msg, type: 'success' });
           loadDetail();

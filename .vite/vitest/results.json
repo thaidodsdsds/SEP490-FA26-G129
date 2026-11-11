@@ -1,1 +1,0 @@
-{"version":"2.1.9","results":[[":backend/src/tests/customerRouter.test.ts",{"duration":214.95709999999985,"failed":false}],[":backend/src/tests/authRouter.test.ts",{"duration":468.2636,"failed":false}],[":backend/src/tests/deviceRouter.test.ts",{"duration":129.4340000000002,"failed":false}]]}

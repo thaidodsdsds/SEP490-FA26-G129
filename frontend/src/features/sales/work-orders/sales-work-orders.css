@@ -1,0 +1,301 @@
+/* =====================================================
+   SALES WORK ORDERS MANAGEMENT STYLES - ISOCAL
+   ===================================================== */
+
+.sales-wo-page {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 8px 12px 48px;
+}
+
+/* ─── Header ─────────────────────────────────────────────────── */
+.sales-wo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.sales-wo-header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.sales-wo-header p {
+  color: #64748b;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+/* ─── Metric Cards ────────────────────────────────────────────── */
+.sales-wo-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+  .sales-wo-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .sales-wo-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-wo-metric-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sales-wo-metric-card:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.sales-wo-metric-card.active {
+  border-color: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+  background: #f8faff;
+}
+
+.sales-wo-metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.sales-wo-metric-val {
+  font-size: 1.65rem;
+  font-weight: 850;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.sales-wo-metric-desc {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+/* ─── Filter Bar ─────────────────────────────────────────────── */
+.sales-wo-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.sales-wo-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+
+.sales-wo-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.sales-wo-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  outline: none;
+  background: #f8fafc;
+  color: #1e293b;
+  transition: all 0.15s ease;
+}
+
+.sales-wo-search-input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.sales-wo-filter-select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ─── Table Container ────────────────────────────────────────── */
+.sales-wo-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.sales-wo-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.sales-wo-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.82rem;
+}
+
+.sales-wo-table th {
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.sales-wo-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.sales-wo-table tr:hover td {
+  background: #f8faff;
+}
+
+/* ─── Badges ─────────────────────────────────────────────────── */
+.sales-wo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sales-wo-badge-open {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.sales-wo-badge-assigned {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.sales-wo-badge-inprogress {
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+
+.sales-wo-badge-done {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.sales-wo-badge-cancelled {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+/* ─── Links & Buttons ────────────────────────────────────────── */
+.sales-wo-link {
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.sales-wo-link:hover {
+  text-decoration: underline;
+}
+
+.sales-wo-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.sales-wo-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* ─── Drawer / Modal ─────────────────────────────────────────── */
+.sales-wo-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.sales-wo-modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  max-width: 740px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  padding: 24px 28px;
+}
+
