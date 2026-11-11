@@ -3,7 +3,9 @@ import { authenticate } from '../../middlewares/auth.js';
 import {
   createDeviceHandler,
   getDeviceDetail,
+  getDeviceOwnershipHistoryHandler,
   getDevices,
+  transferDeviceOwnershipHandler,
   updateDeviceHandler,
 } from './devices.controller.js';
 
@@ -14,7 +16,9 @@ devicesRoutes.use(authenticate);
 
 devicesRoutes.get('/', getDevices);
 devicesRoutes.get('/:id', getDeviceDetail);
+devicesRoutes.get('/:id/ownership-history', getDeviceOwnershipHistoryHandler);
 devicesRoutes.post('/', createDeviceHandler);
+devicesRoutes.post('/:id/transfer-ownership', transferDeviceOwnershipHandler);
 devicesRoutes.put('/:id', updateDeviceHandler);
 
 export default devicesRoutes;
