@@ -545,6 +545,42 @@
 
 .ct-signature-space {
   height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ct-signature-space.has-signature {
+  border-bottom: 1px dashed #bfdbfe;
+}
+
+.ct-signature-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.ct-signature-script {
+  font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.ct-signature-verified {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #047857;
+}
+
+.ct-signature-stamp small {
+  color: #6b7280;
+  font-size: 0.64rem;
+  font-style: normal;
 }
 
 .ct-signature-name {

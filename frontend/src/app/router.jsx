@@ -84,6 +84,8 @@ const customerRoutes = [
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="customer" /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="customer" /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/customer/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/customer/contracts" /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],

@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import {
   approveContractApi,
   cancelContractApi,
+  customerSignContractApi,
+  downloadSignedContractApi,
   extractApiErrorMessage,
   getContractDetailApi,
   liquidateContractApi,
@@ -17,6 +19,19 @@ const formatLongDate = (value) => {
   const [year, month, day] = String(value).slice(0, 10).split('-');
   if (!year || !month || !day) return formatDate(value);
   return `ngày ${day} tháng ${month} năm ${year}`;
+};
+
+const formatSignatureTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 };
 
 const PartyBlock = ({ title, party, showBudgetCode = false }) => (
@@ -103,6 +118,26 @@ function ContractDetailPage({ basePath }) {
     }
   };
 
+  const downloadSignedPdf = async () => {
+    setBusy(true);
+    setActionError('');
+    try {
+      const blob = await downloadSignedContractApi(contract.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${contract.contract_code}-signed.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (downloadFailure) {
+      setActionError(extractApiErrorMessage(downloadFailure, 'Không tải được PDF đã ký.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="dash-page ct-page ct-empty">Đang tải hợp đồng…</div>;
   }
@@ -117,6 +152,10 @@ function ContractDetailPage({ basePath }) {
       </div>
     );
   }
+
+  const signatures = contract.signatures ?? [];
+  const companySignature = signatures.find((signature) => signature.purpose === 'CompanyApproval') ?? null;
+  const customerSignature = signatures.find((signature) => signature.purpose === 'CustomerApproval') ?? null;
 
   const travelFee = Number(contract.travel_fee) || 0;
   const travelTax = Math.round((travelFee * 8) / 100);
@@ -138,6 +177,17 @@ function ContractDetailPage({ basePath }) {
           <button className="button button-secondary" onClick={() => window.print()} type="button">
             In / Xuất PDF
           </button>
+
+          {contract.signed_file_url ? (
+            <button
+              className="button button-primary"
+              disabled={busy}
+              onClick={downloadSignedPdf}
+              type="button"
+            >
+              Tải PDF đã ký
+            </button>
+          ) : null}
 
           {contract.can_edit && (
             <Link className="button button-secondary" to={`${basePath}/${contract.id}/edit`}>
@@ -162,10 +212,28 @@ function ContractDetailPage({ basePath }) {
             <button
               className="button button-success"
               disabled={busy}
-              onClick={() => runAction(approveContractApi, 'Duyệt hợp đồng này?')}
+              onClick={() =>
+                runAction(approveContractApi, 'Duyệt và ký số cho Bên B? Hợp đồng sẽ chuyển sang trạng thái Đã duyệt.')
+              }
               type="button"
             >
-              Duyệt hợp đồng
+              Duyệt &amp; Ký số
+            </button>
+          )}
+
+          {contract.can_sign_customer && (
+            <button
+              className="button button-success"
+              disabled={busy}
+              onClick={() =>
+                runAction(
+                  customerSignContractApi,
+                  'Ký xác nhận hợp đồng với tư cách Bên A? Sau khi ký, hợp đồng không thể chỉnh sửa.',
+                )
+              }
+              type="button"
+            >
+              Ký xác nhận (Bên A)
             </button>
           )}
 
@@ -414,15 +482,37 @@ function ContractDetailPage({ basePath }) {
           <div className="ct-signature-box">
             <strong>Đại diện Bên A</strong>
             <small>(Ký, ghi rõ họ tên, đóng dấu)</small>
-            <div className="ct-signature-space" />
-            <div className="ct-signature-name">{contract.party_a.representative || '........................................'}</div>
+            <div className={`ct-signature-space${customerSignature ? ' has-signature' : ''}`}>
+              {customerSignature ? (
+                <div className="ct-signature-stamp">
+                  <span className="ct-signature-script">{customerSignature.signer_name}</span>
+                  <span className="ct-signature-verified">Đã ký số</span>
+                  <small>{formatSignatureTime(customerSignature.signed_at)}</small>
+                  <small>{customerSignature.provider_transaction_id}</small>
+                </div>
+              ) : null}
+            </div>
+            <div className="ct-signature-name">
+              {customerSignature?.signer_name || contract.party_a.representative || '........................................'}
+            </div>
             {contract.party_a.position ? <small>{contract.party_a.position}</small> : null}
           </div>
           <div className="ct-signature-box">
             <strong>Đại diện Bên B</strong>
             <small>(Ký, ghi rõ họ tên, đóng dấu)</small>
-            <div className="ct-signature-space" />
-            <div className="ct-signature-name">{contract.party_b.representative || '........................................'}</div>
+            <div className={`ct-signature-space${companySignature ? ' has-signature' : ''}`}>
+              {companySignature ? (
+                <div className="ct-signature-stamp">
+                  <span className="ct-signature-script">{companySignature.signer_name}</span>
+                  <span className="ct-signature-verified">Đã ký số</span>
+                  <small>{formatSignatureTime(companySignature.signed_at)}</small>
+                  <small>{companySignature.provider_transaction_id}</small>
+                </div>
+              ) : null}
+            </div>
+            <div className="ct-signature-name">
+              {companySignature?.signer_name || contract.party_b.representative || '........................................'}
+            </div>
             {contract.party_b.position ? <small>{contract.party_b.position}</small> : null}
           </div>
         </div>
