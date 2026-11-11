@@ -9,7 +9,11 @@ import {
   ServiceRequestItem,
 } from '../../database/entities.js';
 
-export const ALLOWED_CREATE_QUOTATION_STATUSES = ['Draft', 'Sent'] as const;
+export const ALLOWED_CREATE_QUOTATION_STATUSES = [
+  'Draft',
+  'PendingApproval',
+  'Sent',
+] as const;
 export type CreateQuotationStatus = (typeof ALLOWED_CREATE_QUOTATION_STATUSES)[number];
 
 const NON_QUOTABLE_REQUEST_STATUSES = new Set([
@@ -33,6 +37,9 @@ export interface CreateQuotationInput {
   travel_fee?: number;
   estimated_completion_date?: string | null;
   status?: CreateQuotationStatus;
+  sales_submission_note?: string | null;
+  actor_id?: number;
+  actor_role?: string;
   line_items: CreateQuotationLineItemInput[];
 }
 
@@ -56,6 +63,17 @@ export interface QuotationResult {
   total_amount: number;
   estimated_completion_date: string | null;
   status: string;
+  created_by?: number | null;
+  head_sales_reviewed_by?: number | null;
+  head_sales_reviewed_at?: string | null;
+  head_sales_note?: string | null;
+  head_sales_decision?: string | null;
+  customer_reject_reason?: string | null;
+  customer_responded_at?: string | null;
+  sales_submission_note?: string | null;
+  submission_count?: number;
+  last_rejected_total?: number | null;
+  last_rejected_discount?: number | null;
   is_updated_draft?: boolean;
   line_items: QuotationLineItemResult[];
 }
@@ -95,11 +113,25 @@ export interface QuotationDetailResult {
   total_amount: number;
   estimated_completion_date: string | null;
   status: string;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  head_sales_reviewed_by?: number | null;
+  head_sales_reviewer_name?: string | null;
+  head_sales_reviewed_at?: string | null;
+  head_sales_note?: string | null;
+  head_sales_decision?: string | null;
+  customer_reject_reason?: string | null;
+  customer_responded_at?: string | null;
+  sales_submission_note?: string | null;
+  submission_count?: number;
+  last_rejected_total?: number | null;
+  last_rejected_discount?: number | null;
   customer: {
     id: number;
     company_name: string;
     tax_code: string | null;
     address: string;
+    assigned_sales_id?: number | null;
   };
   service_request: {
     id: number;
@@ -112,6 +144,7 @@ export interface QuotationDetailResult {
   };
   line_items: QuotationLineItemDetailResult[];
   can_send: boolean;
+  can_head_sales_review: boolean;
   can_approve: boolean;
   can_reject: boolean;
 }
@@ -145,9 +178,22 @@ export const createQuotation = async (
     extra_discount: extraDiscount = 0,
     travel_fee: rawTravelFee = 0,
     estimated_completion_date: rawCompletionDate = null,
-    status = 'Draft',
+    status: requestedStatus = 'Draft',
+    sales_submission_note: salesSubmissionNote,
+    actor_id: actorId,
+    actor_role: actorRole,
     line_items: lineItems,
   } = input;
+
+  const normalizedRole = String(actorRole || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isSalesStaff = normalizedRole === 'sales';
+  const isHeadSalesOrAdmin = ['headsales', 'admin', 'ceo'].includes(normalizedRole);
+
+  // Nhân viên Sales khi bấm gửi báo giá sẽ chuyển sang 'PendingApproval' (chờ HeadSales duyệt) thay vì 'Sent' trực tiếp
+  const status: CreateQuotationStatus =
+    isSalesStaff && requestedStatus === 'Sent'
+      ? 'PendingApproval'
+      : requestedStatus;
 
   // 1. Kiểm tra phiếu yêu cầu dịch vụ (ServiceRequest) tồn tại và hợp lệ
   const serviceRequestRepo = dataSource.getRepository(ServiceRequest);
@@ -155,6 +201,15 @@ export const createQuotation = async (
     select: {
       id: true,
       status: true,
+      customer_id: true,
+      customer: {
+        id: true,
+        company_name: true,
+        assigned_sales_id: true,
+      },
+    },
+    relations: {
+      customer: true,
     },
     where: { id: serviceRequestId },
   });
@@ -164,6 +219,20 @@ export const createQuotation = async (
       'Service request not found.',
       404,
       ERROR_CODES.NOT_FOUND,
+    );
+  }
+
+  // Nếu người thao tác là Sales, chỉ được tạo/cập nhật báo giá cho khách hàng được gán cho mình
+  if (
+    isSalesStaff
+    && actorId
+    && serviceRequest.customer
+    && serviceRequest.customer.assigned_sales_id !== actorId
+  ) {
+    throw new AppError(
+      `Khách hàng "${serviceRequest.customer.company_name}" chưa được phân công cho bạn phụ trách. Bạn không thể lập báo giá cho đơn này.`,
+      403,
+      ERROR_CODES.FORBIDDEN,
     );
   }
 
@@ -201,7 +270,19 @@ export const createQuotation = async (
     );
   }
 
-  const existingDraft = existingQuotations.find((q) => q.status === 'Draft') ?? null;
+  const existingDraft =
+    existingQuotations.find(
+      (q) => q.status === 'Draft' || q.status === 'PendingApproval',
+    ) ?? null;
+
+  // [CHỐNG SPAM SALES]: Nếu báo giá đang PendingApproval thì khóa không cho nộp trùng
+  if (existingDraft && existingDraft.status === 'PendingApproval' && isSalesStaff) {
+    throw new AppError(
+      `Báo giá ${formatQuotationCode(existingDraft.id)} đang trong hàng chờ Trưởng phòng Kinh doanh (HeadSales) phê duyệt. Vui lòng không nộp trùng lặp hoặc hãy thu hồi về Draft nếu cần chỉnh sửa thêm.`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
 
   // 3. Kiểm tra danh sách hạng mục (ServiceRequestItem) tồn tại và thuộc đúng ServiceRequest
   const requestItemIds = lineItems.map((item) => item.service_request_item_id);
@@ -336,6 +417,40 @@ export const createQuotation = async (
   const totalAmount = roundCurrency(subtotal - totalDiscountAmount + travelFee);
   const estimatedCompletionDate = rawCompletionDate ? rawCompletionDate.trim() : null;
 
+  // [CHỐNG SPAM SALES]: Nếu báo giá vừa bị HeadSales từ chối và Sales muốn trình lại (PendingApproval):
+  // 1. Kiểm tra xem Sales đã sửa số liệu (tổng tiền hoặc chiết khấu) chưa.
+  // 2. Bắt buộc Sales phải có ghi chú giải trình (sales_submission_note).
+  if (
+    existingDraft
+    && existingDraft.head_sales_decision === 'Rejected'
+    && status === 'PendingApproval'
+    && isSalesStaff
+  ) {
+    const prevTotal = existingDraft.last_rejected_total ? Number(existingDraft.last_rejected_total) : null;
+    const prevDiscount = existingDraft.last_rejected_discount ? Number(existingDraft.last_rejected_discount) : null;
+
+    if (
+      prevTotal !== null
+      && prevDiscount !== null
+      && Math.abs(totalAmount - prevTotal) < 0.01
+      && Math.abs(totalDiscountAmount - prevDiscount) < 0.01
+    ) {
+      throw new AppError(
+        'Báo giá chưa có thay đổi nào về tổng tiền hoặc mức chiết khấu so với lúc bị Trưởng phòng từ chối. Vui lòng điều chỉnh lại phương án giá trước khi trình duyệt lại.',
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+      );
+    }
+
+    if (!salesSubmissionNote || salesSubmissionNote.trim().length < 5) {
+      throw new AppError(
+        'Vui lòng nhập ghi chú giải trình (tối thiểu 5 ký tự) nêu rõ các thay đổi bạn đã thực hiện theo yêu cầu của Trưởng phòng.',
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+      );
+    }
+  }
+
   // 5. Lưu mới hoặc cập nhật trực tiếp bản nháp Draft hiện có (Upsert Draft)
   const persistQuotation = async (
     getRepository: typeof dataSource.getRepository,
@@ -354,6 +469,20 @@ export const createQuotation = async (
       existingDraft.total_amount = toFixedNumericString(totalAmount);
       existingDraft.estimated_completion_date = estimatedCompletionDate;
       existingDraft.status = status;
+      if (actorId && !existingDraft.created_by) {
+        existingDraft.created_by = actorId;
+      }
+      if (status === 'PendingApproval') {
+        existingDraft.head_sales_decision = null;
+        existingDraft.head_sales_reviewed_by = null;
+        existingDraft.head_sales_reviewed_at = null;
+        existingDraft.sales_submission_note = salesSubmissionNote ? salesSubmissionNote.trim() : null;
+        existingDraft.submission_count = (existingDraft.submission_count || 0) + 1;
+      } else if (status === 'Sent' && isHeadSalesOrAdmin && actorId) {
+        existingDraft.head_sales_reviewed_by = actorId;
+        existingDraft.head_sales_reviewed_at = new Date();
+        existingDraft.head_sales_decision = 'Approved';
+      }
       savedQuotation = await quotationRepo.save(existingDraft);
 
       if (typeof quotationLineItemRepo.delete === 'function') {
@@ -368,6 +497,12 @@ export const createQuotation = async (
         total_amount: toFixedNumericString(totalAmount),
         estimated_completion_date: estimatedCompletionDate,
         status,
+        created_by: actorId ?? null,
+        sales_submission_note: status === 'PendingApproval' && salesSubmissionNote ? salesSubmissionNote.trim() : null,
+        submission_count: status === 'PendingApproval' ? 1 : 0,
+        head_sales_reviewed_by: status === 'Sent' && isHeadSalesOrAdmin && actorId ? actorId : null,
+        head_sales_reviewed_at: status === 'Sent' && isHeadSalesOrAdmin ? new Date() : null,
+        head_sales_decision: status === 'Sent' && isHeadSalesOrAdmin ? 'Approved' : null,
       });
 
       savedQuotation = await quotationRepo.save(quotationEntity);
@@ -403,6 +538,13 @@ export const createQuotation = async (
       total_amount: Number(savedQuotation.total_amount),
       estimated_completion_date: savedQuotation.estimated_completion_date ?? null,
       status: savedQuotation.status,
+      created_by: savedQuotation.created_by ?? null,
+      head_sales_reviewed_by: savedQuotation.head_sales_reviewed_by ?? null,
+      head_sales_reviewed_at: savedQuotation.head_sales_reviewed_at
+        ? new Date(savedQuotation.head_sales_reviewed_at).toISOString()
+        : null,
+      head_sales_note: savedQuotation.head_sales_note ?? null,
+      head_sales_decision: savedQuotation.head_sales_decision ?? null,
       ...(isUpdatingDraft ? { is_updated_draft: true } : {}),
       line_items: savedLineItems.map((savedLine) => ({
         id: savedLine.id,
@@ -425,18 +567,27 @@ export const createQuotation = async (
 };
 
 /**
- * Chuyển báo giá từ bản nháp ('Draft') sang trạng thái gửi khách hàng ('Sent')
- * và tự động cập nhật trạng thái ServiceRequest sang 'Quoted'.
+ * Chuyển báo giá từ bản nháp ('Draft'):
+ * - Nếu người thao tác là Sales -> chuyển sang 'PendingApproval' (Trình HeadSales phê duyệt nội bộ)
+ * - Nếu người thao tác là HeadSales / Admin / CEO -> chuyển sang 'Sent' (Phát hành gửi khách hàng) và chuyển ServiceRequest sang 'Quoted'
  */
 export const sendDraftQuotation = async (
   quotationId: number,
+  actor?: { accountId?: number; role?: string },
+  submissionNote?: string,
 ): Promise<QuotationResult> => {
+  const normalizedRole = String(actor?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isSalesStaff = normalizedRole === 'sales';
+  const isHeadSalesOrAdmin = ['headsales', 'admin', 'ceo'].includes(normalizedRole);
+
   const quotationRepo = dataSource.getRepository(Quotation);
   const quotation = await quotationRepo.findOne({
     where: { id: quotationId },
     relations: {
       line_items: true,
-      service_request: true,
+      service_request: {
+        customer: true,
+      },
     },
   });
 
@@ -448,9 +599,59 @@ export const sendDraftQuotation = async (
     );
   }
 
-  if (quotation.status !== 'Draft') {
+  if (
+    isSalesStaff
+    && actor?.accountId
+    && quotation.service_request?.customer
+    && quotation.service_request.customer.assigned_sales_id !== actor.accountId
+  ) {
     throw new AppError(
-      `Only quotations in "Draft" status can be sent. Current status: "${quotation.status}".`,
+      `Khách hàng "${quotation.service_request.customer.company_name}" chưa được phân công cho bạn phụ trách.`,
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
+  }
+
+  if (isSalesStaff && quotation.status !== 'Draft') {
+    throw new AppError(
+      `Chỉ có thể trình duyệt báo giá đang ở trạng thái "Draft". Trạng thái hiện tại: "${quotation.status}".`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  // [CHỐNG SPAM SALES]: Khi trình lại báo giá từng bị HeadSales từ chối:
+  if (isSalesStaff && quotation.head_sales_decision === 'Rejected') {
+    const prevTotal = quotation.last_rejected_total ? Number(quotation.last_rejected_total) : null;
+    const prevDiscount = quotation.last_rejected_discount ? Number(quotation.last_rejected_discount) : null;
+    const currentTotal = Number(quotation.total_amount);
+    const currentDiscount = Number(quotation.discount_amount);
+
+    if (
+      prevTotal !== null
+      && prevDiscount !== null
+      && Math.abs(currentTotal - prevTotal) < 0.01
+      && Math.abs(currentDiscount - prevDiscount) < 0.01
+    ) {
+      throw new AppError(
+        'Báo giá chưa có thay đổi nào về số liệu so với lúc bị Trưởng phòng từ chối. Vui lòng bấm vào "Cập nhật báo giá" để chỉnh sửa đơn giá / chiết khấu trước khi trình lại.',
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+      );
+    }
+
+    if (!submissionNote || submissionNote.trim().length < 5) {
+      throw new AppError(
+        'Vui lòng nhập ghi chú giải trình (tối thiểu 5 ký tự) nêu rõ các thay đổi bạn đã thực hiện theo yêu cầu của Trưởng phòng.',
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+      );
+    }
+  }
+
+  if (!isSalesStaff && quotation.status !== 'Draft' && quotation.status !== 'PendingApproval') {
+    throw new AppError(
+      `Chỉ có thể duyệt và gửi báo giá đang ở trạng thái "Draft" hoặc "PendingApproval". Trạng thái hiện tại: "${quotation.status}".`,
       400,
       ERROR_CODES.VALIDATION_ERROR,
     );
@@ -481,17 +682,30 @@ export const sendDraftQuotation = async (
     }
   }
 
+  const targetStatus = isSalesStaff ? 'PendingApproval' : 'Sent';
+
   const persistSend = async (
     getRepository: typeof dataSource.getRepository,
   ): Promise<QuotationResult> => {
     const qRepo = getRepository(Quotation);
     const srRepo = getRepository(ServiceRequest);
 
-    quotation.status = 'Sent';
+    quotation.status = targetStatus;
+    if (targetStatus === 'PendingApproval') {
+      quotation.head_sales_decision = null;
+      quotation.head_sales_reviewed_by = null;
+      quotation.head_sales_reviewed_at = null;
+      quotation.sales_submission_note = submissionNote ? submissionNote.trim() : null;
+      quotation.submission_count = (quotation.submission_count || 0) + 1;
+    } else if (targetStatus === 'Sent' && isHeadSalesOrAdmin && actor?.accountId) {
+      quotation.head_sales_reviewed_by = actor.accountId;
+      quotation.head_sales_reviewed_at = new Date();
+      quotation.head_sales_decision = 'Approved';
+    }
     const savedQuotation = await qRepo.save(quotation);
 
-    let updatedServiceRequestStatus = serviceRequest?.status ?? 'Quoted';
-    if (serviceRequest && serviceRequest.status !== 'Quoted') {
+    let updatedServiceRequestStatus = serviceRequest?.status ?? 'New';
+    if (targetStatus === 'Sent' && serviceRequest && serviceRequest.status !== 'Quoted') {
       serviceRequest.status = 'Quoted';
       await srRepo.save(serviceRequest);
       updatedServiceRequestStatus = 'Quoted';
@@ -508,6 +722,13 @@ export const sendDraftQuotation = async (
       total_amount: Number(savedQuotation.total_amount),
       estimated_completion_date: savedQuotation.estimated_completion_date ?? null,
       status: savedQuotation.status,
+      created_by: savedQuotation.created_by ?? null,
+      head_sales_reviewed_by: savedQuotation.head_sales_reviewed_by ?? null,
+      head_sales_reviewed_at: savedQuotation.head_sales_reviewed_at
+        ? new Date(savedQuotation.head_sales_reviewed_at).toISOString()
+        : null,
+      head_sales_note: savedQuotation.head_sales_note ?? null,
+      head_sales_decision: savedQuotation.head_sales_decision ?? null,
       line_items: (quotation.line_items ?? []).map((line) => ({
         id: line.id,
         quotation_id: line.quotation_id,
@@ -529,6 +750,140 @@ export const sendDraftQuotation = async (
 };
 
 /**
+ * Thu hồi báo giá (Recall submission):
+ * - Dành cho Sales khi báo giá đang ở 'PendingApproval' (chờ HeadSales duyệt)
+ * - Chuyển trạng thái quay trở lại 'Draft' để Sales tiếp tục chỉnh sửa, tránh HeadSales duyệt nhầm bản có sai sót
+ */
+export const recallQuotationSubmission = async (
+  quotationId: number,
+  actor?: { accountId?: number; role?: string },
+): Promise<QuotationDetailResult> => {
+  const normalizedRole = String(actor?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isSalesStaff = normalizedRole === 'sales';
+
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotation = await quotationRepo.findOne({
+    where: { id: quotationId },
+    relations: {
+      service_request: {
+        customer: true,
+      },
+    },
+  });
+
+  if (!quotation) {
+    throw new AppError('Không tìm thấy báo giá.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (
+    isSalesStaff
+    && actor?.accountId
+    && quotation.service_request?.customer
+    && quotation.service_request.customer.assigned_sales_id !== actor.accountId
+  ) {
+    throw new AppError(
+      `Khách hàng "${quotation.service_request.customer.company_name}" chưa được phân công cho bạn phụ trách.`,
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
+  }
+
+  if (quotation.status !== 'PendingApproval') {
+    throw new AppError(
+      `Chỉ có thể thu hồi báo giá đang ở trạng thái "PendingApproval" (Chờ duyệt). Trạng thái hiện tại: "${quotation.status}".`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  quotation.status = 'Draft';
+  await quotationRepo.save(quotation);
+
+  return getQuotationDetail(quotationId);
+};
+
+/**
+ * Trưởng phòng Kinh doanh (HeadSales) phê duyệt hoặc từ chối nội bộ báo giá:
+ * - decision === 'approve': chuyển báo giá từ 'PendingApproval' (hoặc 'Draft') -> 'Sent' (Gửi tới tay khách hàng), cập nhật ServiceRequest.status = 'Quoted'
+ * - decision === 'reject': trả báo giá về 'Draft' kèm ghi chú head_sales_note để nhân viên Sales chỉnh sửa lại
+ */
+export const reviewQuotationByHeadSales = async (
+  quotationId: number,
+  input: {
+    decision: 'approve' | 'reject';
+    note?: string | null;
+    reviewerId: number;
+    reviewerRole?: string;
+  },
+): Promise<QuotationDetailResult> => {
+  const normalizedRole = String(input.reviewerRole || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!['headsales', 'admin', 'ceo'].includes(normalizedRole)) {
+    throw new AppError(
+      'Chỉ Trưởng phòng Kinh doanh (HeadSales) mới có quyền phê duyệt báo giá trước khi gửi khách hàng.',
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
+  }
+
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const quotation = await quotationRepo.findOne({
+    where: { id: quotationId },
+    relations: {
+      service_request: true,
+    },
+  });
+
+  if (!quotation) {
+    throw new AppError('Không tìm thấy báo giá.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (quotation.status !== 'PendingApproval' && quotation.status !== 'Draft') {
+    throw new AppError(
+      `Chỉ có thể xét duyệt báo giá đang ở trạng thái "PendingApproval" (Chờ duyệt) hoặc "Draft". Trạng thái hiện tại: "${quotation.status}".`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  const trimmedNote = input.note && input.note.trim() ? input.note.trim() : null;
+
+  await dataSource.transaction(async (manager) => {
+    const qRepo = manager.getRepository(Quotation);
+    const srRepo = manager.getRepository(ServiceRequest);
+
+    quotation.head_sales_reviewed_by = input.reviewerId;
+    quotation.head_sales_reviewed_at = new Date();
+
+    if (input.decision === 'approve') {
+      quotation.status = 'Sent';
+      quotation.head_sales_decision = 'Approved';
+      quotation.head_sales_note = trimmedNote;
+      await qRepo.save(quotation);
+
+      if (quotation.service_request && quotation.service_request.status !== 'Quoted') {
+        quotation.service_request.status = 'Quoted';
+        await srRepo.save(quotation.service_request);
+      }
+    } else {
+      quotation.status = 'Draft';
+      quotation.head_sales_decision = 'Rejected';
+      quotation.head_sales_note =
+        trimmedNote || 'Trưởng phòng Kinh doanh yêu cầu chỉnh sửa lại đơn giá / chiết khấu.';
+      quotation.last_rejected_total = quotation.total_amount;
+      quotation.last_rejected_discount = quotation.discount_amount;
+      await qRepo.save(quotation);
+
+      if (quotation.service_request && quotation.service_request.status === 'Quoted') {
+        quotation.service_request.status = 'New';
+        await srRepo.save(quotation.service_request);
+      }
+    }
+  });
+
+  return getQuotationDetail(quotationId);
+};
+
+/**
  * Lấy chi tiết báo giá (Quotation Detail) theo quotationId
  */
 export const getQuotationDetail = async (
@@ -539,6 +894,8 @@ export const getQuotationDetail = async (
   const quotation = await quotationRepo.findOne({
     where: { id: quotationId },
     relations: {
+      created_by_account: true,
+      head_sales_reviewer: true,
       service_request: {
         customer: true,
       },
@@ -559,8 +916,8 @@ export const getQuotationDetail = async (
     if (quotation.service_request?.customer_id !== customerIdFilter) {
       throw new AppError('Báo giá không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
     }
-    if (quotation.status === 'Draft') {
-      throw new AppError('Báo giá này đang được biên soạn bản nháp, chưa gửi cho khách hàng.', 404, ERROR_CODES.NOT_FOUND);
+    if (quotation.status === 'Draft' || quotation.status === 'PendingApproval') {
+      throw new AppError('Báo giá này đang được biên soạn hoặc chờ Trưởng phòng Kinh doanh phê duyệt, chưa gửi cho khách hàng.', 404, ERROR_CODES.NOT_FOUND);
     }
   }
 
@@ -613,11 +970,29 @@ export const getQuotationDetail = async (
     total_amount: Number(quotation.total_amount),
     estimated_completion_date: quotation.estimated_completion_date ?? null,
     status: quotation.status,
+    created_by: quotation.created_by ?? null,
+    created_by_name: quotation.created_by_account?.full_name ?? null,
+    head_sales_reviewed_by: quotation.head_sales_reviewed_by ?? null,
+    head_sales_reviewer_name: quotation.head_sales_reviewer?.full_name ?? null,
+    head_sales_reviewed_at: quotation.head_sales_reviewed_at
+      ? new Date(quotation.head_sales_reviewed_at).toISOString()
+      : null,
+    head_sales_note: quotation.head_sales_note ?? null,
+    head_sales_decision: quotation.head_sales_decision ?? null,
+    customer_reject_reason: quotation.customer_reject_reason ?? null,
+    customer_responded_at: quotation.customer_responded_at
+      ? new Date(quotation.customer_responded_at).toISOString()
+      : null,
+    sales_submission_note: quotation.sales_submission_note ?? null,
+    submission_count: quotation.submission_count ?? 0,
+    last_rejected_total: quotation.last_rejected_total ? Number(quotation.last_rejected_total) : null,
+    last_rejected_discount: quotation.last_rejected_discount ? Number(quotation.last_rejected_discount) : null,
     customer: {
       id: customer?.id ?? sr?.customer_id ?? 0,
       company_name: customer?.company_name ?? '—',
       tax_code: customer?.tax_code ?? null,
       address: customer?.address ?? '—',
+      assigned_sales_id: customer?.assigned_sales_id ?? null,
     },
     service_request: {
       id: sr?.id ?? quotation.service_request_id,
@@ -630,6 +1005,7 @@ export const getQuotationDetail = async (
     },
     line_items: lineItemsDetail,
     can_send: quotation.status === 'Draft',
+    can_head_sales_review: quotation.status === 'PendingApproval',
     can_approve: quotation.status === 'Sent',
     can_reject: quotation.status === 'Sent',
   };
@@ -672,6 +1048,8 @@ export const approveQuotation = async (
     const srRepo = getRepository(ServiceRequest);
 
     quotation.status = 'Approved';
+    quotation.customer_reject_reason = null;
+    quotation.customer_responded_at = new Date();
     await qRepo.save(quotation);
 
     if (quotation.service_request) {
@@ -728,6 +1106,8 @@ export const rejectQuotation = async (
     const srRepo = getRepository(ServiceRequest);
 
     quotation.status = 'Rejected';
+    quotation.customer_reject_reason = reason && reason.trim() ? reason.trim() : null;
+    quotation.customer_responded_at = new Date();
     await qRepo.save(quotation);
 
     if (quotation.service_request && reason && reason.trim()) {
@@ -755,10 +1135,13 @@ export const rejectQuotation = async (
  */
 export const listQuotations = async (
   customerIdFilter?: number,
+  assignedSalesIdFilter?: number,
 ): Promise<QuotationDetailResult[]> => {
   const quotationRepo = dataSource.getRepository(Quotation);
   const quotations = await quotationRepo.find({
     relations: {
+      created_by_account: true,
+      head_sales_reviewer: true,
       service_request: {
         customer: true,
       },
@@ -777,7 +1160,10 @@ export const listQuotations = async (
   const filtered = quotations.filter((q) => {
     if (customerIdFilter !== undefined) {
       if (q.service_request?.customer_id !== customerIdFilter) return false;
-      if (q.status === 'Draft') return false;
+      if (q.status === 'Draft' || q.status === 'PendingApproval') return false;
+    }
+    if (assignedSalesIdFilter !== undefined) {
+      if (q.service_request?.customer?.assigned_sales_id !== assignedSalesIdFilter) return false;
     }
     return true;
   });
@@ -832,11 +1218,29 @@ export const listQuotations = async (
       total_amount: Number(quotation.total_amount),
       estimated_completion_date: quotation.estimated_completion_date ?? null,
       status: quotation.status,
+      created_by: quotation.created_by ?? null,
+      created_by_name: quotation.created_by_account?.full_name ?? null,
+      head_sales_reviewed_by: quotation.head_sales_reviewed_by ?? null,
+      head_sales_reviewer_name: quotation.head_sales_reviewer?.full_name ?? null,
+      head_sales_reviewed_at: quotation.head_sales_reviewed_at
+        ? new Date(quotation.head_sales_reviewed_at).toISOString()
+        : null,
+      head_sales_note: quotation.head_sales_note ?? null,
+      head_sales_decision: quotation.head_sales_decision ?? null,
+      customer_reject_reason: quotation.customer_reject_reason ?? null,
+      customer_responded_at: quotation.customer_responded_at
+        ? new Date(quotation.customer_responded_at).toISOString()
+        : null,
+      sales_submission_note: quotation.sales_submission_note ?? null,
+      submission_count: quotation.submission_count ?? 0,
+      last_rejected_total: quotation.last_rejected_total ? Number(quotation.last_rejected_total) : null,
+      last_rejected_discount: quotation.last_rejected_discount ? Number(quotation.last_rejected_discount) : null,
       customer: {
         id: customer?.id ?? sr?.customer_id ?? 0,
         company_name: customer?.company_name ?? '—',
         tax_code: customer?.tax_code ?? null,
         address: customer?.address ?? '—',
+        assigned_sales_id: customer?.assigned_sales_id ?? null,
       },
       service_request: {
         id: sr?.id ?? quotation.service_request_id,
@@ -849,6 +1253,7 @@ export const listQuotations = async (
       },
       line_items: lineItemsDetail,
       can_send: quotation.status === 'Draft',
+      can_head_sales_review: quotation.status === 'PendingApproval',
       can_approve: quotation.status === 'Sent',
       can_reject: quotation.status === 'Sent',
     };

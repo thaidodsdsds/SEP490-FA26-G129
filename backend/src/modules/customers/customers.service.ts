@@ -24,6 +24,12 @@ export type DeviceStatus = (typeof ALLOWED_DEVICE_STATUSES)[number];
 export interface CustomerSummary {
   id: number;
   company_name: string;
+  tax_code?: string | null;
+  address?: string;
+  industry?: string;
+  assigned_sales_id?: number | null;
+  assigned_sales_name?: string | null;
+  assigned_sales_email?: string | null;
 }
 
 export interface CustomerDetailed {
@@ -32,6 +38,12 @@ export interface CustomerDetailed {
   tax_code: string | null;
   address: string;
   industry: string;
+  assigned_sales_id?: number | null;
+  assigned_sales_name?: string | null;
+  assigned_sales_email?: string | null;
+  assigned_by?: number | null;
+  assigned_by_name?: string | null;
+  assigned_at?: Date | null;
   created_at: Date;
   accounts_count?: number;
   devices_count?: number;
@@ -69,6 +81,8 @@ export interface CreateCustomerInput {
   tax_code?: string | null;
   address: string;
   industry: string;
+  assigned_sales_id?: number | null;
+  assigned_by?: number | null;
   contact_person?: {
     full_name: string;
     email: string;
@@ -97,19 +111,40 @@ const generateInternalCode = (): string => {
 };
 
 /**
- * Lấy danh sách ID và tên khách hàng (company_name) từ Customer entity
+ * Lấy danh sách ID và tên khách hàng (company_name) từ Customer entity.
+ * Nếu truyền assignedSalesIdFilter (ví dụ role Sales đang đăng nhập), chỉ trả về các khách hàng được gán cho Sales đó.
  */
-export const listCustomers = async (): Promise<CustomerSummary[]> => dataSource
-  .getRepository(Customer)
-  .find({
-    select: {
-      id: true,
-      company_name: true,
-    },
-    order: {
-      company_name: 'ASC',
-    },
-  });
+export const listCustomers = async (
+  assignedSalesIdFilter?: number,
+): Promise<CustomerSummary[]> => {
+  const qb = dataSource
+    .getRepository(Customer)
+    .createQueryBuilder('customer')
+    .leftJoinAndSelect('customer.assigned_sales', 'assigned_sales')
+    .orderBy('customer.company_name', 'ASC');
+
+  if (
+    typeof assignedSalesIdFilter === 'number'
+    && Number.isInteger(assignedSalesIdFilter)
+    && assignedSalesIdFilter > 0
+  ) {
+    qb.andWhere('customer.assigned_sales_id = :assignedSalesIdFilter', {
+      assignedSalesIdFilter,
+    });
+  }
+
+  const items = await qb.getMany();
+  return items.map((c) => ({
+    id: c.id,
+    company_name: c.company_name,
+    tax_code: c.tax_code,
+    address: c.address,
+    industry: c.industry,
+    assigned_sales_id: c.assigned_sales_id ?? null,
+    assigned_sales_name: c.assigned_sales?.full_name ?? null,
+    assigned_sales_email: c.assigned_sales?.email ?? null,
+  }));
+};
 
 /**
  * Lấy danh sách chi tiết khách hàng với tìm kiếm, lọc và phân trang
@@ -117,6 +152,8 @@ export const listCustomers = async (): Promise<CustomerSummary[]> => dataSource
 export const listCustomersDetailed = async (options: {
   search?: string;
   industry?: string;
+  assignedSalesIdFilter?: number;
+  assignmentStatus?: 'all' | 'assigned' | 'unassigned';
   page?: number;
   limit?: number;
 }): Promise<{
@@ -132,7 +169,9 @@ export const listCustomersDetailed = async (options: {
 
   const query = dataSource
     .getRepository(Customer)
-    .createQueryBuilder('customer');
+    .createQueryBuilder('customer')
+    .leftJoinAndSelect('customer.assigned_sales', 'assigned_sales')
+    .leftJoinAndSelect('customer.assigned_by_account', 'assigned_by_account');
 
   if (options.search && options.search.trim()) {
     const s = `%${options.search.trim().toLowerCase()}%`;
@@ -144,6 +183,20 @@ export const listCustomersDetailed = async (options: {
 
   if (options.industry && options.industry.trim()) {
     query.andWhere('customer.industry = :industry', { industry: options.industry.trim() });
+  }
+
+  if (
+    typeof options.assignedSalesIdFilter === 'number'
+    && Number.isInteger(options.assignedSalesIdFilter)
+    && options.assignedSalesIdFilter > 0
+  ) {
+    query.andWhere('customer.assigned_sales_id = :assignedSalesIdFilter', {
+      assignedSalesIdFilter: options.assignedSalesIdFilter,
+    });
+  } else if (options.assignmentStatus === 'assigned') {
+    query.andWhere('customer.assigned_sales_id IS NOT NULL');
+  } else if (options.assignmentStatus === 'unassigned') {
+    query.andWhere('customer.assigned_sales_id IS NULL');
   }
 
   query.orderBy('customer.id', 'DESC');
@@ -195,6 +248,12 @@ export const listCustomersDetailed = async (options: {
     tax_code: item.tax_code,
     address: item.address,
     industry: item.industry,
+    assigned_sales_id: item.assigned_sales_id ?? null,
+    assigned_sales_name: item.assigned_sales?.full_name ?? null,
+    assigned_sales_email: item.assigned_sales?.email ?? null,
+    assigned_by: item.assigned_by ?? null,
+    assigned_by_name: item.assigned_by_account?.full_name ?? null,
+    assigned_at: item.assigned_at ?? null,
     created_at: item.created_at,
     accounts_count: accountsCounts[item.id] || 0,
     devices_count: devicesCounts[item.id] || 0,
@@ -343,11 +402,23 @@ export const createCustomer = async (input: CreateCustomerInput) => {
   }
 
   return dataSource.transaction(async (manager) => {
+    const assignedSalesId =
+      typeof input.assigned_sales_id === 'number' && input.assigned_sales_id > 0
+        ? input.assigned_sales_id
+        : null;
+    const assignedBy =
+      typeof input.assigned_by === 'number' && input.assigned_by > 0
+        ? input.assigned_by
+        : assignedSalesId;
+
     const newCustomer = manager.create(Customer, {
       company_name: companyName,
       tax_code: taxCode,
       address,
       industry,
+      assigned_sales_id: assignedSalesId,
+      assigned_by: assignedSalesId ? assignedBy : null,
+      assigned_at: assignedSalesId ? new Date() : null,
     });
     const savedCustomer = await manager.save(newCustomer);
 
@@ -587,5 +658,219 @@ export const createCustomerDevice = async (
     is_group2: savedDevice.is_group2,
     next_due_date: savedDevice.next_due_date,
     status: savedDevice.status,
+  };
+};
+
+/**
+ * Lấy danh sách nhân viên Sales kèm số lượng khách hàng đang phụ trách & danh sách toàn bộ khách hàng để HeadSales phân công
+ */
+export const getSalesCustomerAssignments = async () => {
+  const accountRepo = dataSource.getRepository(Account);
+  const customerRepo = dataSource.getRepository(Customer);
+
+  const salesAccounts = await accountRepo
+    .createQueryBuilder('account')
+    .innerJoinAndSelect('account.role', 'role')
+    .where('role.name = :roleName', { roleName: 'Sales' })
+    .orderBy('account.full_name', 'ASC')
+    .getMany();
+
+  const customers = await customerRepo
+    .createQueryBuilder('customer')
+    .leftJoinAndSelect('customer.assigned_sales', 'assigned_sales')
+    .leftJoinAndSelect('customer.assigned_by_account', 'assigned_by_account')
+    .orderBy('customer.id', 'ASC')
+    .getMany();
+
+  const customerIds = customers.map((c) => c.id);
+  const devicesCounts: Record<number, number> = {};
+  const srCounts: Record<number, number> = {};
+
+  if (customerIds.length > 0) {
+    const [devData, srData] = await Promise.all([
+      dataSource
+        .getRepository(Device)
+        .createQueryBuilder('d')
+        .select('d.customer_id', 'customerId')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('d.customer_id IN (:...customerIds)', { customerIds })
+        .groupBy('d.customer_id')
+        .getRawMany(),
+      dataSource
+        .getRepository(ServiceRequest)
+        .createQueryBuilder('sr')
+        .select('sr.customer_id', 'customerId')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('sr.customer_id IN (:...customerIds)', { customerIds })
+        .groupBy('sr.customer_id')
+        .getRawMany(),
+    ]);
+    devData.forEach((r) => {
+      devicesCounts[Number(r.customerId)] = Number(r.cnt);
+    });
+    srData.forEach((r) => {
+      srCounts[Number(r.customerId)] = Number(r.cnt);
+    });
+  }
+
+  const assignedCountBySalesId = new Map<number, number>();
+  const requestsCountBySalesId = new Map<number, number>();
+  for (const c of customers) {
+    if (c.assigned_sales_id) {
+      assignedCountBySalesId.set(
+        c.assigned_sales_id,
+        (assignedCountBySalesId.get(c.assigned_sales_id) || 0) + 1,
+      );
+      requestsCountBySalesId.set(
+        c.assigned_sales_id,
+        (requestsCountBySalesId.get(c.assigned_sales_id) || 0) + (srCounts[c.id] || 0),
+      );
+    }
+  }
+
+  const sales_staff = salesAccounts.map((acc) => ({
+    id: acc.id,
+    full_name: acc.full_name,
+    email: acc.email,
+    phone: acc.phone,
+    assigned_customers_count: assignedCountBySalesId.get(acc.id) || 0,
+    service_requests_count: requestsCountBySalesId.get(acc.id) || 0,
+  }));
+
+  const customerItems = customers.map((c) => ({
+    id: c.id,
+    company_name: c.company_name,
+    tax_code: c.tax_code,
+    address: c.address,
+    industry: c.industry,
+    assigned_sales_id: c.assigned_sales_id ?? null,
+    assigned_sales_name: c.assigned_sales?.full_name ?? null,
+    assigned_sales_email: c.assigned_sales?.email ?? null,
+    assigned_by: c.assigned_by ?? null,
+    assigned_by_name: c.assigned_by_account?.full_name ?? null,
+    assigned_at: c.assigned_at ?? null,
+    devices_count: devicesCounts[c.id] || 0,
+    service_requests_count: srCounts[c.id] || 0,
+    created_at: c.created_at,
+  }));
+
+  const assignedCustomersCount = customerItems.filter((c) => c.assigned_sales_id !== null).length;
+
+  return {
+    sales_staff,
+    customers: customerItems,
+    summary: {
+      total_customers: customerItems.length,
+      assigned_customers: assignedCustomersCount,
+      unassigned_customers: customerItems.length - assignedCustomersCount,
+      total_sales_staff: sales_staff.length,
+    },
+  };
+};
+
+/**
+ * Gán (hoặc gỡ gán) 1 khách hàng cho 1 nhân viên Sales (1 khách hàng - 1 Sales phụ trách)
+ */
+export const assignCustomerToSales = async (
+  customerId: number,
+  salesAccountId: number | null,
+  assignedByAccountId: number,
+) => {
+  const customerRepo = dataSource.getRepository(Customer);
+  const customer = await customerRepo.findOne({ where: { id: customerId } });
+  if (!customer) {
+    throw new AppError('Không tìm thấy khách hàng.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  let salesAccount: Account | null = null;
+  if (salesAccountId !== null) {
+    const accountRepo = dataSource.getRepository(Account);
+    salesAccount = await accountRepo.findOne({
+      where: { id: salesAccountId },
+      relations: ['role'],
+    });
+    if (!salesAccount || String(salesAccount.role?.name || '').toLowerCase() !== 'sales') {
+      throw new AppError(
+        'Nhân viên được chọn không hợp lệ hoặc không thuộc bộ phận Sales.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+  }
+
+  customer.assigned_sales_id = salesAccount ? salesAccount.id : null;
+  customer.assigned_by = salesAccount ? assignedByAccountId : null;
+  customer.assigned_at = salesAccount ? new Date() : null;
+
+  await customerRepo.save(customer);
+
+  const reloaded = await customerRepo.findOne({
+    where: { id: customerId },
+    relations: ['assigned_sales', 'assigned_by_account'],
+  });
+
+  return {
+    id: reloaded!.id,
+    company_name: reloaded!.company_name,
+    tax_code: reloaded!.tax_code,
+    address: reloaded!.address,
+    industry: reloaded!.industry,
+    assigned_sales_id: reloaded!.assigned_sales_id,
+    assigned_sales_name: reloaded!.assigned_sales?.full_name ?? null,
+    assigned_sales_email: reloaded!.assigned_sales?.email ?? null,
+    assigned_by: reloaded!.assigned_by,
+    assigned_by_name: reloaded!.assigned_by_account?.full_name ?? null,
+    assigned_at: reloaded!.assigned_at,
+  };
+};
+
+/**
+ * Gán hàng loạt nhiều khách hàng cho 1 nhân viên Sales (hoặc gỡ gán khi salesAccountId = null)
+ */
+export const bulkAssignCustomersToSales = async (
+  customerIds: number[],
+  salesAccountId: number | null,
+  assignedByAccountId: number,
+) => {
+  if (!Array.isArray(customerIds) || customerIds.length === 0) {
+    throw new AppError(
+      'Vui lòng chọn ít nhất 1 khách hàng để phân công.',
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  let salesAccount: Account | null = null;
+  if (salesAccountId !== null) {
+    const accountRepo = dataSource.getRepository(Account);
+    salesAccount = await accountRepo.findOne({
+      where: { id: salesAccountId },
+      relations: ['role'],
+    });
+    if (!salesAccount || String(salesAccount.role?.name || '').toLowerCase() !== 'sales') {
+      throw new AppError(
+        'Nhân viên được chọn không hợp lệ hoặc không thuộc bộ phận Sales.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+  }
+
+  await dataSource
+    .createQueryBuilder()
+    .update(Customer)
+    .set({
+      assigned_sales_id: salesAccount ? salesAccount.id : null,
+      assigned_by: salesAccount ? assignedByAccountId : null,
+      assigned_at: salesAccount ? new Date() : null,
+    })
+    .where('id IN (:...customerIds)', { customerIds })
+    .execute();
+
+  return {
+    updated_count: customerIds.length,
+    customer_ids: customerIds,
+    assigned_sales_id: salesAccount ? salesAccount.id : null,
+    assigned_sales_name: salesAccount ? salesAccount.full_name : null,
   };
 };
