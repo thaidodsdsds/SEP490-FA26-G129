@@ -17,6 +17,7 @@ import serviceTypesRoutes from './modules/service-types/service-types.routes.js'
 import serviceRequestsRoutes from './modules/service-requests/service-requests.routes.js';
 import quotationsRoutes from './modules/quotations/quotations.routes.js';
 import contractsRoutes from './modules/contracts/contracts.routes.js';
+import workOrdersRoutes from './modules/work-orders/work-orders.routes.js';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use(`${API_PREFIX}/service-types`, serviceTypesRoutes);
 app.use(`${API_PREFIX}/service-requests`, serviceRequestsRoutes);
 app.use(`${API_PREFIX}/quotations`, quotationsRoutes);
 app.use(`${API_PREFIX}/contracts`, contractsRoutes);
+app.use(`${API_PREFIX}/work-orders`, workOrdersRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {
