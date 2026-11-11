@@ -483,6 +483,28 @@
   color: #566f82;
 }
 
+.operations-feedback {
+  margin: 0 22px 14px;
+  padding: 10px 12px;
+  border: 1px solid #c8e4d2;
+  border-radius: 8px;
+  background: #f1faf4;
+  color: #397650;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.operations-feedback.error {
+  border-color: #f0cfcb;
+  background: #fdf5f4;
+  color: #a33a33;
+}
+
+.filter-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .empty-panel,
 .task-empty {
   display: grid;

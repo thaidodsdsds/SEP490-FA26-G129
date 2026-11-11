@@ -1,35 +1,79 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { initialWorkOrders, technicians } from './mockData.js';
+import {
+  extractApiErrorMessage,
+  getWorkOrderDetailApi,
+  getWorkOrderLookupsApi,
+  listWorkOrdersApi,
+  updateWorkOrderAssignmentApi,
+} from '../../services/work-order-service.js';
 import './operations.css';
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const standards = [
-  'Calibrator Fluke 5522A',
-  'Bộ quả cân chuẩn F2',
-  'Buồng nhiệt ẩm ESPEC',
-  'Thước chuẩn Mitutoyo',
-];
-
 const formatSchedule = (value) => {
   if (!value) return 'Chưa xếp lịch';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa xếp lịch';
   return new Intl.DateTimeFormat('vi-VN', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(value));
+  }).format(date);
 };
 
+const toDateTimeLocal = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const initials = (name) => (name || '?')
+  .split(' ')
+  .slice(-2)
+  .map((part) => part[0])
+  .join('');
+
 function HeadOfTechPage() {
-  const [workOrders, setWorkOrders] = useState(initialWorkOrders);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [lookups, setLookups] = useState({ technicians: [], standards: [] });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [assignment, setAssignment] = useState(null);
   const [message, setMessage] = useState('');
+  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
   const assignmentModalRef = useRef(null);
   const assignmentOpen = Boolean(assignment);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [summaries, lookupData] = await Promise.all([
+        listWorkOrdersApi(),
+        getWorkOrderLookupsApi(),
+      ]);
+      const details = await Promise.all(
+        summaries.map((order) => getWorkOrderDetailApi(order.id)),
+      );
+      setWorkOrders(details);
+      setLookups(lookupData ?? { technicians: [], standards: [] });
+    } catch (loadFailure) {
+      setLoadError(extractApiErrorMessage(loadFailure, 'Không tải được dữ liệu phân công.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     if (!assignmentOpen) return undefined;
@@ -78,35 +122,37 @@ function HeadOfTechPage() {
   }, [assignmentOpen]);
 
   const flatItems = useMemo(
-    () => workOrders.flatMap((order) => order.items.map((item) => ({ ...item, order }))),
+    () => workOrders.flatMap((order) => (order.assignments ?? []).map((item) => ({ ...item, order }))),
     [workOrders],
   );
-  const assignedCount = flatItems.filter((item) => item.technician).length;
+  const assignedCount = flatItems.filter((item) => item.technician_id).length;
   const unassignedCount = flatItems.length - assignedCount;
   const filteredOrders = workOrders.map((order) => ({
     ...order,
-    items: order.items.filter((item) => {
+    items: (order.assignments ?? []).filter((item) => {
       const query = search.trim().toLowerCase();
       const matchesSearch = !query
-        || `${order.id} ${order.customer} ${item.device} ${item.serial}`.toLowerCase().includes(query);
+        || `${order.work_order_code} ${order.customer_name} ${order.contract_code} ${item.device_name}`.toLowerCase().includes(query);
       const matchesFilter = filter === 'all'
-        || (filter === 'unassigned' && !item.technician)
-        || (filter === 'assigned' && item.technician);
+        || (filter === 'unassigned' && !item.technician_id)
+        || (filter === 'assigned' && item.technician_id);
       return matchesSearch && matchesFilter;
     }),
   })).filter((order) => order.items.length > 0);
 
   const openAssignment = (order, item) => {
     setMessage('');
+    setNotice('');
     setAssignment({
       orderId: order.id,
-      itemId: item.id,
-      device: item.device,
-      customer: order.customer,
-      technician: item.technician || '',
-      standard: item.standard || '',
-      scheduledStart: item.scheduledStart || '',
-      scheduledEnd: item.scheduledEnd || '',
+      orderCode: order.work_order_code,
+      assignmentId: item.id,
+      device: item.device_name,
+      customer: order.customer_name,
+      technicianId: item.technician_id ? String(item.technician_id) : '',
+      standard: item.standard_name || '',
+      scheduledStart: toDateTimeLocal(item.scheduled_start),
+      scheduledEnd: toDateTimeLocal(item.scheduled_end),
     });
   };
 
@@ -115,32 +161,47 @@ function HeadOfTechPage() {
     setAssignment((current) => ({ ...current, [name]: value }));
   };
 
-  const saveAssignment = (event) => {
+  const saveAssignment = async (event) => {
     event.preventDefault();
+    setMessage('');
+
+    if (!assignment.technicianId) {
+      setMessage('Vui lòng chọn kỹ thuật viên phụ trách.');
+      return;
+    }
+    if (!assignment.standard) {
+      setMessage('Vui lòng chọn chuẩn đối chứng.');
+      return;
+    }
+    if (!assignment.scheduledStart || !assignment.scheduledEnd) {
+      setMessage('Vui lòng nhập đầy đủ thời gian bắt đầu và kết thúc.');
+      return;
+    }
     if (new Date(assignment.scheduledEnd) <= new Date(assignment.scheduledStart)) {
       setMessage('Thời gian kết thúc phải sau thời gian bắt đầu.');
       return;
     }
 
-    setWorkOrders((currentOrders) => currentOrders.map((order) => (
-      order.id !== assignment.orderId
-        ? order
-        : {
-            ...order,
-            items: order.items.map((item) => (
-              item.id !== assignment.itemId
-                ? item
-                : {
-                    ...item,
-                    technician: assignment.technician,
-                    standard: assignment.standard,
-                    scheduledStart: assignment.scheduledStart,
-                    scheduledEnd: assignment.scheduledEnd,
-                  }
-            )),
-          }
-    )));
-    setAssignment(null);
+    setSaving(true);
+    try {
+      const updated = await updateWorkOrderAssignmentApi(
+        assignment.orderId,
+        assignment.assignmentId,
+        {
+          technician_id: Number(assignment.technicianId),
+          standard_name: assignment.standard,
+          scheduled_start: new Date(assignment.scheduledStart).toISOString(),
+          scheduled_end: new Date(assignment.scheduledEnd).toISOString(),
+        },
+      );
+      setWorkOrders((current) => current.map((order) => (order.id === updated.id ? updated : order)));
+      setAssignment(null);
+      setNotice(`Đã lưu phân công cho ${updated.work_order_code}.`);
+    } catch (saveFailure) {
+      setMessage(extractApiErrorMessage(saveFailure, 'Không lưu được phân công.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -153,7 +214,7 @@ function HeadOfTechPage() {
             Phân công kỹ thuật viên, chuẩn đối chứng và lịch hẹn cho từng thiết bị trong Work Order.
           </p>
         </div>
-        <span className="demo-pill"><span /> Dữ liệu minh họa</span>
+        <span className="demo-pill"><span /> Đồng bộ từ Work Order</span>
       </div>
 
       <div className="operations-stats">
@@ -207,9 +268,21 @@ function HeadOfTechPage() {
               {label}
             </button>
           ))}
+          <button className="filter-chip" disabled={loading} onClick={load} type="button">
+            Làm mới
+          </button>
         </div>
 
-        {filteredOrders.length ? (
+        {notice && <div className="operations-feedback" role="status">{notice}</div>}
+        {loadError && <div className="operations-feedback error" role="alert">{loadError}</div>}
+
+        {loading ? (
+          <div className="empty-panel">
+            <span aria-hidden="true">⌛</span>
+            <strong>Đang tải dữ liệu phân công</strong>
+            <p>Danh sách Work Order sẽ hiển thị sau ít giây.</p>
+          </div>
+        ) : filteredOrders.length ? (
           <div className="work-order-list">
             {filteredOrders.map((order) => (
               <article className="work-order-card" key={order.id}>
@@ -217,12 +290,12 @@ function HeadOfTechPage() {
                   <div className="work-order-id">
                     <span className="order-mark" aria-hidden="true">WO</span>
                     <div>
-                      <strong>{order.id}</strong>
-                      <span>{order.customer}</span>
+                      <strong>{order.work_order_code}</strong>
+                      <span>{order.customer_name} · Hợp đồng {order.contract_code || '—'}</span>
                     </div>
                   </div>
-                  <span className={`priority-tag ${order.priority === 'Ưu tiên' ? 'priority-high' : ''}`}>
-                    {order.priority}
+                  <span className={`priority-tag ${order.status === 'Assigned' ? '' : 'priority-high'}`}>
+                    {order.status === 'Assigned' ? 'Đã phân công' : 'Chờ điều phối'}
                   </span>
                 </div>
 
@@ -237,34 +310,32 @@ function HeadOfTechPage() {
                   {order.items.map((item) => (
                     <div className="assignment-row" key={item.id}>
                       <div className="device-cell">
-                        <strong>{item.device}</strong>
-                        <span>{item.model} · SN {item.serial}</span>
-                        <small>{item.service}</small>
+                        <strong>{item.device_name}</strong>
+                        <span>{item.technician_id ? 'Đã phân công kỹ thuật' : 'Chưa có kỹ thuật viên'}</span>
+                        <small>Dòng phân công #{item.id}</small>
                       </div>
                       <div className="assignment-person">
-                        {item.technician ? (
+                        {item.technician_id ? (
                           <>
-                            <span className="mini-avatar">
-                              {item.technician.split(' ').slice(-2).map((part) => part[0]).join('')}
-                            </span>
-                            <span>{item.technician}</span>
+                            <span className="mini-avatar">{initials(item.technician_name)}</span>
+                            <span>{item.technician_name}</span>
                           </>
                         ) : <span className="muted-value">Chưa phân công</span>}
                       </div>
                       <div className="assignment-standard">
-                        <strong>{item.standard || 'Chưa chọn chuẩn'}</strong>
-                        <span>{item.field}</span>
+                        <strong>{item.standard_name || 'Chưa chọn chuẩn'}</strong>
+                        <span>{item.standard_name ? 'Đã chọn chuẩn đối chứng' : 'Cần bổ sung'}</span>
                       </div>
                       <div className="assignment-date">
-                        <strong>{formatSchedule(item.scheduledStart)}</strong>
-                        <span>Hạn dự kiến: {item.due}</span>
+                        <strong>{formatSchedule(item.scheduled_start)}</strong>
+                        <span>Kết thúc: {formatSchedule(item.scheduled_end)}</span>
                       </div>
                       <button
-                        className={`button ${item.technician ? 'button-secondary' : 'button-primary'} assign-button`}
+                        className={`button ${item.technician_id ? 'button-secondary' : 'button-primary'} assign-button`}
                         onClick={() => openAssignment(order, item)}
                         type="button"
                       >
-                        {item.technician ? 'Điều chỉnh' : 'Phân công'}
+                        {item.technician_id ? 'Điều chỉnh' : 'Phân công'}
                       </button>
                     </div>
                   ))}
@@ -280,7 +351,8 @@ function HeadOfTechPage() {
           </div>
         )}
         <p className="mock-note">
-          <strong>Lưu ý:</strong> Đây là dữ liệu mẫu. Thay đổi phân công chỉ được lưu trong phiên trình duyệt này.
+          <strong>Lưu ý:</strong> Dữ liệu phân công được lưu trực tiếp vào Work Order. Thay đổi sẽ được giữ lại
+          khi tải lại trang.
         </p>
       </section>
 
@@ -310,7 +382,7 @@ function HeadOfTechPage() {
           >
             <div className="modal-heading">
               <div>
-                <p className="eyebrow">WORK ORDER {assignment.orderId}</p>
+                <p className="eyebrow">WORK ORDER {assignment.orderCode}</p>
                 <h2 id="assignment-modal-title">Phân công thiết bị</h2>
                 <p>{assignment.device} · {assignment.customer}</p>
               </div>
@@ -318,18 +390,18 @@ function HeadOfTechPage() {
             </div>
             <form className="assignment-form" onSubmit={saveAssignment}>
               <label htmlFor="assignee">Kỹ thuật viên <span>*</span></label>
-              <select id="assignee" name="technician" onChange={updateAssignment} required value={assignment.technician}>
+              <select id="assignee" name="technicianId" onChange={updateAssignment} required value={assignment.technicianId}>
                 <option value="">Chọn kỹ thuật viên</option>
-                {technicians.map((technician) => (
-                  <option key={technician.name} value={technician.name}>
-                    {technician.name} · {technician.specialty}
+                {lookups.technicians.map((technician) => (
+                  <option key={technician.id} value={technician.id}>
+                    {technician.full_name} · {technician.role === 'HeadTechnician' ? 'Trưởng nhóm kỹ thuật' : 'Kỹ thuật viên'}
                   </option>
                 ))}
               </select>
               <label htmlFor="standard">Chuẩn đối chứng <span>*</span></label>
               <select id="standard" name="standard" onChange={updateAssignment} required value={assignment.standard}>
                 <option value="">Chọn chuẩn còn hạn</option>
-                {standards.map((standard) => <option key={standard} value={standard}>{standard}</option>)}
+                {lookups.standards.map((standard) => <option key={standard} value={standard}>{standard}</option>)}
               </select>
               <div className="form-grid-two">
                 <div>
@@ -361,8 +433,10 @@ function HeadOfTechPage() {
               </div>
               {message && <p className="inline-error" role="alert">{message}</p>}
               <div className="modal-actions">
-                <button className="button button-secondary" onClick={() => setAssignment(null)} type="button">Hủy</button>
-                <button className="button button-primary" type="submit">Lưu phân công</button>
+                <button className="button button-secondary" disabled={saving} onClick={() => setAssignment(null)} type="button">Hủy</button>
+                <button className="button button-primary" disabled={saving} type="submit">
+                  {saving ? 'Đang lưu…' : 'Lưu phân công'}
+                </button>
               </div>
             </form>
           </motion.section>
