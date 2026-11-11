@@ -7,7 +7,9 @@ import {
   createDevice,
   type DeviceStatus,
   getDeviceById,
+  getDeviceOwnershipHistory,
   listDevices,
+  transferDeviceOwnership,
   updateDevice,
 } from './devices.service.js';
 
@@ -177,4 +179,62 @@ export const updateDeviceHandler: RequestHandler = async (req, res, next) => {
     return next(error);
   }
 };
+
+/**
+ * Handler lấy lịch sử sở hữu của thiết bị (View Device Ownership History)
+ */
+export const getDeviceOwnershipHistoryHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const deviceId = Number(req.params.id);
+    if (!Number.isInteger(deviceId) || deviceId <= 0) {
+      return next(new AppError('Mã thiết bị không hợp lệ.', 400, ERROR_CODES.BAD_REQUEST));
+    }
+
+    const requestingUser = req.user as {
+      id?: number;
+      role?: string;
+      customer_id?: number | null;
+    } | undefined;
+
+    const data = await getDeviceOwnershipHistory(deviceId, requestingUser);
+    return res.status(200).json(buildSuccessResponse(data));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * Handler chuyển quyền sở hữu thiết bị (Transfer Device Ownership)
+ */
+export const transferDeviceOwnershipHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const deviceId = Number(req.params.id);
+    if (!Number.isInteger(deviceId) || deviceId <= 0) {
+      return next(new AppError('Mã thiết bị không hợp lệ.', 400, ERROR_CODES.BAD_REQUEST));
+    }
+
+    const requestingUser = req.user as {
+      id?: number;
+      role?: string;
+      customer_id?: number | null;
+    } | undefined;
+
+    const { new_customer_id, transfer_reason, notes } = (req.body ?? {}) as Record<string, unknown>;
+
+    const result = await transferDeviceOwnership(
+      deviceId,
+      {
+        new_customer_id: Number(new_customer_id),
+        transfer_reason: typeof transfer_reason === 'string' ? transfer_reason : '',
+        notes: typeof notes === 'string' ? notes : null,
+      },
+      requestingUser,
+    );
+
+    return res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 

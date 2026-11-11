@@ -1,0 +1,21 @@
+{
+  "name": "ISOCAL Tech - Ứng dụng Kỹ thuật viên Ngoại tuyến",
+  "short_name": "ISOCAL Tech",
+  "description": "Ứng dụng di động ghi nhận kết quả đo kiểm, chụp ảnh và ký số ngoại tuyến cho kỹ thuật viên ISOCAL.",
+  "start_url": "/mobile/technician",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "orientation": "portrait",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
