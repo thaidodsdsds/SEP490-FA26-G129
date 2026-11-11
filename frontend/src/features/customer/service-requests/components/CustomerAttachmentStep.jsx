@@ -85,25 +85,49 @@ function CustomerAttachmentStep({
 
         {attachments.length > 0 && (
           <ul className="csr-attachment-list" aria-label="Danh sách tệp đã chọn">
-            {attachments.map((file) => (
-              <li className="csr-attachment-item" key={file.id}>
-                <div className="csr-attachment-name">
-                  <span aria-hidden="true">📄</span>
-                  <div>
-                    <strong>{file.file_name}</strong>
-                    <small>{formatFileSize(file.size)}</small>
+            {attachments.map((file) => {
+              const isImg =
+                /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.file_name || '') ||
+                (file.file_url || '').startsWith('data:image/');
+              return (
+                <li className="csr-attachment-item" key={file.id}>
+                  <div className="csr-attachment-name" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {isImg && file.file_url ? (
+                      <a href={file.file_url} rel="noreferrer" target="_blank" title="Xem ảnh">
+                        <img
+                          alt={file.file_name}
+                          src={file.file_url}
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            objectFit: 'cover',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                          }}
+                        />
+                      </a>
+                    ) : (
+                      <span aria-hidden="true">📄</span>
+                    )}
+                    <div>
+                      <strong>{file.file_name}</strong>
+                      <small style={{ display: 'block' }}>
+                        {formatFileSize(file.size)}{' '}
+                        {file.uploading ? '· ☁️ Đang tải lên Cloudinary...' : '· ✓ Đã tải lên Cloudinary'}
+                      </small>
+                    </div>
                   </div>
-                </div>
-                <button
-                  aria-label={`Xóa tệp ${file.file_name}`}
-                  className="csr-remove-file-btn"
-                  onClick={() => onRemoveAttachment(file.id)}
-                  type="button"
-                >
-                  Xóa
-                </button>
-              </li>
-            ))}
+                  <button
+                    aria-label={`Xóa tệp ${file.file_name}`}
+                    className="csr-remove-file-btn"
+                    onClick={() => onRemoveAttachment(file.id)}
+                    type="button"
+                  >
+                    🗑 Xóa
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
