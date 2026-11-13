@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { In } from 'typeorm';
+import { In, Not } from 'typeorm';
 import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import dataSource from '../../database/dataSource.js';
@@ -40,12 +40,35 @@ export interface MasterStandardItem {
   days_remaining: number;
 }
 
+export interface TechnicianScheduleItem {
+  assignment_id: number;
+  work_order_id: number;
+  work_order_code: string;
+  service_request_item_id: number;
+  device_name: string;
+  customer_name: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: string;
+}
+
+export interface TechnicianWorkload {
+  assigned_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  active_count: number;
+  workload_level: 'Low' | 'Normal' | 'High' | 'Overloaded';
+  workload_text: string;
+}
+
 export interface TechnicianItem {
   id: number;
   full_name: string;
   email: string;
   phone: string | null;
   role_name: string;
+  workload: TechnicianWorkload;
+  schedules: TechnicianScheduleItem[];
 }
 
 export interface AssignmentResourcesResult {
@@ -696,6 +719,11 @@ export const updateWorkOrderStatus = async (
 export const getAssignmentResources = async (): Promise<AssignmentResourcesResult> => {
   const accountRepo = dataSource.getRepository(Account);
   const standardRepo = dataSource.getRepository(MasterStandard);
+  const assignmentRepo = dataSource.getRepository(WorkOrderAssignment);
+  const workOrderRepo = dataSource.getRepository(WorkOrder);
+  const contractRepo = dataSource.getRepository(Contract);
+  const quotationRepo = dataSource.getRepository(Quotation);
+  const customerRepo = dataSource.getRepository(Customer);
 
   const technicians = await accountRepo.find({
     relations: ['role'],
@@ -709,6 +737,77 @@ export const getAssignmentResources = async (): Promise<AssignmentResourcesResul
   const standards = await standardRepo.find({
     order: { status: 'ASC', calibration_expiry: 'DESC' },
   });
+
+  // Lấy toàn bộ các phân công chưa bị hủy để tính toán lịch trình và tải công việc
+  const allAssignments = await assignmentRepo.find({
+    where: { status: Not('Cancelled') },
+    relations: [
+      'work_order',
+      'service_request_item',
+      'service_request_item.device',
+    ],
+    order: { scheduled_start: 'ASC' },
+  });
+
+  // Lấy thông tin khách hàng cho các Work Order liên quan
+  const woIds = Array.from(new Set(allAssignments.map((a) => a.work_order_id)));
+  const workOrders = woIds.length
+    ? await workOrderRepo.find({ where: { id: In(woIds) } })
+    : [];
+
+  const contractIds = workOrders
+    .map((w) => w.contract_id)
+    .filter((id): id is number => typeof id === 'number');
+  const quotationIds = workOrders
+    .map((w) => w.quotation_id)
+    .filter((id): id is number => typeof id === 'number');
+
+  const contracts = contractIds.length
+    ? await contractRepo.find({ where: { id: In(contractIds) } })
+    : [];
+  const quotations = quotationIds.length
+    ? await quotationRepo.find({
+        where: { id: In(quotationIds) },
+        relations: ['service_request'],
+      })
+    : [];
+
+  const customerIds = new Set<number>();
+  for (const c of contracts) if (c.customer_id) customerIds.add(c.customer_id);
+  for (const q of quotations) {
+    if (q.service_request?.customer_id) customerIds.add(q.service_request.customer_id);
+  }
+
+  const customers = customerIds.size
+    ? await customerRepo.find({ where: { id: In(Array.from(customerIds)) } })
+    : [];
+  const contractMap = new Map<number, Contract>(contracts.map((c) => [c.id, c]));
+  const quotationMap = new Map<number, Quotation>(quotations.map((q) => [q.id, q]));
+  const customerMap = new Map<number, Customer>(customers.map((c) => [c.id, c]));
+
+  const woCustomerMap = new Map<number, string>();
+  for (const wo of workOrders) {
+    let cName = 'Khách hàng Doanh nghiệp';
+    const c = wo.contract_id ? contractMap.get(wo.contract_id) : null;
+    const q = wo.quotation_id ? quotationMap.get(wo.quotation_id) : null;
+    if (c?.customer_id && customerMap.get(c.customer_id)?.company_name) {
+      cName = customerMap.get(c.customer_id)!.company_name;
+    } else if (
+      q?.service_request?.customer_id &&
+      customerMap.get(q.service_request.customer_id)?.company_name
+    ) {
+      cName = customerMap.get(q.service_request.customer_id)!.company_name;
+    }
+    woCustomerMap.set(wo.id, cName);
+  }
+
+  // Nhóm phân công theo từng kỹ thuật viên
+  const techAssignmentsMap = new Map<number, WorkOrderAssignment[]>();
+  for (const a of allAssignments) {
+    const list = techAssignmentsMap.get(a.technician_id) || [];
+    list.push(a);
+    techAssignmentsMap.set(a.technician_id, list);
+  }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -729,14 +828,77 @@ export const getAssignmentResources = async (): Promise<AssignmentResourcesResul
     };
   });
 
-  return {
-    technicians: technicians.map((t) => ({
+  const formattedTechnicians: TechnicianItem[] = technicians.map((t) => {
+    const assignmentsForTech = techAssignmentsMap.get(t.id) || [];
+    let assignedCount = 0;
+    let inProgressCount = 0;
+    let completedCount = 0;
+
+    const schedules: TechnicianScheduleItem[] = [];
+
+    for (const a of assignmentsForTech) {
+      if (a.status === 'Assigned') assignedCount++;
+      else if (a.status === 'InProgress') inProgressCount++;
+      else if (a.status === 'Completed') completedCount++;
+
+      const woCode = formatWorkOrderCode(
+        a.work_order_id,
+        new Date(a.work_order?.created_at || a.scheduled_start),
+      );
+      const devName = a.service_request_item?.device?.name || 'Thiết bị đo lường';
+      const custName = woCustomerMap.get(a.work_order_id) || 'Khách hàng';
+
+      schedules.push({
+        assignment_id: a.id,
+        work_order_id: a.work_order_id,
+        work_order_code: woCode,
+        service_request_item_id: a.service_request_item_id,
+        device_name: devName,
+        customer_name: custName,
+        scheduled_start: new Date(a.scheduled_start).toISOString(),
+        scheduled_end: new Date(a.scheduled_end).toISOString(),
+        status: a.status,
+      });
+    }
+
+    const activeCount = assignedCount + inProgressCount;
+    let workloadLevel: 'Low' | 'Normal' | 'High' | 'Overloaded' = 'Low';
+    let workloadText = 'Rảnh rỗi (0 việc)';
+
+    if (activeCount === 0) {
+      workloadLevel = 'Low';
+      workloadText = 'Rảnh rỗi (0 việc)';
+    } else if (activeCount <= 2) {
+      workloadLevel = 'Normal';
+      workloadText = `Vừa phải (${activeCount} việc)`;
+    } else if (activeCount <= 4) {
+      workloadLevel = 'High';
+      workloadText = `Bận (${activeCount} việc)`;
+    } else {
+      workloadLevel = 'Overloaded';
+      workloadText = `Quá tải (${activeCount} việc)`;
+    }
+
+    return {
       id: t.id,
       full_name: t.full_name,
       email: t.email,
       phone: t.phone,
       role_name: t.role?.name || 'Technician',
-    })),
+      workload: {
+        assigned_count: assignedCount,
+        in_progress_count: inProgressCount,
+        completed_count: completedCount,
+        active_count: activeCount,
+        workload_level: workloadLevel,
+        workload_text: workloadText,
+      },
+      schedules,
+    };
+  });
+
+  return {
+    technicians: formattedTechnicians,
     master_standards: formattedStandards,
   };
 };
@@ -1040,6 +1202,40 @@ export const saveWorkOrderAssignment = async (
       service_request_item_id,
     },
   });
+
+  // KIỂM TRA TRÙNG LỊCH KỸ THUẬT VIÊN (SCHEDULE CONFLICT CHECK)
+  // Hai khoảng thời gian [startA, endA] và [startB, endB] bị trùng nhau khi:
+  // startA < endB && endA > startB
+  const existingTechAssignments = await assignmentRepo.find({
+    where: {
+      technician_id,
+      status: In(['Assigned', 'InProgress']),
+    },
+    relations: ['work_order', 'service_request_item', 'service_request_item.device'],
+  });
+
+  const conflict = existingTechAssignments.find((a) => {
+    // Nếu đang chỉnh sửa chính assignment này thì bỏ qua
+    if (assignment && a.id === assignment.id) return false;
+    const aStart = new Date(a.scheduled_start);
+    const aEnd = new Date(a.scheduled_end);
+    return startDate < aEnd && endDate > aStart;
+  });
+
+  if (conflict) {
+    const conflictDevice = conflict.service_request_item?.device?.name || 'thiết bị';
+    const conflictStart = new Date(conflict.scheduled_start).toLocaleString('vi-VN');
+    const conflictEnd = new Date(conflict.scheduled_end).toLocaleString('vi-VN');
+    const woCode = formatWorkOrderCode(
+      conflict.work_order_id,
+      new Date(conflict.work_order?.created_at || conflict.scheduled_start),
+    );
+    throw new AppError(
+      `Trùng lịch! Kỹ thuật viên "${technician.full_name}" đã có lịch thực hiện "${conflictDevice}" (${woCode}) từ ${conflictStart} đến ${conflictEnd}. Vui lòng chọn kỹ thuật viên khác hoặc điều chỉnh khung giờ!`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
 
   if (hasAssignment(assignment)) {
     assignment.technician_id = technician_id;
