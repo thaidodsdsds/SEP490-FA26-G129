@@ -6,6 +6,32 @@ import { getRoleDashboardPath, getUserInitials } from '../app/role-routing.js';
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/* ─── Nav helpers ─────────────────────────────────────────────── */
+const matchesPath = (to, pathname) =>
+  Boolean(to) && (pathname === to || pathname.startsWith(`${to}/`));
+
+const getGroupId = (link, index) => link.id ?? `group-${index}`;
+
+// Nhóm chứa route hiện tại (chọn link khớp dài nhất để tránh nhầm với route gốc)
+const findActiveGroupId = (links, pathname) => {
+  let activeId = null;
+  let activeLength = -1;
+
+  links.forEach((link, index) => {
+    if (!Array.isArray(link.children)) return;
+    const groupId = getGroupId(link, index);
+    link.children.forEach((child) => {
+      if (!matchesPath(child.to, pathname)) return;
+      if (child.to.length > activeLength) {
+        activeLength = child.to.length;
+        activeId = groupId;
+      }
+    });
+  });
+
+  return activeId;
+};
+
 /* ─── UserDropdown ─────────────────────────────────────────────── */
 function UserDropdown({ displayName, displayInitials, roleName, profilePath, onLogout }) {
   const [open, setOpen] = useState(false);
@@ -96,6 +122,17 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
   const displayInitials = getUserInitials(session.user, initials);
   const dashboardPath = getRoleDashboardPath(session.user) || '/login';
   const roleName = session.role === 'public' ? role : session.role;
+
+  const navLinks = links ?? [];
+  const activeGroupId = findActiveGroupId(navLinks, location.pathname);
+  const [openGroupId, setOpenGroupId] = useState(activeGroupId);
+  const [lastActiveGroupId, setLastActiveGroupId] = useState(activeGroupId);
+
+  // Khi đổi route, tự mở nhóm chứa trang đang xem (không dùng effect để tránh render 2 lần)
+  if (activeGroupId !== lastActiveGroupId) {
+    setLastActiveGroupId(activeGroupId);
+    setOpenGroupId(activeGroupId);
+  }
 
   useEffect(() => {
     if (!isNavOpen) return undefined;
@@ -218,8 +255,49 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
           </div>
           <nav className="role-sidebar-nav">
             <span className="role-sidebar-label">MENU</span>
-            {links.map((link) => (
-              link.soon ? (
+            {navLinks.map((link, index) => {
+              if (Array.isArray(link.children)) {
+                const groupId = getGroupId(link, index);
+                const sublistId = `role-nav-sublist-${groupId}`;
+                const isOpen = openGroupId === groupId;
+                const hasActiveChild = link.children.some((child) => matchesPath(child.to, location.pathname));
+
+                return (
+                  <div
+                    className={`role-nav-group${hasActiveChild ? ' role-nav-group-active' : ''}`}
+                    key={groupId}
+                  >
+                    <button
+                      aria-controls={sublistId}
+                      aria-expanded={isOpen}
+                      className="role-nav-link role-nav-group-toggle"
+                      onClick={() => setOpenGroupId((current) => (current === groupId ? null : groupId))}
+                      type="button"
+                    >
+                      <span aria-hidden="true">{link.icon}</span>
+                      {link.label}
+                      <span aria-hidden="true" className="role-nav-chevron">▾</span>
+                    </button>
+                    <div className="role-nav-sublist" hidden={!isOpen} id={sublistId} role="group">
+                      {link.children.map((child) => (
+                        <NavLink
+                          className={({ isActive }) => `role-nav-link role-nav-link-child${isActive ? ' role-nav-link-active' : ''}`}
+                          end
+                          key={child.to}
+                          onClick={closeNav}
+                          title={child.label}
+                          to={child.to}
+                        >
+                          <span aria-hidden="true" className="role-nav-dot" />
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+
+              return link.soon ? (
                 <span className="role-nav-link role-nav-link-soon" key={`${link.to}-${link.label}`}>
                   <span aria-hidden="true">{link.icon}</span>
                   {link.label}
@@ -236,8 +314,8 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
                   <span aria-hidden="true">{link.icon}</span>
                   {link.label}
                 </NavLink>
-              )
-            ))}
+              );
+            })}
           </nav>
           <div className="role-sidebar-footer">
             <span className="demo-indicator" />
