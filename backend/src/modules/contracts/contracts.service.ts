@@ -148,6 +148,7 @@ export interface ContractDetail extends ContractSummary {
   can_approve: boolean;
   can_sign_customer: boolean;
   can_cancel: boolean;
+  show_cancel: boolean;
   can_liquidate: boolean;
 }
 
@@ -393,8 +394,11 @@ const mapContract = (
       actor?.role === 'Customer' &&
       !signatures.some((signature) => signature.purpose === CUSTOMER_SIGNATURE_PURPOSE),
     can_cancel:
-      !['Cancelled', 'Liquidated'].includes(status) &&
+      ['Draft', 'PendingApproval', 'Approved'].includes(status) &&
       (isAdmin || (isSales && isOwner && ['Draft', 'PendingApproval'].includes(status))),
+    // Vẫn hiện nút Huỷ (ở dạng xám, không bấm được) để người dùng biết hành động này bị chặn
+    show_cancel:
+      !['Cancelled', 'Liquidated'].includes(status) && (isAdmin || (isSales && isOwner)),
     can_liquidate:
       ['Approved', 'Signed'].includes(status) && (isAdmin || actor?.role === 'Accountant'),
   };

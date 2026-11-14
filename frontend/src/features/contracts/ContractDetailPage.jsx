@@ -157,6 +157,9 @@ function ContractDetailPage({ basePath }) {
   const companySignature = signatures.find((signature) => signature.purpose === 'CompanyApproval') ?? null;
   const customerSignature = signatures.find((signature) => signature.purpose === 'CustomerApproval') ?? null;
 
+  // show_cancel: hiện nút Huỷ ở dạng xám khi hợp đồng đã ký (không cho bấm)
+  const showCancelButton = contract.show_cancel ?? contract.can_cancel;
+
   const travelFee = Number(contract.travel_fee) || 0;
   const travelTax = Math.round((travelFee * 8) / 100);
   const travelAmount = travelFee + travelTax;
@@ -248,10 +251,15 @@ function ContractDetailPage({ basePath }) {
             </button>
           )}
 
-          {contract.can_cancel && (
+          {showCancelButton && (
             <button
               className="button button-danger"
-              disabled={busy}
+              disabled={busy || !contract.can_cancel}
+              title={
+                contract.can_cancel
+                  ? undefined
+                  : 'Không thể huỷ: hợp đồng đã được ký, đã huỷ hoặc đã thanh lý.'
+              }
               onClick={() =>
                 runAction(
                   cancelContractApi,
