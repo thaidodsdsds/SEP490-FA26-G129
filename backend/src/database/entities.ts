@@ -1452,6 +1452,77 @@ export class CalibrationRecord {
 
   @Column({ type: 'timestamptz', nullable: true })
   submitted_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  reject_reason!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  reviewed_at!: Date | null;
+
+  @ManyToOne(() => Account, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'reviewer_id',
+    foreignKeyConstraintName: 'FK_calibration_records_reviewer',
+  })
+  reviewer!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  reviewer_id!: number | null;
+
+  @OneToMany(() => ReviewLog, (reviewLog) => reviewLog.calibration_record)
+  review_logs!: ReviewLog[];
+}
+
+// ==================== REVIEW LOG ====================
+
+@Entity({ name: 'review_logs' })
+@Index('IDX_review_logs_calibration_record_id', ['calibration_record_id'])
+@Index('IDX_review_logs_reviewer_id', ['reviewer_id'])
+@Index('IDX_review_logs_action', ['action'])
+export class ReviewLog {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => CalibrationRecord, (cr) => cr.review_logs, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'calibration_record_id',
+    foreignKeyConstraintName: 'FK_review_logs_calibration_record',
+  })
+  calibration_record!: CalibrationRecord;
+
+  @Column({ type: 'integer' })
+  calibration_record_id!: number;
+
+  @ManyToOne(() => Account, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'reviewer_id',
+    foreignKeyConstraintName: 'FK_review_logs_reviewer',
+  })
+  reviewer!: Account;
+
+  @Column({ type: 'integer' })
+  reviewer_id!: number;
+
+  @Column({ type: 'varchar', length: 20 })
+  action!: 'Approve' | 'Reject';
+
+  @Column({ type: 'text', nullable: true })
+  reject_reason!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  comment!: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
 }
 
 // ==================== STEP RESULT ====================
@@ -1583,4 +1654,5 @@ export const entities = [
   CalibrationRecord,
   StepResult,
   MeasurementDetail,
+  ReviewLog,
 ];

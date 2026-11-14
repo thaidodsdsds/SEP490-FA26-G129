@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
   chats as initialChats,
@@ -9,6 +9,10 @@ import {
   notifications as initialNotifications,
   seals as initialSeals,
 } from './mockData.js';
+import {
+  getReviewQueueApi,
+  reviewCalibrationRecordApi,
+} from '../../services/calibration-record-service.js';
 import ReviewerWorkspaceContext from './ReviewerWorkspaceContext.js';
 import ReviewerWorkspaceOverlays from './shared/ReviewerWorkspaceOverlays.jsx';
 import './reviewer.css';
@@ -16,6 +20,8 @@ import './reviewer.css';
 function ReviewerWorkspaceProvider() {
   const [procedures, setProcedures] = useState(initialProcedures);
   const [records, setRecords] = useState(initialReviewRecords);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+  const [recordsError, setRecordsError] = useState(null);
   const [certificateList, setCertificateList] = useState(certificates);
   const [standards, setStandards] = useState(initialStandards);
   const [seals, setSeals] = useState(initialSeals);
@@ -31,50 +37,99 @@ function ReviewerWorkspaceProvider() {
     setFeedbackState(message ? { message, tone } : null);
   };
 
+  // Load CalibrationRecords review queue from Backend API
+  const loadReviewQueue = async () => {
+    setLoadingRecords(true);
+    setRecordsError(null);
+    try {
+      const data = await getReviewQueueApi({ status: 'all' });
+      if (Array.isArray(data)) {
+        setRecords(data);
+      }
+    } catch (err) {
+      console.error('Failed to load review queue from API:', err);
+      setRecordsError(
+        err?.response?.data?.error?.message ||
+          'Không thể tải hàng chờ soát xét từ máy chủ.',
+      );
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReviewQueue();
+  }, []);
+
   const normalizedQuery = query.trim().toLocaleLowerCase('vi-VN');
   const matches = (value) => !normalizedQuery || String(value).toLocaleLowerCase('vi-VN').includes(normalizedQuery);
 
-  const handleApprove = (record) => {
-    setRecords((current) => current.map((item) => item.id === record.id ? { ...item, status: 'Approved' } : item));
-    setCertificateList((current) => current.some((item) => item.record === record.id)
-      ? current
-      : [{
-          id: `CERT-${record.id.replace('CR-', '')}`,
-          record: record.id,
-          device: record.device,
-          customer: record.customer,
-          service: record.type,
-          procedure: record.procedure,
-          status: 'Draft',
-          issuedAt: '21/10/2026',
-        }, ...current]);
-    setFeedback(`Đã duyệt hồ sơ ${record.id}. Certificate có thể được khởi tạo.`);
-    setModal(null);
+  const handleApprove = async (record, signOptions = {}) => {
+    try {
+      const recId = record.raw_id || record.id;
+      await reviewCalibrationRecordApi(recId, {
+        action: 'Approve',
+        signature_image: signOptions.signature_image || null,
+        comment: signOptions.comment || null,
+      });
+
+      // Automatically populate Draft Certificate in workspace
+      setCertificateList((current) =>
+        current.some((item) => String(item.record) === String(record.id) || String(item.record) === String(recId))
+          ? current
+          : [
+              {
+                id: `CERT-${String(record.id).replace('CR-', '')}`,
+                record: record.id,
+                device: record.device,
+                customer: record.customer,
+                service: record.type,
+                procedure: record.procedure,
+                status: 'Draft',
+                issuedAt: new Date().toLocaleDateString('vi-VN'),
+              },
+              ...current,
+            ],
+      );
+
+      setFeedback(
+        `Đã phê duyệt hồ sơ ${record.id} và ký số TechnicalReview thành công! Giấy chứng nhận (Certificate) đã được khởi tạo ở trạng thái Bản thảo.`,
+        'success',
+      );
+      setModal(null);
+      await loadReviewQueue();
+    } catch (err) {
+      const msg = err?.response?.data?.error?.message || 'Không thể phê duyệt hồ sơ.';
+      setFeedback(msg, 'error');
+      setModal((current) => ({ ...current, error: msg }));
+    }
   };
 
-  const handleReject = (event) => {
+  const handleReject = async (event) => {
     event.preventDefault();
     const reason = String(new FormData(event.currentTarget).get('reason') || '').trim();
     if (!reason) {
-      setModal((current) => ({ ...current, error: 'Nhập lý do Reject để lưu ReviewLog.' }));
+      setModal((current) => ({ ...current, error: 'Vui lòng nhập lý do Reject để lưu ReviewLog.' }));
       return;
     }
-    const rejected = records.find((record) => record.id === modal.record.id);
-    setRecords((current) => current.map((item) => item.id === modal.record.id
-      ? { ...item, status: 'Rejected', rejectReason: reason }
-      : item));
-    if (rejected) {
-      const nextRecord = {
-        ...rejected,
-        id: `${rejected.id}-R1`,
-        status: 'Pending',
-        submittedAt: 'Chưa trình lại',
-        measurements: rejected.measurements.map((measurement) => ({ ...measurement })),
-      };
-      setRecords((current) => [...current, nextRecord]);
+
+    try {
+      const recId = modal.record?.raw_id || modal.record?.id;
+      await reviewCalibrationRecordApi(recId, {
+        action: 'Reject',
+        reject_reason: reason,
+      });
+
+      setFeedback(
+        `Đã ghi nhận từ chối ${modal.record?.id}. ReviewLog đã được lưu và hồ sơ cũ được giữ nguyên để đối soát audit.`,
+        'success',
+      );
+      setModal(null);
+      await loadReviewQueue();
+    } catch (err) {
+      const msg = err?.response?.data?.error?.message || 'Không thể từ chối hồ sơ.';
+      setModal((current) => ({ ...current, error: msg }));
     }
-    setFeedback(`Đã ghi nhận từ chối ${modal.record.id}; bản ghi cũ được giữ nguyên và cần đo lại trên hồ sơ mới.`);
-    setModal(null);
   };
 
   const saveProcedure = (event) => {
@@ -171,7 +226,7 @@ function ReviewerWorkspaceProvider() {
   };
 
   const value = {
-    procedures, records, certificateList, standards, seals, chatThreads, alerts,
+    procedures, records, loadingRecords, recordsError, loadReviewQueue, certificateList, standards, seals, chatThreads, alerts,
     query, setQuery, normalizedQuery, matches,
     feedback, setFeedback, selectedChat, setSelectedChat, sentMessages, setSentMessages, modal,
     setChatThreads, setModal, handleApprove, handleReject, saveProcedure, publishProcedure,
