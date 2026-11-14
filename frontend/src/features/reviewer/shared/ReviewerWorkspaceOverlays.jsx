@@ -20,7 +20,7 @@ function ReviewerWorkspaceOverlays() {
       {modal?.type === 'review' && (
         <ReviewModal
           key="review"
-          onApprove={() => handleApprove(modal.record)}
+          onApprove={(signOptions) => handleApprove(modal.record, signOptions)}
           onClose={() => setModal(null)}
           onReject={handleReject}
           error={modal.error}
