@@ -30,7 +30,12 @@ export const authorize = (...allowedRoles: string[]): RequestHandler => (req, re
 
   const userRole = typeof req.user === 'string' ? undefined : req.user.role;
   const roles = Array.isArray(userRole) ? userRole : userRole ? [userRole] : [];
-  const hasAccess = allowedRoles.length === 0 || allowedRoles.some((role) => roles.includes(role));
+  const normalizedUserRoles = roles.map((r) => String(r).trim().toLowerCase());
+  const hasAccess =
+    allowedRoles.length === 0 ||
+    allowedRoles.some((role) =>
+      normalizedUserRoles.includes(String(role).trim().toLowerCase()),
+    );
 
   if (!hasAccess) {
     return next(new AppError('Permission denied.', 403, ERROR_CODES.FORBIDDEN));

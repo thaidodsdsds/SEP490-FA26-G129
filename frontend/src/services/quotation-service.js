@@ -18,10 +18,33 @@ export const createQuotationApi = async (payload) => {
 };
 
 /**
- * Gửi báo giá bản nháp ('Draft') cho khách hàng -> chuyển sang 'Sent'
+ * Gửi báo giá bản nháp ('Draft'):
+ * - Với Sales: chuyển sang 'PendingApproval' (Trình HeadSales duyệt) kèm ghi chú giải trình (nếu có)
+ * - Với HeadSales/Admin: chuyển sang 'Sent' (Gửi khách hàng)
  */
-export const sendDraftQuotationApi = async (quotationId) => {
-  const response = await apiClient.patch(`/quotations/${quotationId}/send`);
+export const sendDraftQuotationApi = async (quotationId, { sales_submission_note } = {}) => {
+  const response = await apiClient.patch(`/quotations/${quotationId}/send`, {
+    sales_submission_note,
+  });
+  return response.data?.data;
+};
+
+/**
+ * Thu hồi báo giá đang ở trạng thái 'PendingApproval' quay về 'Draft'
+ */
+export const recallQuotationApi = async (quotationId) => {
+  const response = await apiClient.patch(`/quotations/${quotationId}/recall`);
+  return response.data?.data;
+};
+
+/**
+ * Trưởng phòng Kinh doanh (HeadSales) phê duyệt ('approve') hoặc yêu cầu chỉnh sửa ('reject') báo giá
+ */
+export const headSalesReviewQuotationApi = async (quotationId, { decision, note } = {}) => {
+  const response = await apiClient.patch(`/quotations/${quotationId}/head-sales-review`, {
+    decision,
+    note,
+  });
   return response.data?.data;
 };
 

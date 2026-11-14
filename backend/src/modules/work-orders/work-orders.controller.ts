@@ -3,41 +3,43 @@ import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import { buildSuccessResponse } from '../../common/response.js';
 import {
+  deleteWorkOrderAssignment,
+  getAssignmentResources,
+  getInitialInspection,
+  getPendingInspectionConsents,
+  getProcedureExecution,
+  getTechnicianTasks,
+  getWorkOrderAssignmentsList,
   getWorkOrderDetail,
-  getWorkOrderLookups,
+  listDigitalSignatures,
   listWorkOrders,
-  updateWorkOrderAssignment,
-  type UpdateAssignmentInput,
+  saveCalibrationRecord,
+  saveInitialInspection,
+  saveWorkOrderAssignment,
+  submitInspectionConsent,
+  syncTechnicianTasks,
+  updateWorkOrderStatus,
+  verifyCalibrationSignature,
+  type WorkOrderStatus,
 } from './work-orders.service.js';
 
-const parseId = (value: unknown, field: string): number => {
-  const id = Number(value);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new AppError(`${field} không hợp lệ.`, 400, ERROR_CODES.VALIDATION_ERROR);
-  }
-  return id;
-};
-
-const getActorId = (req: Request): number => {
-  const user =
-    typeof req.user === 'object' && req.user !== null
-      ? (req.user as { id?: unknown })
-      : {};
-  const id = Number(user.id);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new AppError('Không xác định được người dùng.', 401, ERROR_CODES.UNAUTHORIZED);
-  }
-  return id;
-};
-
 export const listWorkOrdersHandler = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const workOrders = await listWorkOrders();
-    res.status(200).json(buildSuccessResponse(workOrders));
+    const { search, status, location_type, contract_id, quotation_id } = req.query;
+
+    const result = await listWorkOrders({
+      search: typeof search === 'string' ? search : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      location_type: typeof location_type === 'string' ? location_type : undefined,
+      contract_id: contract_id ? Number(contract_id) : undefined,
+      quotation_id: quotation_id ? Number(quotation_id) : undefined,
+    });
+
+    res.status(200).json(buildSuccessResponse(result));
   } catch (error) {
     next(error);
   }
@@ -49,77 +51,307 @@ export const getWorkOrderDetailHandler = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const workOrderId = parseId(req.params.workOrderId, 'workOrderId');
-    const workOrder = await getWorkOrderDetail(workOrderId);
-    res.status(200).json(buildSuccessResponse(workOrder));
+    const id = Number(req.params.id);
+    if (!id || Number.isNaN(id) || id <= 0) {
+      throw new AppError(
+        'Mã Work Order không hợp lệ',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const result = await getWorkOrderDetail(id);
+    res.status(200).json(buildSuccessResponse(result));
   } catch (error) {
     next(error);
   }
 };
 
-export const getWorkOrderLookupsHandler = async (
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const lookups = await getWorkOrderLookups();
-    res.status(200).json(buildSuccessResponse(lookups));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updateWorkOrderAssignmentHandler = async (
+export const updateWorkOrderStatusHandler = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const workOrderId = parseId(req.params.workOrderId, 'workOrderId');
-    const assignmentId = parseId(req.params.assignmentId, 'assignmentId');
-    const actorId = getActorId(req);
-    const body = (req.body ?? {}) as Record<string, unknown>;
-    const input: UpdateAssignmentInput = {};
-
-    if (Object.prototype.hasOwnProperty.call(body, 'technician_id')) {
-      input.technician_id =
-        body.technician_id === null || body.technician_id === ''
-          ? null
-          : Number(body.technician_id);
+    const id = Number(req.params.id);
+    if (!id || Number.isNaN(id) || id <= 0) {
+      throw new AppError(
+        'Mã Work Order không hợp lệ',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
     }
 
-    if (Object.prototype.hasOwnProperty.call(body, 'standard_name')) {
-      input.standard_name =
-        body.standard_name === null ? null : String(body.standard_name);
+    const { status } = req.body;
+    if (!status) {
+      throw new AppError(
+        'Vui lòng cung cấp trạng thái mới cho Work Order',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
     }
 
-    if (Object.prototype.hasOwnProperty.call(body, 'scheduled_start')) {
-      input.scheduled_start =
-        body.scheduled_start === null || body.scheduled_start === ''
-          ? null
-          : String(body.scheduled_start);
-    }
-
-    if (Object.prototype.hasOwnProperty.call(body, 'scheduled_end')) {
-      input.scheduled_end =
-        body.scheduled_end === null || body.scheduled_end === ''
-          ? null
-          : String(body.scheduled_end);
-    }
-
-    if (Object.prototype.hasOwnProperty.call(body, 'notes')) {
-      input.notes = body.notes === null ? null : String(body.notes);
-    }
-
-    const workOrder = await updateWorkOrderAssignment(
-      workOrderId,
-      assignmentId,
-      input,
-      actorId,
-    );
-    res.status(200).json(buildSuccessResponse(workOrder));
+    const result = await updateWorkOrderStatus(id, status as WorkOrderStatus);
+    res.status(200).json(buildSuccessResponse(result));
   } catch (error) {
     next(error);
   }
 };
+
+export const getAssignmentResourcesHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const result = await getAssignmentResources();
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getWorkOrderAssignmentsListHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const result = await getWorkOrderAssignmentsList();
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveWorkOrderAssignmentHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const assignedById = (req.user as { id?: number })?.id || 1;
+    const {
+      work_order_id,
+      service_request_item_id,
+      technician_id,
+      master_standard_id,
+      scheduled_start,
+      scheduled_end,
+      status,
+    } = req.body;
+
+    const result = await saveWorkOrderAssignment(
+      {
+        work_order_id: Number(work_order_id),
+        service_request_item_id: Number(service_request_item_id),
+        technician_id: Number(technician_id),
+        master_standard_id: Number(master_standard_id),
+        scheduled_start,
+        scheduled_end,
+        status,
+      },
+      assignedById,
+    );
+
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteWorkOrderAssignmentHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const id = Number(req.params.id);
+    if (!id || Number.isNaN(id) || id <= 0) {
+      throw new AppError(
+        'Mã phân công không hợp lệ',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    const result = await deleteWorkOrderAssignment(id);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTechnicianTasksHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const technicianId = (req.user as { id?: number })?.id;
+    const showAll = req.query.all === 'true';
+    const idToFilter = showAll ? undefined : technicianId;
+    const tasks = await getTechnicianTasks(idToFilter);
+    res.status(200).json(buildSuccessResponse(tasks));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const syncTechnicianTasksHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const technicianId = (req.user as { id?: number })?.id || 1;
+    const result = await syncTechnicianTasks(req.body, technicianId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveInitialInspectionHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const technicianId = (req.user as { id?: number })?.id || 1;
+    const result = await saveInitialInspection(req.body, technicianId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInitialInspectionHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const serviceRequestItemId = Number(req.params.serviceRequestItemId);
+    if (!serviceRequestItemId || Number.isNaN(serviceRequestItemId) || serviceRequestItemId <= 0) {
+      throw new AppError(
+        'Mã service_request_item_id không hợp lệ',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+    const result = await getInitialInspection(serviceRequestItemId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitInspectionConsentHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = req.user as {
+      id: number;
+      role?: string;
+      customer_id?: number | null;
+      full_name?: string;
+    };
+    if (!user || !user.id) {
+      throw new AppError('Chưa xác thực người dùng', 401, ERROR_CODES.UNAUTHORIZED);
+    }
+    const result = await submitInspectionConsent(req.body, user);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingInspectionConsentsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = req.user as {
+      id: number;
+      role?: string;
+      customer_id?: number | null;
+    };
+    if (!user || !user.id) {
+      throw new AppError('Chưa xác thực người dùng', 401, ERROR_CODES.UNAUTHORIZED);
+    }
+    const result = await getPendingInspectionConsents(user);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getProcedureExecutionHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const serviceRequestItemId = Number(req.params.serviceRequestItemId);
+    if (!serviceRequestItemId || Number.isNaN(serviceRequestItemId) || serviceRequestItemId <= 0) {
+      throw new AppError(
+        'Mã service_request_item_id không hợp lệ',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+    const result = await getProcedureExecution(serviceRequestItemId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveCalibrationRecordHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const technicianId = (req.user as { id?: number })?.id || 1;
+    const result = await saveCalibrationRecord(req.body, technicianId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyCalibrationSignatureHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const serviceRequestItemId = Number(req.params.serviceRequestItemId);
+    const result = await verifyCalibrationSignature(serviceRequestItemId);
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listDigitalSignaturesHandler = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const result = await listDigitalSignatures();
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+

@@ -1,5 +1,13 @@
+const resolveDefaultWsUrl = () => {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+  return `ws://${host}:3000/ws`;
+};
+
 export const createWebSocketClient = ({
-  url = import.meta.env.VITE_WS_URL || 'ws://localhost:3000/ws',
+  url = resolveDefaultWsUrl(),
   onOpen,
   onMessage,
   onClose,

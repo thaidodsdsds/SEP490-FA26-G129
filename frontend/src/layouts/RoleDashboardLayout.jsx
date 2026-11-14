@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAppContext } from '../app/providers.jsx';
 import { getRoleDashboardPath, getUserInitials } from '../app/role-routing.js';
+import AuthRequiredState from '../components/auth/AuthRequiredState.jsx';
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -189,6 +190,15 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
     endSession();
     navigate('/login');
   };
+
+  if (!session.isAuthenticated || !session.user) {
+    return (
+      <AuthRequiredState
+        portalHint={role?.toLowerCase() === 'customer' ? 'customer' : 'staff'}
+        targetPath={window.location.pathname}
+      />
+    );
+  }
 
   return (
     <div className="role-dashboard-shell">

@@ -14,12 +14,17 @@ import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
 import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
+import SalesCustomerListPage from '../features/sales/customers/SalesCustomerListPage.jsx';
+import SalesCustomerDetailPage from '../features/sales/customers/SalesCustomerDetailPage.jsx';
+import HeadSalesCustomerAssignmentPage from '../features/sales/customers/HeadSalesCustomerAssignmentPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
+import HeadSalesQuotationApprovalPage from '../features/sales/quotations/HeadSalesQuotationApprovalPage.jsx';
 import ContractListPage from '../features/contracts/ContractListPage.jsx';
 import ContractFormPage from '../features/contracts/ContractFormPage.jsx';
 import ContractDetailPage from '../features/contracts/ContractDetailPage.jsx';
+import SalesWorkOrderListPage from '../features/sales/work-orders/SalesWorkOrderListPage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -45,13 +50,18 @@ import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
 import RoleDashboardGate from './RoleDashboardGate.jsx';
+import ProtectedRoute from '../components/auth/ProtectedRoute.jsx';
 
 // Auth pages
 import { CustomerLoginPage } from '../features/auth/CustomerLoginPage.jsx';
 import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
+import DeviceListPage from '../features/devices/DeviceListPage.jsx';
+import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
+import MobileTechnicianApp from '../features/mobile-technician/MobileTechnicianApp.jsx';
 
 const publicRoutes = [
   // Standalone auth pages — no wrapping layout, each manages its own shell
@@ -59,6 +69,10 @@ const publicRoutes = [
   { path: '/staff-login', element: <StaffLoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Standalone Mobile PWA routes for Technician Offline App
+  { path: '/mobile/technician', element: <MobileTechnicianApp /> },
+  { path: '/mobile', element: <Navigate to="/mobile/technician" replace /> },
   {
     path: '/',
     element: <PublicLayout />,
@@ -71,7 +85,11 @@ const publicRoutes = [
 const customerRoutes = [
   {
     path: '/internal/customer',
-    element: <CustomerLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['customer']} portalType="customer">
+        <CustomerLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -83,6 +101,8 @@ const customerRoutes = [
       },
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="customer" /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="customer" /> },
+      { path: 'devices', element: <DeviceListPage role="customer" basePath="/internal/customer/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
       { path: 'contracts', element: <ContractListPage basePath="/internal/customer/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/customer/contracts" /> },
@@ -95,7 +115,11 @@ const customerRoutes = [
 const accountantRoutes = [
   {
     path: '/internal/accountant',
-    element: <AccountantLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['accountant', 'admin']} portalType="staff">
+        <AccountantLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -115,7 +139,11 @@ const accountantRoutes = [
 const adminRoutes = [
   {
     path: '/internal/admin',
-    element: <AdminLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['admin']} portalType="staff">
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -139,7 +167,11 @@ const adminRoutes = [
 const salesRoutes = [
   {
     path: '/internal/sales',
-    element: <SalesLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['sales', 'headsales', 'admin', 'ceo']} portalType="staff">
+        <SalesLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -149,6 +181,26 @@ const salesRoutes = [
           </RoleDashboardGate>
         ),
       },
+      {
+        path: 'customer-assignments',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesCustomerAssignmentPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'quotation-approvals',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesQuotationApprovalPage />
+          </ProtectedRoute>
+        ),
+      },
+      { path: 'customers', element: <SalesCustomerListPage /> },
+      { path: 'customers/:id', element: <SalesCustomerDetailPage /> },
+      { path: 'devices', element: <DeviceListPage role="sales" basePath="/internal/sales/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="sales" basePath="/internal/sales/devices" /> },
       { path: 'service-requests', element: <CustomerServiceRequestListPage role="sales" /> },
       { path: 'service-requests/new', element: <ServiceRequestCreatePage /> },
       { path: 'service-requests/:id', element: <CustomerServiceRequestDetailPage role="sales" /> },
@@ -159,6 +211,7 @@ const salesRoutes = [
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
+      { path: 'work-orders', element: <SalesWorkOrderListPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -167,7 +220,11 @@ const salesRoutes = [
 const warehouseRoutes = [
   {
     path: '/internal/warehouse',
-    element: <WarehouseLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin']} portalType="staff">
+        <WarehouseLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -177,6 +234,8 @@ const warehouseRoutes = [
           </RoleDashboardGate>
         ),
       },
+      { path: 'devices', element: <DeviceListPage role="warehouse" basePath="/internal/warehouse/devices" /> },
+      { path: 'devices/:id', element: <DeviceDetailPage role="warehouse" basePath="/internal/warehouse/devices" /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -189,11 +248,19 @@ const legacyRoutes = [
 const internalRoutes = [
   {
     path: '/internal',
-    element: <InternalDashboardLanding />,
+    element: (
+      <ProtectedRoute portalType="staff">
+        <InternalDashboardLanding />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/internal/head-of-tech',
-    element: <HeadOfTechLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
+        <HeadOfTechLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         element: (
@@ -224,7 +291,11 @@ const internalRoutes = [
   },
   {
     path: '/internal/technician',
-    element: <TechnicianLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['technician', 'admin']} portalType="staff">
+        <TechnicianLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,

@@ -1,4 +1,4 @@
-import { In, Like, Not } from 'typeorm';
+import { EntityManager, In, Like, Not } from 'typeorm';
 import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import { numberToVietnameseWords } from '../../common/number-to-words.js';
@@ -8,9 +8,9 @@ import {
   Contract,
   ContractItem,
   Quotation,
+  WorkOrder,
 } from '../../database/entities.js';
 import { formatQuotationCode } from '../quotations/quotations.service.js';
-import { ensureWorkOrderForContract } from '../work-orders/work-orders.service.js';
 import {
   COMPANY_SIGNATURE_PURPOSE,
   CUSTOMER_SIGNATURE_PURPOSE,
@@ -30,6 +30,29 @@ export const CONTRACT_STATUSES = [
 ] as const;
 
 export const EDITABLE_STATUSES = ['Draft', 'PendingApproval'] as const;
+
+/**
+ * Bảo đảm mỗi hợp đồng đã ký có đúng 1 Work Order (schema work_orders hiện tại:
+ * contract_id, quotation_id, status). Việc phân công KTV được thực hiện sau
+ * ở màn hình Head of Tech.
+ */
+const ensureWorkOrderForContract = async (
+  manager: EntityManager,
+  contract: Contract,
+): Promise<void> => {
+  const repository = manager.getRepository(WorkOrder);
+
+  const existing = await repository.findOne({ where: { contract_id: contract.id } });
+  if (existing) return;
+
+  await repository.save(
+    repository.create({
+      contract_id: contract.id,
+      quotation_id: contract.quotation_id,
+      status: 'Open',
+    }),
+  );
+};
 
 export interface ContractActor {
   id: number;

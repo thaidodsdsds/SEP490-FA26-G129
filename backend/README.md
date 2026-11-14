@@ -35,3 +35,5 @@ GET /api/v1/roles
 
 The endpoint returns each role's `id`, `code`, and `name`, sorted by code. It
 does not require authentication.
+
+DOOOO
