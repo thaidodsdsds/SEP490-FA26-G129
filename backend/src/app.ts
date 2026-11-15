@@ -22,6 +22,7 @@ import devicesRoutes from './modules/devices/devices.routes.js';
 import workOrdersRoutes from './modules/work-orders/work-orders.routes.js';
 import uploadsRoutes from './modules/uploads/uploads.routes.js';
 import calibrationRecordsRoutes from './modules/calibration-records/calibration-records.routes.js';
+import certificatesRoutes from './modules/certificates/certificates.routes.js';
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use(`${API_PREFIX}/devices`, devicesRoutes);
 app.use(`${API_PREFIX}/work-orders`, workOrdersRoutes);
 app.use(`${API_PREFIX}/uploads`, uploadsRoutes);
 app.use(`${API_PREFIX}/calibration-records`, calibrationRecordsRoutes);
+app.use(`${API_PREFIX}/certificates`, certificatesRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {
