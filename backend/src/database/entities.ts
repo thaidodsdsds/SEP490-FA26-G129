@@ -8,6 +8,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryColumn,
   PrimaryGeneratedColumn,
   Unique,
@@ -994,6 +995,8 @@ export class ContractItem {
 @Entity({ name: 'digital_signatures' })
 @Index('IDX_digital_signatures_contract_id', ['contract_id'])
 @Index('IDX_digital_signatures_calibration_record_id', ['calibration_record_id'])
+@Index('IDX_digital_signatures_certificate_id', ['certificate_id'])
+@Index('IDX_digital_signatures_seal_revocation_id', ['seal_revocation_id'])
 @Index('IDX_digital_signatures_signer_id', ['signer_id'])
 @Index('IDX_digital_signatures_status', ['status'])
 @Unique('UQ_digital_signatures_contract_purpose', ['contract_id', 'purpose'])
@@ -1013,6 +1016,32 @@ export class DigitalSignature {
 
   @Column({ type: 'integer', nullable: true })
   calibration_record_id!: number | null;
+
+  @ManyToOne(() => Certificate, (certificate) => certificate.signatures, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'certificate_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_certificate',
+  })
+  certificate!: Certificate | null;
+
+  @Column({ type: 'integer', nullable: true })
+  certificate_id!: number | null;
+
+  @ManyToOne(() => SealRevocation, (revocation) => revocation.signatures, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'seal_revocation_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_seal_revocation',
+  })
+  seal_revocation!: SealRevocation | null;
+
+  @Column({ type: 'integer', nullable: true })
+  seal_revocation_id!: number | null;
 
   @Column({ type: 'varchar', length: 30 })
   purpose!: string;
@@ -1056,6 +1085,233 @@ export class DigitalSignature {
 
   @Column({ type: 'timestamptz', default: () => 'NOW()' })
   created_at!: Date;
+}
+
+// ==================== CERTIFICATE ====================
+
+@Entity({ name: 'certificates' })
+@Index('IDX_certificates_calibration_record_id', ['calibration_record_id'])
+@Index('IDX_certificates_status', ['status'])
+@Unique('UQ_certificates_certificate_no', ['certificate_no'])
+@Check(
+  'CHK_certificates_status',
+  `"status" IN ('Draft', 'PendingPayment', 'Released')`,
+)
+export class Certificate {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => CalibrationRecord, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'calibration_record_id',
+    foreignKeyConstraintName: 'FK_certificates_calibration_record',
+  })
+  calibration_record!: CalibrationRecord;
+
+  @Column({ type: 'integer' })
+  calibration_record_id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  certificate_no!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Draft' })
+  status!: 'Draft' | 'PendingPayment' | 'Released';
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  file_url!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  issued_at!: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToOne(() => Seal, (seal) => seal.certificate)
+  seal!: Seal | null;
+
+  @OneToMany(() => DigitalSignature, (signature) => signature.certificate)
+  signatures!: DigitalSignature[];
+}
+
+// ==================== SEAL ====================
+
+@Entity({ name: 'seals' })
+@Index('IDX_seals_device_id', ['device_id'])
+@Index('IDX_seals_status', ['status'])
+@Index('IDX_seals_due_date', ['due_date'])
+@Unique('UQ_seals_seal_code', ['seal_code'])
+@Unique('UQ_seals_certificate_id', ['certificate_id'])
+@Check(
+  'CHK_seals_status',
+  `"status" IN ('PendingPayment', 'Active', 'Expired', 'Revoked')`,
+)
+@Check('CHK_seals_dates', `"due_date" >= "cal_date"`)
+export class Seal {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Device, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'device_id',
+    foreignKeyConstraintName: 'FK_seals_device',
+  })
+  device!: Device;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @OneToOne(() => Certificate, (certificate) => certificate.seal, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'certificate_id',
+    foreignKeyConstraintName: 'FK_seals_certificate',
+  })
+  certificate!: Certificate;
+
+  @Column({ type: 'integer' })
+  certificate_id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  seal_code!: string;
+
+  @Column({ type: 'date' })
+  cal_date!: string;
+
+  @Column({ type: 'date' })
+  due_date!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Active' })
+  status!: 'PendingPayment' | 'Active' | 'Expired' | 'Revoked';
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  issued_at!: Date;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToMany(() => SealRevocation, (revocation) => revocation.seal)
+  revocations!: SealRevocation[];
+
+  @OneToMany(() => SealVerificationLog, (log) => log.seal)
+  verification_logs!: SealVerificationLog[];
+}
+
+// ==================== SEAL REVOCATION ====================
+
+@Entity({ name: 'seal_revocations' })
+@Index('IDX_seal_revocations_seal_id', ['seal_id'])
+@Index('IDX_seal_revocations_status', ['status'])
+@Index('IDX_seal_revocations_requested_by', ['requested_by'])
+@Check(
+  'CHK_seal_revocations_status',
+  `"status" IN ('Pending', 'Approved', 'Rejected')`,
+)
+@Check(
+  'CHK_seal_revocations_distinct_actors',
+  `"decided_by" IS NULL OR "decided_by" <> "requested_by"`,
+)
+export class SealRevocation {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Seal, (seal) => seal.revocations, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'seal_id',
+    foreignKeyConstraintName: 'FK_seal_revocations_seal',
+  })
+  seal!: Seal;
+
+  @Column({ type: 'integer' })
+  seal_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'requested_by',
+    foreignKeyConstraintName: 'FK_seal_revocations_requested_by',
+  })
+  requester!: Account;
+
+  @Column({ type: 'integer' })
+  requested_by!: number;
+
+  @Column({ type: 'text' })
+  reason!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: 'Pending' | 'Approved' | 'Rejected';
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'decided_by',
+    foreignKeyConstraintName: 'FK_seal_revocations_decided_by',
+  })
+  decider!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  decided_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  decided_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  decision_note!: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToMany(() => DigitalSignature, (signature) => signature.seal_revocation)
+  signatures!: DigitalSignature[];
+}
+
+// ==================== SEAL VERIFICATION LOG ====================
+
+@Entity({ name: 'seal_verification_logs' })
+@Index('IDX_seal_verification_logs_seal_id', ['seal_id'])
+@Index('IDX_seal_verification_logs_seal_code', ['seal_code'])
+@Index('IDX_seal_verification_logs_verified_at', ['verified_at'])
+@Check(
+  'CHK_seal_verification_logs_result',
+  `"verification_result" IN ('Valid', 'Expired', 'Revoked', 'NotFound')`,
+)
+export class SealVerificationLog {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Seal, (seal) => seal.verification_logs, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'seal_id',
+    foreignKeyConstraintName: 'FK_seal_verification_logs_seal',
+  })
+  seal!: Seal | null;
+
+  @Column({ type: 'integer', nullable: true })
+  seal_id!: number | null;
+
+  @Column({ type: 'varchar', length: 50 })
+  seal_code!: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  verification_result!: 'Valid' | 'Expired' | 'Revoked' | 'NotFound';
+
+  @Column({ type: 'varchar', length: 45, nullable: true })
+  source_ip!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  user_agent!: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  verified_at!: Date;
 }
 
 // ==================== WORK ORDER ====================
@@ -1483,6 +1739,9 @@ export class CalibrationRecord {
 
   @OneToMany(() => ReviewLog, (reviewLog) => reviewLog.calibration_record)
   review_logs!: ReviewLog[];
+
+  @OneToOne(() => Certificate, (certificate) => certificate.calibration_record)
+  certificate!: Certificate | null;
 }
 
 // ==================== REVIEW LOG ====================
@@ -1664,4 +1923,8 @@ export const entities = [
   StepResult,
   MeasurementDetail,
   ReviewLog,
+  Certificate,
+  Seal,
+  SealRevocation,
+  SealVerificationLog,
 ];
