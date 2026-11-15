@@ -23,6 +23,7 @@ import workOrdersRoutes from './modules/work-orders/work-orders.routes.js';
 import uploadsRoutes from './modules/uploads/uploads.routes.js';
 import calibrationRecordsRoutes from './modules/calibration-records/calibration-records.routes.js';
 import certificatesRoutes from './modules/certificates/certificates.routes.js';
+import sealsRoutes from './modules/seals/seals.routes.js';
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use(`${API_PREFIX}/work-orders`, workOrdersRoutes);
 app.use(`${API_PREFIX}/uploads`, uploadsRoutes);
 app.use(`${API_PREFIX}/calibration-records`, calibrationRecordsRoutes);
 app.use(`${API_PREFIX}/certificates`, certificatesRoutes);
+app.use(`${API_PREFIX}/seals`, sealsRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {

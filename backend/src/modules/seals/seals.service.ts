@@ -1,0 +1,893 @@
+import crypto from 'node:crypto';
+import dataSource from '../../database/dataSource.js';
+import { ERROR_CODES } from '../../common/constants.js';
+import { AppError } from '../../common/errors.js';
+import {
+  buildSealVerifyUrl,
+  generateSealPdfBuffer,
+  generateSealQrPng,
+  type SealStickerData,
+} from './seal-pdf.service.js';
+
+export interface SealActor {
+  id: number;
+  full_name?: string | null;
+  role?: string | null;
+  customer_id?: number | null;
+}
+
+export interface SealListFilter {
+  status?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateSealInput {
+  certificate_id: number;
+  due_date?: string | null;
+}
+
+interface SealRow {
+  id: number;
+  seal_code: string;
+  status: string;
+  cal_date: string;
+  due_date: string;
+  issued_at: Date;
+  created_at: Date;
+  device_id: number;
+  device_name: string;
+  model: string | null;
+  manufacturer: string | null;
+  serial_number: string | null;
+  internal_code: string;
+  measuring_range: string | null;
+  customer_id: number;
+  customer_name: string;
+  customer_address: string | null;
+  customer_tax_code: string | null;
+  device_next_due_date: string | null;
+  certificate_id: number;
+  certificate_no: string;
+  certificate_status: string;
+  certificate_issued_at: Date | null;
+  certificate_file_url: string | null;
+  calibration_record_id: number;
+  service_name: string | null;
+  service_code: string | null;
+  procedure_version: string | null;
+  result_status: string | null;
+  technician_name: string | null;
+  reviewer_name: string | null;
+  signer_name: string | null;
+  signed_at: Date | null;
+  signature_transaction_id: string | null;
+  days_remaining: number | null;
+  revocation_id: number | null;
+  revocation_status: string | null;
+  revocation_reason: string | null;
+  revocation_created_at: Date | null;
+}
+
+const SEAL_STATUS_LABELS: Record<string, string> = {
+  Active: 'Đang hiệu lực',
+  PendingPayment: 'Chờ thanh toán',
+  Expired: 'Hết hạn',
+  Revoked: 'Đã thu hồi',
+};
+
+const SEAL_SELECT = `
+  SELECT
+    s.id,
+    s.seal_code,
+    s.status,
+    to_char(s.cal_date, 'YYYY-MM-DD') AS cal_date,
+    to_char(s.due_date, 'YYYY-MM-DD') AS due_date,
+    s.issued_at,
+    s.created_at,
+    d.id AS device_id,
+    d.name AS device_name,
+    d.model,
+    d.manufacturer,
+    d.serial_number,
+    d.internal_code,
+    d.measuring_range,
+    d.customer_id,
+    c.company_name AS customer_name,
+    c.address AS customer_address,
+    c.tax_code AS customer_tax_code,
+    to_char(d.next_due_date, 'YYYY-MM-DD') AS device_next_due_date,
+    cert.id AS certificate_id,
+    cert.certificate_no,
+    cert.status AS certificate_status,
+    cert.issued_at AS certificate_issued_at,
+    cert.file_url AS certificate_file_url,
+    cr.id AS calibration_record_id,
+    cr.result_status,
+    st.name AS service_name,
+    st.standard_code AS service_code,
+    cp.version AS procedure_version,
+    tech.full_name AS technician_name,
+    reviewer.full_name AS reviewer_name,
+    release_sig.signer_name,
+    release_sig.signed_at,
+    release_sig.provider_transaction_id AS signature_transaction_id,
+    (s.due_date - CURRENT_DATE) AS days_remaining,
+    rev.id AS revocation_id,
+    rev.status AS revocation_status,
+    rev.reason AS revocation_reason,
+    rev.created_at AS revocation_created_at
+  FROM seals s
+  JOIN devices d ON d.id = s.device_id
+  JOIN customers c ON c.id = d.customer_id
+  JOIN certificates cert ON cert.id = s.certificate_id
+  JOIN calibration_records cr ON cr.id = cert.calibration_record_id
+  LEFT JOIN calibration_procedures cp ON cp.id = cr.procedure_id
+  LEFT JOIN service_types st ON st.id = cp.service_type_id
+  LEFT JOIN accounts tech ON tech.id = cr.technician_id
+  LEFT JOIN accounts reviewer ON reviewer.id = cr.reviewer_id
+  LEFT JOIN LATERAL (
+    SELECT ds.signer_name, ds.signed_at, ds.provider_transaction_id
+    FROM digital_signatures ds
+    WHERE ds.certificate_id = cert.id
+      AND ds.purpose = 'CertificateRelease'
+    ORDER BY ds.id DESC
+    LIMIT 1
+  ) release_sig ON true
+  LEFT JOIN LATERAL (
+    SELECT r.id, r.status, r.reason, r.created_at
+    FROM seal_revocations r
+    WHERE r.seal_id = s.id
+    ORDER BY r.id DESC
+    LIMIT 1
+  ) rev ON true
+`;
+
+const formatDate = (value: Date | string | null | undefined): string => {
+  if (!value) return '—';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+};
+
+const formatDateTime = (value: Date | string | null | undefined): string => {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const mapSealRow = (row: SealRow) => {
+  const daysRemaining =
+    row.days_remaining === null || row.days_remaining === undefined
+      ? null
+      : Number(row.days_remaining);
+
+  const deviceParts = [row.device_name];
+  if (row.model) deviceParts.push(`Model: ${row.model}`);
+  if (row.serial_number) deviceParts.push(`SN: ${row.serial_number}`);
+
+  return {
+    id: Number(row.id),
+    seal_code: row.seal_code,
+    code: row.seal_code,
+    status: row.status,
+    status_label: SEAL_STATUS_LABELS[row.status] ?? row.status,
+    cal_date: row.cal_date,
+    due_date: row.due_date,
+    cal_date_formatted: formatDate(row.cal_date),
+    due_date_formatted: formatDate(row.due_date),
+    issued_at: row.issued_at,
+    issued_at_formatted: formatDateTime(row.issued_at),
+    created_at: row.created_at,
+    days_remaining: daysRemaining,
+    is_expired: row.status === 'Expired' || (daysRemaining !== null && daysRemaining < 0),
+    is_expiring_soon:
+      row.status === 'Active' &&
+      daysRemaining !== null &&
+      daysRemaining >= 0 &&
+      daysRemaining <= 30,
+    device_id: Number(row.device_id),
+    device_name: row.device_name,
+    device: deviceParts.filter(Boolean).join(' · '),
+    model: row.model,
+    manufacturer: row.manufacturer,
+    serial_number: row.serial_number,
+    internal_code: row.internal_code,
+    measuring_range: row.measuring_range,
+    device_next_due_date: row.device_next_due_date,
+    customer_id: Number(row.customer_id),
+    customer_name: row.customer_name,
+    customer: row.customer_name,
+    customer_address: row.customer_address,
+    customer_tax_code: row.customer_tax_code,
+    certificate_id: Number(row.certificate_id),
+    certificate_no: row.certificate_no,
+    certificate_status: row.certificate_status,
+    certificate_issued_at: row.certificate_issued_at,
+    certificate_file_url: row.certificate_file_url,
+    record_id: Number(row.calibration_record_id),
+    record_code: `CR-${row.calibration_record_id}`,
+    service_name: row.service_name,
+    service_code: row.service_code,
+    procedure_version: row.procedure_version,
+    result_status: row.result_status,
+    technician_name: row.technician_name,
+    reviewer_name: row.reviewer_name,
+    signer_name: row.signer_name,
+    signed_at: row.signed_at,
+    signed_at_formatted: formatDateTime(row.signed_at),
+    signature_transaction_id: row.signature_transaction_id,
+    revocation: row.revocation_id
+      ? {
+          id: Number(row.revocation_id),
+          status: row.revocation_status,
+          reason: row.revocation_reason,
+          created_at: row.revocation_created_at,
+          created_at_formatted: formatDateTime(row.revocation_created_at),
+        }
+      : null,
+    verify_url: buildSealVerifyUrl(row.seal_code),
+  };
+};
+
+const applyCustomerScope = (
+  where: string[],
+  params: unknown[],
+  actor?: SealActor,
+) => {
+  if (actor?.role && String(actor.role).toLowerCase() === 'customer') {
+    params.push(actor.customer_id ?? 0);
+    where.push(`d.customer_id = $${params.length}`);
+  }
+};
+
+/**
+ * FR-F8: tem Active quá due_date phải tự động chuyển Expired.
+ * FR-D6: khi tem hết hiệu lực, thiết bị cũng phải phản ánh trạng thái Expired
+ * nếu không còn tem Active/PendingPayment nào khác.
+ */
+export const expireOverdueSeals = async (): Promise<void> => {
+  await dataSource.query(
+    `UPDATE seals
+     SET status = 'Expired'
+     WHERE status = 'Active'
+       AND due_date < CURRENT_DATE`,
+  );
+
+  await dataSource.query(
+    `UPDATE devices d
+     SET status = 'Expired'
+     WHERE d.status IN ('Active', 'ExpiringSoon')
+       AND EXISTS (
+         SELECT 1
+         FROM seals s
+         WHERE s.device_id = d.id
+           AND s.status = 'Expired'
+           AND s.due_date < CURRENT_DATE
+       )
+       AND NOT EXISTS (
+         SELECT 1
+         FROM seals s
+         WHERE s.device_id = d.id
+           AND s.status IN ('Active', 'PendingPayment')
+       )`,
+  );
+
+  await dataSource.query(
+    `UPDATE devices d
+     SET status = 'ExpiringSoon'
+     WHERE d.status = 'Active'
+       AND EXISTS (
+         SELECT 1
+         FROM seals s
+         WHERE s.device_id = d.id
+           AND s.status = 'Active'
+           AND s.due_date >= CURRENT_DATE
+           AND s.due_date <= (CURRENT_DATE + INTERVAL '30 days')
+       )`,
+  );
+};
+
+const buildWhere = (
+  filters: SealListFilter,
+  actor: SealActor | undefined,
+  includeStatus: boolean,
+) => {
+  const where: string[] = [];
+  const params: unknown[] = [];
+
+  const status = (filters.status || 'all').trim();
+  if (includeStatus && status && status !== 'all') {
+    if (status === 'ExpiringSoon') {
+      where.push(
+        `s.status = 'Active'
+         AND s.due_date >= CURRENT_DATE
+         AND s.due_date <= (CURRENT_DATE + INTERVAL '30 days')`,
+      );
+    } else {
+      params.push(status);
+      where.push(`s.status = $${params.length}`);
+    }
+  }
+
+  const q = (filters.q || '').trim().toLowerCase();
+  if (q) {
+    params.push(`%${q}%`);
+    where.push(`(
+      LOWER(s.seal_code) LIKE $${params.length}
+      OR LOWER(COALESCE(d.name, '')) LIKE $${params.length}
+      OR LOWER(COALESCE(d.serial_number, '')) LIKE $${params.length}
+      OR LOWER(COALESCE(d.internal_code, '')) LIKE $${params.length}
+      OR LOWER(COALESCE(c.company_name, '')) LIKE $${params.length}
+      OR LOWER(COALESCE(cert.certificate_no, '')) LIKE $${params.length}
+    )`);
+  }
+
+  applyCustomerScope(where, params, actor);
+
+  return {
+    whereSql: where.length > 0 ? `WHERE ${where.join(' AND ')}` : '',
+    params,
+  };
+};
+
+export const listSeals = async (
+  filters: SealListFilter = {},
+  actor?: SealActor,
+) => {
+  await expireOverdueSeals();
+
+  const page = Math.max(1, Number(filters.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(filters.limit) || 20));
+  const offset = (page - 1) * limit;
+
+  const filtered = buildWhere(filters, actor, true);
+  const base = buildWhere(filters, actor, false);
+
+  const countRows = await dataSource.query(
+    `SELECT COUNT(*)::int AS total
+     FROM seals s
+     JOIN devices d ON d.id = s.device_id
+     JOIN customers c ON c.id = d.customer_id
+     JOIN certificates cert ON cert.id = s.certificate_id
+     ${filtered.whereSql}`,
+    filtered.params,
+  );
+
+  const summaryRows = await dataSource.query(
+    `SELECT s.status, COUNT(*)::int AS count
+     FROM seals s
+     JOIN devices d ON d.id = s.device_id
+     JOIN customers c ON c.id = d.customer_id
+     JOIN certificates cert ON cert.id = s.certificate_id
+     ${base.whereSql}
+     GROUP BY s.status`,
+    base.params,
+  );
+
+  const expiringRows = await dataSource.query(
+    `SELECT COUNT(*)::int AS count
+     FROM seals s
+     JOIN devices d ON d.id = s.device_id
+     JOIN customers c ON c.id = d.customer_id
+     JOIN certificates cert ON cert.id = s.certificate_id
+     ${base.whereSql ? `${base.whereSql} AND` : 'WHERE'}
+       s.status = 'Active'
+       AND s.due_date >= CURRENT_DATE
+       AND s.due_date <= (CURRENT_DATE + INTERVAL '30 days')`,
+    base.params,
+  );
+
+  const rows = await dataSource.query(
+    `${SEAL_SELECT}
+     ${filtered.whereSql}
+     ORDER BY
+       CASE s.status
+         WHEN 'Active' THEN 0
+         WHEN 'PendingPayment' THEN 1
+         WHEN 'Expired' THEN 2
+         ELSE 3
+       END,
+       s.due_date ASC,
+       s.id DESC
+     LIMIT $${filtered.params.length + 1} OFFSET $${filtered.params.length + 2}`,
+    [...filtered.params, limit, offset],
+  );
+
+  const total = Number(countRows?.[0]?.total ?? 0);
+  const summary: Record<string, number> = {};
+  for (const item of Array.isArray(summaryRows) ? summaryRows : []) {
+    summary[item.status] = Number(item.count);
+  }
+
+  return {
+    items: (Array.isArray(rows) ? rows : []).map((row) =>
+      mapSealRow(row as SealRow),
+    ),
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    summary: {
+      total,
+      active: summary.Active ?? 0,
+      pending_payment: summary.PendingPayment ?? 0,
+      expired: summary.Expired ?? 0,
+      revoked: summary.Revoked ?? 0,
+      expiring_soon: Number(expiringRows?.[0]?.count ?? 0),
+    },
+  };
+};
+
+const loadSealRow = async (
+  sealId: number,
+  actor?: SealActor,
+): Promise<SealRow> => {
+  if (!Number.isInteger(sealId) || sealId <= 0) {
+    throw new AppError('Mã tem không hợp lệ.', 400, ERROR_CODES.VALIDATION_ERROR);
+  }
+
+  const where: string[] = ['s.id = $1'];
+  const params: unknown[] = [sealId];
+  applyCustomerScope(where, params, actor);
+
+  const rows = await dataSource.query(
+    `${SEAL_SELECT} WHERE ${where.join(' AND ')} LIMIT 1`,
+    params,
+  );
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new AppError(
+      `Không tìm thấy tem #${sealId}.`,
+      404,
+      ERROR_CODES.NOT_FOUND,
+    );
+  }
+
+  return rows[0] as SealRow;
+};
+
+const loadRevocations = async (sealId: number) => {
+  const rows = await dataSource.query(
+    `SELECT
+       r.id,
+       r.seal_id,
+       r.reason,
+       r.status,
+       r.requested_by,
+       r.decided_by,
+       r.decided_at,
+       r.decision_note,
+       r.created_at,
+       requester.full_name AS requested_by_name,
+       decider.full_name AS decided_by_name
+     FROM seal_revocations r
+     LEFT JOIN accounts requester ON requester.id = r.requested_by
+     LEFT JOIN accounts decider ON decider.id = r.decided_by
+     WHERE r.seal_id = $1
+     ORDER BY r.id DESC`,
+    [sealId],
+  );
+
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number(row.id),
+    seal_id: Number(row.seal_id),
+    reason: row.reason,
+    status: row.status,
+    requested_by: Number(row.requested_by),
+    requested_by_name: row.requested_by_name,
+    decided_by: row.decided_by !== null ? Number(row.decided_by) : null,
+    decided_by_name: row.decided_by_name,
+    decided_at: row.decided_at,
+    decided_at_formatted: formatDateTime(row.decided_at),
+    decision_note: row.decision_note,
+    created_at: row.created_at,
+    created_at_formatted: formatDateTime(row.created_at),
+  }));
+};
+
+const loadVerificationLogs = async (sealId: number) => {
+  const rows = await dataSource.query(
+    `SELECT id, seal_code, verification_result, source_ip, user_agent, verified_at
+     FROM seal_verification_logs
+     WHERE seal_id = $1
+     ORDER BY verified_at DESC, id DESC
+     LIMIT 20`,
+    [sealId],
+  );
+
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number(row.id),
+    seal_code: row.seal_code,
+    verification_result: row.verification_result,
+    source_ip: row.source_ip,
+    user_agent: row.user_agent,
+    verified_at: row.verified_at,
+    verified_at_formatted: formatDateTime(row.verified_at),
+  }));
+};
+
+export const getSealDetail = async (sealId: number, actor?: SealActor) => {
+  await expireOverdueSeals();
+
+  const row = await loadSealRow(sealId, actor);
+  const mapped = mapSealRow(row);
+  const revocations = await loadRevocations(sealId);
+  const verificationLogs = await loadVerificationLogs(sealId);
+  const pendingRevocation =
+    revocations.find((revocation) => revocation.status === 'Pending') ?? null;
+
+  return {
+    ...mapped,
+    revocations,
+    pending_revocation: pendingRevocation,
+    verification: {
+      total: verificationLogs.length,
+      last_verified_at:
+        verificationLogs.length > 0 ? verificationLogs[0].verified_at : null,
+      last_verified_at_formatted:
+        verificationLogs.length > 0
+          ? verificationLogs[0].verified_at_formatted
+          : '—',
+      recent: verificationLogs,
+    },
+    can_revoke:
+      (mapped.status === 'Active' || mapped.status === 'Expired') &&
+      !pendingRevocation,
+  };
+};
+
+export const listEligibleCertificates = async () => {
+  const rows = await dataSource.query(
+    `SELECT
+       cert.id AS certificate_id,
+       cert.certificate_no,
+       cert.status AS certificate_status,
+       cert.issued_at AS certificate_issued_at,
+       cert.file_url AS certificate_file_url,
+       cr.id AS calibration_record_id,
+       cr.result_status,
+       d.id AS device_id,
+       d.name AS device_name,
+       d.model,
+       d.serial_number,
+       d.internal_code,
+       d.measuring_range,
+       c.id AS customer_id,
+       c.company_name AS customer_name,
+       st.name AS service_name,
+       st.standard_code AS service_code,
+       cp.version AS procedure_version,
+       release_sig.signer_name,
+       release_sig.signed_at,
+       to_char(
+         (COALESCE(cr.reviewed_at, cr.submitted_at, cert.issued_at)
+           AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+         'YYYY-MM-DD'
+       ) AS default_cal_date,
+       to_char(
+         ((COALESCE(cr.reviewed_at, cr.submitted_at, cert.issued_at)
+           AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + INTERVAL '12 months')::date,
+         'YYYY-MM-DD'
+       ) AS default_due_date
+     FROM certificates cert
+     JOIN calibration_records cr ON cr.id = cert.calibration_record_id
+     LEFT JOIN service_request_items sri ON sri.id = cr.service_request_item_id
+     LEFT JOIN devices d ON d.id = sri.device_id
+     LEFT JOIN customers c ON c.id = d.customer_id
+     LEFT JOIN calibration_procedures cp ON cp.id = cr.procedure_id
+     LEFT JOIN service_types st ON st.id = cp.service_type_id
+     LEFT JOIN LATERAL (
+       SELECT ds.signer_name, ds.signed_at
+       FROM digital_signatures ds
+       WHERE ds.certificate_id = cert.id
+         AND ds.purpose = 'CertificateRelease'
+         AND ds.status = 'Signed'
+       ORDER BY ds.id DESC
+       LIMIT 1
+     ) release_sig ON true
+     WHERE cert.status = 'Released'
+       AND release_sig.signed_at IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM seals s WHERE s.certificate_id = cert.id
+       )
+     ORDER BY cert.issued_at DESC NULLS LAST, cert.id DESC`,
+  );
+
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    certificate_id: Number(row.certificate_id),
+    certificate_no: row.certificate_no,
+    certificate_status: row.certificate_status,
+    certificate_issued_at: row.certificate_issued_at,
+    certificate_issued_at_formatted: formatDateTime(row.certificate_issued_at),
+    certificate_file_url: row.certificate_file_url,
+    record_id: Number(row.calibration_record_id),
+    record_code: `CR-${row.calibration_record_id}`,
+    result_status: row.result_status,
+    device_id: row.device_id !== null ? Number(row.device_id) : null,
+    device_name: row.device_name,
+    model: row.model,
+    serial_number: row.serial_number,
+    internal_code: row.internal_code,
+    measuring_range: row.measuring_range,
+    customer_id: row.customer_id !== null ? Number(row.customer_id) : null,
+    customer_name: row.customer_name,
+    service_name: row.service_name,
+    service_code: row.service_code,
+    procedure_version: row.procedure_version,
+    signer_name: row.signer_name,
+    signed_at: row.signed_at,
+    signed_at_formatted: formatDateTime(row.signed_at),
+    default_cal_date: row.default_cal_date,
+    default_due_date: row.default_due_date,
+    default_due_date_formatted: formatDate(row.default_due_date),
+  }));
+};
+
+const isValidIsoDate = (value: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
+};
+
+const nextSealCode = async (queryRunner: {
+  query: (sql: string, params?: unknown[]) => Promise<unknown>;
+}): Promise<string> => {
+  await queryRunner.query(`SELECT pg_advisory_xact_lock(918273646)`);
+
+  const year = String(new Date().getFullYear()).slice(-2);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = `ISO-${year}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const rows = (await queryRunner.query(
+      `SELECT 1 FROM seals WHERE seal_code = $1 LIMIT 1`,
+      [code],
+    )) as unknown[];
+    if (!Array.isArray(rows) || rows.length === 0) return code;
+  }
+
+  throw new AppError(
+    'Không thể sinh mã tem duy nhất, vui lòng thử lại.',
+    500,
+    ERROR_CODES.INTERNAL_ERROR,
+  );
+};
+
+const isUniqueViolation = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  (error as { code?: string }).code === '23505';
+
+export const createSeal = async (input: CreateSealInput, actor: SealActor) => {
+  const certificateId = Number(input.certificate_id);
+  if (!Number.isInteger(certificateId) || certificateId <= 0) {
+    throw new AppError(
+      'Vui lòng chọn chứng nhận hợp lệ (certificate_id).',
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  await expireOverdueSeals();
+
+  const queryRunner = dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  let sealId: number;
+
+  try {
+    const certificateRows = await queryRunner.query(
+      `SELECT
+         cert.id,
+         cert.certificate_no,
+         cert.status,
+         COALESCE(cr.reviewed_at, cr.submitted_at, cert.issued_at) AS cal_source,
+         d.id AS device_id
+       FROM certificates cert
+       JOIN calibration_records cr ON cr.id = cert.calibration_record_id
+       LEFT JOIN service_request_items sri ON sri.id = cr.service_request_item_id
+       LEFT JOIN devices d ON d.id = sri.device_id
+       WHERE cert.id = $1
+       FOR UPDATE OF cert`,
+      [certificateId],
+    );
+
+    if (!Array.isArray(certificateRows) || certificateRows.length === 0) {
+      throw new AppError(
+        `Không tìm thấy chứng nhận #${certificateId}.`,
+        404,
+        ERROR_CODES.NOT_FOUND,
+      );
+    }
+
+    const certificate = certificateRows[0];
+
+    if (certificate.status !== 'Released') {
+      throw new AppError(
+        `Chứng nhận ${certificate.certificate_no} chưa được phát hành (trạng thái hiện tại: ${certificate.status}). Chỉ cấp tem cho chứng nhận đã phát hành.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    const signatureRows = await queryRunner.query(
+      `SELECT id
+       FROM digital_signatures
+       WHERE certificate_id = $1
+         AND purpose = 'CertificateRelease'
+         AND status = 'Signed'
+       LIMIT 1`,
+      [certificateId],
+    );
+
+    if (!Array.isArray(signatureRows) || signatureRows.length === 0) {
+      throw new AppError(
+        `Chứng nhận ${certificate.certificate_no} chưa có chữ ký số phát hành hợp lệ, không thể cấp tem.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    if (!certificate.device_id) {
+      throw new AppError(
+        `Chứng nhận ${certificate.certificate_no} không gắn với thiết bị nào, không thể cấp tem.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    const existingRows = await queryRunner.query(
+      `SELECT id, seal_code FROM seals WHERE certificate_id = $1 LIMIT 1`,
+      [certificateId],
+    );
+
+    if (Array.isArray(existingRows) && existingRows.length > 0) {
+      throw new AppError(
+        `Chứng nhận ${certificate.certificate_no} đã có tem ${existingRows[0].seal_code}.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    const dateRows = await queryRunner.query(
+      `SELECT
+         to_char(
+           (COALESCE($1::timestamptz, NOW()) AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+           'YYYY-MM-DD'
+         ) AS cal_date,
+         to_char(
+           ((COALESCE($1::timestamptz, NOW()) AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+             + INTERVAL '12 months')::date,
+           'YYYY-MM-DD'
+         ) AS due_date`,
+      [certificate.cal_source],
+    );
+
+    const calDate = String(dateRows[0].cal_date);
+    const requestedDueDate = input.due_date ? String(input.due_date).trim() : null;
+    let dueDate = String(dateRows[0].due_date);
+
+    if (requestedDueDate) {
+      if (!isValidIsoDate(requestedDueDate)) {
+        throw new AppError(
+          'Hạn hiệu lực của tem không hợp lệ (định dạng YYYY-MM-DD).',
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+        );
+      }
+      if (requestedDueDate < calDate) {
+        throw new AppError(
+          'Hạn hiệu lực của tem phải sau hoặc bằng ngày hiệu chuẩn.',
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+        );
+      }
+      dueDate = requestedDueDate;
+    }
+
+    const sealCode = await nextSealCode(queryRunner);
+
+    const inserted = await queryRunner.query(
+      `INSERT INTO seals (
+         device_id,
+         certificate_id,
+         seal_code,
+         cal_date,
+         due_date,
+         status,
+         issued_at,
+         created_at
+       ) VALUES ($1, $2, $3, $4::date, $5::date, 'Active', NOW(), NOW())
+       RETURNING id`,
+      [certificate.device_id, certificateId, sealCode, calDate, dueDate],
+    );
+
+    sealId = Number(inserted[0].id);
+
+    await queryRunner.query(
+      `UPDATE devices
+       SET next_due_date = $2::date,
+           status = CASE
+             WHEN status = 'InRepair' THEN status
+             WHEN $2::date <= (CURRENT_DATE + INTERVAL '30 days') THEN 'ExpiringSoon'
+             ELSE 'Active'
+           END
+       WHERE id = $1`,
+      [certificate.device_id, dueDate],
+    );
+
+    await queryRunner.commitTransaction();
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    if (isUniqueViolation(error)) {
+      throw new AppError(
+        'Tem cho chứng nhận này đã tồn tại, vui lòng tải lại danh sách.',
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
+
+  return getSealDetail(sealId, actor);
+};
+
+const toStickerData = (detail: Awaited<ReturnType<typeof getSealDetail>>): SealStickerData => ({
+  seal_code: detail.seal_code,
+  status: detail.status,
+  status_label: detail.status_label,
+  cal_date_formatted: detail.cal_date_formatted,
+  due_date_formatted: detail.due_date_formatted,
+  issued_at_formatted: detail.issued_at_formatted,
+  device_name: detail.device_name,
+  model: detail.model,
+  serial_number: detail.serial_number,
+  internal_code: detail.internal_code,
+  measuring_range: detail.measuring_range,
+  customer_name: detail.customer_name,
+  customer_address: detail.customer_address,
+  certificate_no: detail.certificate_no,
+  service_name: detail.service_name,
+  service_code: detail.service_code,
+  procedure_version: detail.procedure_version,
+  verify_url: detail.verify_url,
+});
+
+export const getSealQr = async (sealId: number, actor?: SealActor) => {
+  const detail = await getSealDetail(sealId, actor);
+  return {
+    seal_code: detail.seal_code,
+    verify_url: detail.verify_url,
+    buffer: await generateSealQrPng(detail.seal_code),
+  };
+};
+
+export const getSealPdf = async (sealId: number, actor?: SealActor) => {
+  const detail = await getSealDetail(sealId, actor);
+  const buffer = await generateSealPdfBuffer(toStickerData(detail));
+
+  return {
+    fileName: `seal-${detail.seal_code}.pdf`,
+    buffer,
+  };
+};
