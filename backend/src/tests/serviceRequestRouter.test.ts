@@ -7,7 +7,6 @@ import {
   Attachment,
   Customer,
   Device,
-  InitialInspection,
   ServiceRequest,
   ServiceRequestItem,
   ServiceType,
@@ -104,11 +103,6 @@ describe('Service Requests Module API', () => {
         return {
           create: createAttachmentMock,
           save: saveAttachmentMock,
-        };
-      }
-      if (entity === InitialInspection) {
-        return {
-          find: vi.fn().mockResolvedValue([]),
         };
       }
       return {};

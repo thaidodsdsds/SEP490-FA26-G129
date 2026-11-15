@@ -168,11 +168,8 @@ export const getServiceRequestsHandler: RequestHandler = async (req, res, next) 
         ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
         : {};
 
-    const normalizedRole = String(authUser.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     let customerIdFilter: number | undefined;
-    let assignedSalesIdFilter: number | undefined;
-
-    if (normalizedRole === 'customer') {
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
       const tokenCustomerId = Number(authUser.customer_id);
       const resolvedId = isPositiveInteger(tokenCustomerId)
         ? tokenCustomerId
@@ -182,14 +179,9 @@ export const getServiceRequestsHandler: RequestHandler = async (req, res, next) 
         return res.status(200).json(buildSuccessResponse([]));
       }
       customerIdFilter = resolvedId;
-    } else if (normalizedRole === 'sales') {
-      const salesAccountId = Number(authUser.id);
-      if (isPositiveInteger(salesAccountId)) {
-        assignedSalesIdFilter = salesAccountId;
-      }
     }
 
-    const serviceRequests = await listServiceRequests(customerIdFilter, assignedSalesIdFilter);
+    const serviceRequests = await listServiceRequests(customerIdFilter);
     return res.status(200).json(buildSuccessResponse(serviceRequests));
   } catch (error) {
     return next(error);
@@ -312,7 +304,6 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
       request_code: normalizedRequestCode,
       customer_id: customerId,
       created_by: userId,
-      created_by_role: String(authUser.role || ''),
       location_type: location_type as ServiceRequestLocationType,
       preferred_date: normalizedPreferredDate,
       special_notes: normalizedSpecialNotes,

@@ -11,11 +11,6 @@ import {
   getServiceTypesApi,
   upsertMyCompanyApi,
 } from '../../../services/service-request-service.js';
-import {
-  deleteFileFromCloudApi,
-  readFileAsDataUrl,
-  uploadFileToCloudApi,
-} from '../../../services/work-order-service.js';
 import CustomerAttachmentStep from './components/CustomerAttachmentStep.jsx';
 import CustomerDeviceServiceList from './components/CustomerDeviceServiceList.jsx';
 import CustomerLocationModeStep from './components/CustomerLocationModeStep.jsx';
@@ -231,60 +226,18 @@ function CustomerServiceRequestCreatePage() {
     }
   };
 
-  const handleAddFiles = async (fileList) => {
-    for (let idx = 0; idx < fileList.length; idx++) {
-      const file = fileList[idx];
-      const tempId = `${Date.now()}-${idx}-${file.name}`;
-      try {
-        const previewData = await readFileAsDataUrl(file);
-        setAttachments((current) => [
-          ...current,
-          {
-            id: tempId,
-            file_name: file.name,
-            size: file.size,
-            file_url: previewData,
-            uploading: true,
-          },
-        ]);
-
-        const uploaded = await uploadFileToCloudApi({
-          fileData: previewData,
-          fileName: file.name,
-          folder: 'service_requests',
-        });
-
-        setAttachments((current) =>
-          current.map((item) =>
-            item.id === tempId
-              ? {
-                  ...item,
-                  file_url: uploaded?.url || previewData,
-                  public_id: uploaded?.public_id || '',
-                  uploading: false,
-                }
-              : item,
-          ),
-        );
-      } catch {
-        setAttachments((current) => current.filter((item) => item.id !== tempId));
-      }
-    }
+  const handleAddFiles = (fileList) => {
+    const mapped = fileList.map((file, idx) => ({
+      id: `${Date.now()}-${idx}-${file.name}`,
+      file_name: file.name,
+      size: file.size,
+      file_url: `client-upload://${encodeURIComponent(file.name)}`,
+    }));
+    setAttachments((current) => [...current, ...mapped]);
   };
 
-  const handleRemoveAttachment = async (attachmentId) => {
-    const target = attachments.find((item) => item.id === attachmentId);
+  const handleRemoveAttachment = (attachmentId) => {
     setAttachments((current) => current.filter((item) => item.id !== attachmentId));
-    if (target?.public_id || /^https?:\/\//i.test(target?.file_url || '') || (target?.file_url || '').startsWith('/uploads/')) {
-      try {
-        await deleteFileFromCloudApi({
-          public_id: target.public_id,
-          url: target.file_url,
-        });
-      } catch {
-        // ignore
-      }
-    }
   };
 
   const handleRemoveDevice = (deviceId) => {
