@@ -4,10 +4,20 @@ import jwt from 'jsonwebtoken';
 import dataSource from '../database/dataSource.js';
 import { Account, Customer, Role } from '../database/entities.js';
 import { buildSuccessResponse, buildErrorResponse } from '../common/response.js';
-import { sendPasswordResetEmail } from '../common/emailService.js';
+import { sendPasswordResetEmail, send2FAOTPEmail } from '../common/emailService.js';
 import env from '../config/env.js';
 
 const router = Router();
+
+const maskEmail = (email: string): string => {
+  const parts = email.split('@');
+  if (parts.length !== 2) return email;
+  const [user, domain] = parts;
+  if (user.length <= 2) {
+    return `${user[0]}***@${domain}`;
+  }
+  return `${user[0]}***${user[user.length - 1]}@${domain}`;
+};
 
 /**
  * POST /api/v1/auth/login
@@ -37,10 +47,40 @@ router.post('/login', async (req, res) => {
       return res.status(401).json(buildErrorResponse('Invalid email or password.', 'UNAUTHORIZED'));
     }
 
+    // ── Two-Factor Authentication (2FA) Check ────────────────────────────
+    if (account.is_2fa_enabled) {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = await bcrypt.hash(otpCode, 8);
+      const twoFactorToken = jwt.sign(
+        {
+          sub: account.id,
+          type: '2fa_pending',
+          otp_hash: otpHash,
+        },
+        env.jwt.secret,
+        { expiresIn: '5m' },
+      );
+
+      await send2FAOTPEmail({
+        to: account.email,
+        otpCode,
+        fullName: account.full_name,
+      });
+
+      return res.status(200).json(
+        buildSuccessResponse({
+          require_2fa: true,
+          two_factor_token: twoFactorToken,
+          email_masked: maskEmail(account.email),
+          message: 'Mã xác thực 2FA đã được gửi đến email của bạn.',
+        }),
+      );
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     const payload = {
       id: account.id,
       email: account.email,
-      full_name: account.full_name,
       role: account.role?.name ?? '',
       customer_id: account.customer_id,
     };
@@ -70,6 +110,179 @@ router.post('/login', async (req, res) => {
     );
   } catch (error) {
     console.error('[Auth] Login error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * POST /api/v1/auth/verify-2fa
+ * Body: { two_factor_token: string, otp: string }
+ * Verifies 6-digit OTP code and returns session token + account details
+ */
+router.post('/verify-2fa', async (req, res) => {
+  try {
+    const { two_factor_token, otp } = req.body as {
+      two_factor_token?: string;
+      otp?: string;
+    };
+
+    if (!two_factor_token || !otp?.trim()) {
+      return res.status(400).json(
+        buildErrorResponse('Mã OTP và token xác thực là bắt buộc.', 'BAD_REQUEST'),
+      );
+    }
+
+    let decoded: { sub: number; type: string; otp_hash: string } | null = null;
+    try {
+      decoded = jwt.verify(two_factor_token, env.jwt.secret) as unknown as {
+        sub: number;
+        type: string;
+        otp_hash: string;
+      };
+    } catch {
+      return res.status(401).json(
+        buildErrorResponse(
+          'Phiên xác thực 2FA đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
+          'INVALID_TOKEN',
+        ),
+      );
+    }
+
+    if (!decoded || decoded.type !== '2fa_pending' || !decoded.sub || !decoded.otp_hash) {
+      return res.status(401).json(
+        buildErrorResponse('Phiên xác thực 2FA không hợp lệ.', 'INVALID_TOKEN'),
+      );
+    }
+
+    const isOtpValid = await bcrypt.compare(otp.trim(), decoded.otp_hash);
+    if (!isOtpValid) {
+      return res.status(400).json(
+        buildErrorResponse('Mã OTP không chính xác hoặc đã hết hạn.', 'INVALID_OTP'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { id: decoded.sub },
+      relations: ['role', 'customer'],
+    });
+
+    if (!account) {
+      return res.status(404).json(
+        buildErrorResponse('Tài khoản không tồn tại.', 'NOT_FOUND'),
+      );
+    }
+
+    const payload = {
+      id: account.id,
+      email: account.email,
+      role: account.role?.name ?? '',
+      customer_id: account.customer_id,
+    };
+
+    const token = jwt.sign(payload, env.jwt.secret, {
+      expiresIn: env.jwt.expiresIn as jwt.SignOptions['expiresIn'],
+    });
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        token,
+        account: {
+          id: account.id,
+          full_name: account.full_name,
+          email: account.email,
+          phone: account.phone,
+          role: account.role?.name ?? '',
+          customer_id: account.customer_id,
+          customer: account.customer
+            ? {
+                id: account.customer.id,
+                company_name: account.customer.company_name,
+              }
+            : null,
+        },
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Verify 2FA error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * POST /api/v1/auth/resend-2fa
+ * Body: { two_factor_token: string }
+ * Resends a fresh 6-digit OTP code to the user's email
+ */
+router.post('/resend-2fa', async (req, res) => {
+  try {
+    const { two_factor_token } = req.body as { two_factor_token?: string };
+
+    if (!two_factor_token) {
+      return res.status(400).json(
+        buildErrorResponse('Token xác thực là bắt buộc.', 'BAD_REQUEST'),
+      );
+    }
+
+    let decoded: { sub: number; type: string } | null = null;
+    try {
+      decoded = jwt.verify(two_factor_token, env.jwt.secret) as unknown as {
+        sub: number;
+        type: string;
+      };
+    } catch {
+      return res.status(401).json(
+        buildErrorResponse(
+          'Phiên xác thực 2FA đã hết hạn. Vui lòng đăng nhập lại.',
+          'EXPIRED_TOKEN',
+        ),
+      );
+    }
+
+    if (!decoded || decoded.type !== '2fa_pending' || !decoded.sub) {
+      return res.status(401).json(
+        buildErrorResponse('Phiên xác thực 2FA không hợp lệ.', 'INVALID_TOKEN'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { id: decoded.sub },
+    });
+
+    if (!account) {
+      return res.status(404).json(
+        buildErrorResponse('Tài khoản không tồn tại.', 'NOT_FOUND'),
+      );
+    }
+
+    const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const newOtpHash = await bcrypt.hash(newOtpCode, 8);
+    const newTwoFactorToken = jwt.sign(
+      {
+        sub: account.id,
+        type: '2fa_pending',
+        otp_hash: newOtpHash,
+      },
+      env.jwt.secret,
+      { expiresIn: '5m' },
+    );
+
+    await send2FAOTPEmail({
+      to: account.email,
+      otpCode: newOtpCode,
+      fullName: account.full_name,
+    });
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        two_factor_token: newTwoFactorToken,
+        email_masked: maskEmail(account.email),
+        message: 'Mã OTP mới đã được gửi đến email của bạn.',
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Resend 2FA error:', error);
     return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
   }
 });

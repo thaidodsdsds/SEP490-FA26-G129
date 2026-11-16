@@ -4,9 +4,7 @@ import {
   approveQuotationHandler,
   createQuotationHandler,
   getQuotationDetailHandler,
-  headSalesReviewQuotationHandler,
   listQuotationsHandler,
-  recallQuotationHandler,
   rejectQuotationHandler,
   sendQuotationHandler,
 } from './quotations.controller.js';
@@ -19,8 +17,6 @@ quotationsRoutes.get('/', listQuotationsHandler);
 quotationsRoutes.post('/', createQuotationHandler);
 quotationsRoutes.get('/:quotationId', getQuotationDetailHandler);
 quotationsRoutes.patch('/:quotationId/send', sendQuotationHandler);
-quotationsRoutes.patch('/:quotationId/recall', recallQuotationHandler);
-quotationsRoutes.patch('/:quotationId/head-sales-review', headSalesReviewQuotationHandler);
 quotationsRoutes.patch('/:quotationId/approve', approveQuotationHandler);
 quotationsRoutes.patch('/:quotationId/reject', rejectQuotationHandler);
 

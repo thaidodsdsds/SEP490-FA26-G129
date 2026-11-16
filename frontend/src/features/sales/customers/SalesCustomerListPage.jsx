@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAppContext } from '../../../app/providers.jsx';
-import { isHeadSalesAccount } from '../../../app/role-routing.js';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
 import { listCustomersDetailedApi } from '../../../services/customer-service.js';
@@ -23,9 +21,6 @@ const COMMON_INDUSTRIES = [
 ];
 
 export default function SalesCustomerListPage() {
-  const { session } = useAppContext() || {};
-  const isHeadSales = isHeadSalesAccount(session?.user);
-
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -112,31 +107,16 @@ export default function SalesCustomerListPage() {
       )}
 
       <PageHeader
-        title={isHeadSales ? 'Quản lý toàn bộ khách hàng' : 'Khách hàng được phân công phụ trách'}
-        description={
-          isHeadSales
-            ? 'Tra cứu toàn bộ doanh nghiệp, phân công nhân viên Sales phụ trách (1-1) và quản lý hồ sơ thiết bị, hợp đồng.'
-            : 'Danh sách khách hàng do bạn trực tiếp phụ trách theo phân công của Trưởng phòng Kinh doanh (HeadSales).'
-        }
+        title="Quản lý khách hàng"
+        description="Tra cứu doanh nghiệp, thông tin liên hệ, hồ sơ thiết bị, hợp đồng và các yêu cầu dịch vụ hiệu chuẩn."
         action={
-          <div style={{ display: 'flex', gap: 10 }}>
-            {isHeadSales && (
-              <Link
-                to="/internal/sales/customer-assignments"
-                className="sales-cust-btn-secondary"
-                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <span>👥</span> Phân công khách cho Sales
-              </Link>
-            )}
-            <button
-              type="button"
-              className="sales-cust-btn-primary"
-              onClick={handleOpenAdd}
-            >
-              <span>＋</span> Thêm khách hàng mới
-            </button>
-          </div>
+          <button
+            type="button"
+            className="sales-cust-btn-primary"
+            onClick={handleOpenAdd}
+          >
+            <span>＋</span> Thêm khách hàng mới
+          </button>
         }
       />
 
@@ -255,7 +235,6 @@ export default function SalesCustomerListPage() {
                 <tr>
                   <th>Tên Doanh nghiệp &amp; MST</th>
                   <th>Lĩnh vực</th>
-                  <th>Sales phụ trách</th>
                   <th>Địa chỉ trụ sở</th>
                   <th style={{ textAlign: 'center' }}>Tài khoản</th>
                   <th style={{ textAlign: 'center' }}>Thiết bị</th>
@@ -290,34 +269,6 @@ export default function SalesCustomerListPage() {
                       <span className="sales-cust-badge sales-cust-badge--industry">
                         {c.industry || 'Chưa phân loại'}
                       </span>
-                    </td>
-                    <td>
-                      {c.assigned_sales_name ? (
-                        <div>
-                          <strong style={{ color: '#166534', fontSize: '0.82rem' }}>
-                            👤 {c.assigned_sales_name}
-                          </strong>
-                          {c.assigned_sales_email && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                              {c.assigned_sales_email}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '2px 8px',
-                            borderRadius: 999,
-                            background: '#fef3c7',
-                            color: '#92400e',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          ⚠ Chưa phân công
-                        </span>
-                      )}
                     </td>
                     <td style={{ maxWidth: 280, color: '#475569' }}>
                       <span title={c.address}>{c.address}</span>
