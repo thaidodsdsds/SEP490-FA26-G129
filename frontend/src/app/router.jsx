@@ -16,12 +16,15 @@ import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
 import SalesCustomerListPage from '../features/sales/customers/SalesCustomerListPage.jsx';
 import SalesCustomerDetailPage from '../features/sales/customers/SalesCustomerDetailPage.jsx';
+import HeadSalesCustomerAssignmentPage from '../features/sales/customers/HeadSalesCustomerAssignmentPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
+import HeadSalesQuotationApprovalPage from '../features/sales/quotations/HeadSalesQuotationApprovalPage.jsx';
 import ContractListPage from '../features/contracts/ContractListPage.jsx';
 import ContractFormPage from '../features/contracts/ContractFormPage.jsx';
 import ContractDetailPage from '../features/contracts/ContractDetailPage.jsx';
+import SalesWorkOrderListPage from '../features/sales/work-orders/SalesWorkOrderListPage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
@@ -58,6 +61,7 @@ import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
 import DeviceListPage from '../features/devices/DeviceListPage.jsx';
 import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
+import MobileTechnicianApp from '../features/mobile-technician/MobileTechnicianApp.jsx';
 
 const publicRoutes = [
   // Standalone auth pages — no wrapping layout, each manages its own shell
@@ -66,6 +70,9 @@ const publicRoutes = [
   { path: '/register', element: <RegisterPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Standalone Mobile PWA routes for Technician Offline App
+  { path: '/mobile/technician', element: <MobileTechnicianApp /> },
+  { path: '/mobile', element: <Navigate to="/mobile/technician" replace /> },
   {
     path: '/',
     element: <PublicLayout />,
@@ -159,7 +166,7 @@ const salesRoutes = [
   {
     path: '/internal/sales',
     element: (
-      <ProtectedRoute allowedRoles={['sales', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['sales', 'headsales', 'admin', 'ceo']} portalType="staff">
         <SalesLayout />
       </ProtectedRoute>
     ),
@@ -170,6 +177,22 @@ const salesRoutes = [
           <RoleDashboardGate dashboardPath="/internal/sales">
             <SalesDashboardPage />
           </RoleDashboardGate>
+        ),
+      },
+      {
+        path: 'customer-assignments',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesCustomerAssignmentPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'quotation-approvals',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesQuotationApprovalPage />
+          </ProtectedRoute>
         ),
       },
       { path: 'customers', element: <SalesCustomerListPage /> },
@@ -186,6 +209,7 @@ const salesRoutes = [
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
+      { path: 'work-orders', element: <SalesWorkOrderListPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },

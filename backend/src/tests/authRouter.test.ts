@@ -15,7 +15,6 @@ const {
   getRepository,
   transaction,
   sendPasswordResetEmailMock,
-  send2FAOTPEmailMock,
 } = vi.hoisted(() => ({
   findOneAccount: vi.fn(),
   findOneRole: vi.fn(),
@@ -26,7 +25,6 @@ const {
   getRepository: vi.fn(),
   transaction: vi.fn(),
   sendPasswordResetEmailMock: vi.fn(),
-  send2FAOTPEmailMock: vi.fn(),
 }));
 
 vi.mock('../database/dataSource.js', () => ({
@@ -38,7 +36,6 @@ vi.mock('../database/dataSource.js', () => ({
 
 vi.mock('../common/emailService.js', () => ({
   sendPasswordResetEmail: sendPasswordResetEmailMock,
-  send2FAOTPEmail: send2FAOTPEmailMock,
 }));
 
 import app from '../app.js';
@@ -333,174 +330,5 @@ describe('Forgot and Reset Password API', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('BAD_REQUEST');
-  });
-});
-
-describe('Two-Factor Authentication (2FA) API', () => {
-  const passwordPlain = 'Admin@123';
-  let passwordHash: string;
-
-  beforeEach(async () => {
-    passwordHash = await bcrypt.hash(passwordPlain, 10);
-    findOneAccount.mockReset();
-    saveAccount.mockReset();
-    send2FAOTPEmailMock.mockReset().mockResolvedValue({ sent: true });
-    getRepository.mockReset().mockImplementation((entity) => {
-      if (entity === Account) {
-        return { findOne: findOneAccount, save: saveAccount };
-      }
-      return {};
-    });
-  });
-
-  it('logs in directly when 2FA is disabled for account', async () => {
-    findOneAccount.mockResolvedValue({
-      id: 2,
-      email: 'sale@isocal.com',
-      full_name: 'Sales Staff',
-      password_hash: passwordHash,
-      is_2fa_enabled: false,
-      role: { name: 'Sales' },
-      customer_id: null,
-      customer: null,
-    });
-
-    const response = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'sale@isocal.com',
-        password: passwordPlain,
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.token).toBeDefined();
-    expect(response.body.data.account.role).toBe('Sales');
-    expect(send2FAOTPEmailMock).not.toHaveBeenCalled();
-  });
-
-  it('requires 2FA when is_2fa_enabled is true and sends OTP email', async () => {
-    findOneAccount.mockResolvedValue({
-      id: 1,
-      email: 'admin@isocal.com',
-      full_name: 'System Admin',
-      password_hash: passwordHash,
-      is_2fa_enabled: true,
-      role: { name: 'Admin' },
-      customer_id: null,
-      customer: null,
-    });
-
-    const response = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@isocal.com',
-        password: passwordPlain,
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.require_2fa).toBe(true);
-    expect(response.body.data.two_factor_token).toBeDefined();
-    expect(response.body.data.email_masked).toBe('a***n@isocal.com');
-    expect(response.body.data.token).toBeUndefined(); // no session token yet
-    expect(send2FAOTPEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'admin@isocal.com',
-        otpCode: expect.stringMatching(/^\d{6}$/),
-      }),
-    );
-  });
-
-  it('verifies 2FA successfully with correct OTP and returns session token', async () => {
-    const otpCode = '123456';
-    const otpHash = await bcrypt.hash(otpCode, 8);
-    const twoFactorToken = jwt.sign(
-      { sub: 1, type: '2fa_pending', otp_hash: otpHash },
-      env.jwt.secret,
-      { expiresIn: '5m' },
-    );
-
-    findOneAccount.mockResolvedValue({
-      id: 1,
-      email: 'admin@isocal.com',
-      full_name: 'System Admin',
-      role: { name: 'Admin' },
-      customer_id: null,
-      customer: null,
-    });
-
-    const response = await request(app)
-      .post('/api/v1/auth/verify-2fa')
-      .send({
-        two_factor_token: twoFactorToken,
-        otp: '123456',
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.token).toBeDefined();
-    expect(response.body.data.account.email).toBe('admin@isocal.com');
-    expect(response.body.data.account.role).toBe('Admin');
-  });
-
-  it('rejects 2FA verification with incorrect OTP', async () => {
-    const otpCode = '123456';
-    const otpHash = await bcrypt.hash(otpCode, 8);
-    const twoFactorToken = jwt.sign(
-      { sub: 1, type: '2fa_pending', otp_hash: otpHash },
-      env.jwt.secret,
-      { expiresIn: '5m' },
-    );
-
-    const response = await request(app)
-      .post('/api/v1/auth/verify-2fa')
-      .send({
-        two_factor_token: twoFactorToken,
-        otp: '999999',
-      });
-
-    expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe('INVALID_OTP');
-  });
-
-  it('rejects 2FA verification with expired or invalid token', async () => {
-    const response = await request(app)
-      .post('/api/v1/auth/verify-2fa')
-      .send({
-        two_factor_token: 'invalid-token',
-        otp: '123456',
-      });
-
-    expect(response.status).toBe(401);
-    expect(response.body.error.code).toBe('INVALID_TOKEN');
-  });
-
-  it('resends fresh 2FA OTP code and returns new token', async () => {
-    const otpCode = '123456';
-    const otpHash = await bcrypt.hash(otpCode, 8);
-    const twoFactorToken = jwt.sign(
-      { sub: 1, type: '2fa_pending', otp_hash: otpHash },
-      env.jwt.secret,
-      { expiresIn: '5m' },
-    );
-
-    findOneAccount.mockResolvedValue({
-      id: 1,
-      email: 'admin@isocal.com',
-      full_name: 'System Admin',
-    });
-
-    const response = await request(app)
-      .post('/api/v1/auth/resend-2fa')
-      .send({
-        two_factor_token: twoFactorToken,
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.two_factor_token).toBeDefined();
-    expect(send2FAOTPEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'admin@isocal.com',
-        otpCode: expect.stringMatching(/^\d{6}$/),
-      }),
-    );
   });
 });

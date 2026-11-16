@@ -230,7 +230,7 @@ function CustomerLocationModeStep({
             <div>
               <span className="csr-mini-label">ĐỊA ĐIỂM TIẾP NHẬN THIẾT BỊ ISOCAL</span>
               <strong>Trung tâm Đo lường & Hiệu chuẩn ISOCAL — Quầy Tiếp nhận Mẫu</strong>
-              <p>Tầng 1, Khu Công nghệ cao, TP. Thủ Đức, TP. Hồ Chí Minh · Giờ nhận mẫu: 08:00 – 17:00 (Thứ 2 – Thứ 7)</p>
+              <p>Tầng 1, Tòa nhà Hoa Sơn, Thôn Đoài, Xã Hoàn Sơn, Huyện Tiên Du, Tỉnh Bắc Ninh · Giờ nhận mẫu: 08:00 – 17:00 (Thứ 2 – Thứ 7)</p>
             </div>
             <label className="csr-field csr-field--compact">
               <span>Ngày dự kiến gửi thiết bị</span>
