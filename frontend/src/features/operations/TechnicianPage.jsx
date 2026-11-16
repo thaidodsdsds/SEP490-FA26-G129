@@ -25,8 +25,96 @@ const getVerificationHint = (measurement) => {
 };
 
 function TechnicianPage() {
-  const [tasks, setTasks] = useState(initialTechnicianTasks);
-  const [selectedId, setSelectedId] = useState(initialTechnicianTasks[0].id);
+  const { session } = useAppContext();
+  const currentUserId = session?.user?.id || 'guest';
+  const currentUserName = session?.user?.full_name || session?.user?.name || 'Kỹ thuật viên ISOCAL';
+
+  const tasksCacheKey = getTasksCacheKey(currentUserId);
+  const queueCacheKey = getQueueCacheKey(currentUserId);
+  const lastSyncCacheKey = getLastSyncCacheKey(currentUserId);
+
+  // ─── Network & Offline States ─────────────────────────────────────────
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator !== 'undefined' ? navigator.onLine : true,
+  );
+  const [simulatedOffline, setSimulatedOffline] = useState(false);
+  const effectiveOnline = isOnline && !simulatedOffline;
+
+  const [syncQueue, setSyncQueue] = useState(() => {
+    try {
+      const cached = localStorage.getItem(queueCacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [lastSynced, setLastSynced] = useState(() => {
+    return localStorage.getItem(lastSyncCacheKey) || null;
+  });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [offlineModalOpen, setOfflineModalOpen] = useState(false);
+  const [signModalOpen, setSignModalOpen] = useState(false);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [lanIp, setLanIp] = useState('192.168.1.7');
+
+  useEffect(() => {
+    fetch('/api/v1/system/lan-ip')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data?.lanIp) {
+          setLanIp(data.data.lanIp);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // ─── Mobile View State ────────────────────────────────────────────────
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768,
+  );
+  const [mobileView, setMobileView] = useState('list'); // 'list' | 'detail'
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // ─── Online / Offline Event Listeners ─────────────────────────────────
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // ─── Tasks State with LocalStorage Caching ───────────────────────────
+  const [tasks, setTasks] = useState(() => {
+    try {
+      const cached = localStorage.getItem(tasksCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((t) => t.id !== 'task-osc-sample-01');
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi đọc cache nhiệm vụ ngoại tuyến:', err);
+    }
+    return [];
+  });
+
+  const [selectedId, setSelectedId] = useState(() => tasks[0]?.id || '');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
@@ -327,50 +415,222 @@ function TechnicianPage() {
                 <div><h3>Kết quả đo</h3><p>Nhập số đọc thực tế cho từng điểm đo</p></div>
                 <span className="measurement-unit-note">Độ lệch = Giá trị đo − Giá trị chuẩn</span>
               </div>
-              <div className="measurement-table-wrap">
-                <table className="measurement-table">
-                  <thead>
-                    <tr>
-                      <th>Điểm đo</th><th>Giá trị chuẩn</th><th>Giá trị đo</th><th>Dung sai</th><th>Độ lệch</th>
-                      {selectedTask.kind === 'Kiểm định' && <th>Gợi ý</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedTask.measurements.map((measurement) => (
-                      <tr key={measurement.id}>
-                        <td><strong>{measurement.point}</strong></td>
-                        <td>{measurement.reference} <small>{measurement.unit}</small></td>
-                        <td>
-                          <label className="measurement-input">
-                            <input
-                              aria-label={`Giá trị đo ${measurement.point}`}
-                              disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
-                              inputMode="decimal"
-                              onChange={(event) => setMeasurement(measurement.id, event.target.value)}
-                              placeholder="Nhập số đo"
-                              type="number"
-                              value={measurement.measured}
-                            />
-                            <span>{measurement.unit}</span>
-                          </label>
-                        </td>
-                        <td>{measurement.tolerance}</td>
-                        <td className={getDeviation(measurement) === null ? 'deviation-empty' : 'deviation-value'}>
-                          {getDeviation(measurement) === null ? '—' : `${getDeviation(measurement)} ${measurement.unit}`}
-                        </td>
-                        {selectedTask.kind === 'Kiểm định' && (
-                          <td>
-                            {getVerificationHint(measurement) ? (
-                              <span className={`evaluation-hint ${getVerificationHint(measurement) === 'Gợi ý đạt' ? 'within-limit' : 'outside-limit'}`}>
-                                {getVerificationHint(measurement)}
-                              </span>
-                            ) : <span className="deviation-empty">—</span>}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <button
+                onClick={() => setOfflineModalOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Connection Status Box */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
+                marginBottom: '16px',
+              }}
+            >
+              <div
+                style={{
+                  background: effectiveOnline ? '#f0fdf4' : '#fffbeb',
+                  border: `1px solid ${effectiveOnline ? '#bbf7d0' : '#fde68a'}`,
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}
+              >
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>TÌNH TRẠNG KẾT NỐI</div>
+                <div
+                  style={{
+                    fontSize: '1rem',
+                    fontWeight: 800,
+                    color: effectiveOnline ? '#166534' : '#b45309',
+                    marginTop: '2px',
+                  }}
+                >
+                  {effectiveOnline ? '● Đang có mạng' : '● Ngoại tuyến (Offline)'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}
+              >
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>CHỜ ĐỒNG BỘ</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', marginTop: '2px' }}>
+                  {pendingSyncCount} hồ sơ thay đổi
+                </div>
+              </div>
+            </div>
+
+            {/* Offline simulation toggle (For field testing) */}
+            <div
+              style={{
+                background: '#f1f5f9',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px',
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: '0.8rem', color: '#1e293b' }}>
+                  Chế độ mô phỏng mất mạng (Field Test)
+                </strong>
+                <p style={{ margin: '2px 0 0', fontSize: '0.68rem', color: '#64748b' }}>
+                  Bật công tắc này để kiểm thử thao tác như đang làm việc tại hầm/phòng kín không sóng
+                </p>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  checked={simulatedOffline}
+                  onChange={(e) => setSimulatedOffline(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  type="checkbox"
+                />
+              </label>
+            </div>
+
+            {/* Details of Cached Storage */}
+            <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '16px', lineHeight: 1.6 }}>
+              <div>• <strong>Bộ nhớ cục bộ:</strong> Đang lưu trữ {tasks.length} nhiệm vụ và ảnh minh chứng.</div>
+              <div>• <strong>Đồng bộ lần cuối:</strong> {lastSynced || 'Chưa thực hiện trong phiên này'}.</div>
+              <div>• <strong>Bảo mật:</strong> Dữ liệu được mã hóa trong Local Storage của trình duyệt di động.</div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                className="small-action"
+                onClick={async () => {
+                  if (window.confirm('Bạn có chắc muốn xóa bộ nhớ ngoại tuyến và tải lại danh sách từ máy chủ?')) {
+                    localStorage.removeItem(tasksCacheKey);
+                    localStorage.removeItem(queueCacheKey);
+                    setSyncQueue([]);
+                    if (effectiveOnline) {
+                      try {
+                        const remote = await getTechnicianTasksApi();
+                        saveTasks(Array.isArray(remote) ? remote : []);
+                      } catch {
+                        saveTasks([]);
+                      }
+                    } else {
+                      saveTasks([]);
+                    }
+                    setNotice('Đã làm mới danh sách nhiệm vụ từ máy chủ.');
+                    setOfflineModalOpen(false);
+                  }
+                }}
+                style={{ color: '#ef4444' }}
+                type="button"
+              >
+                Làm mới từ máy chủ
+              </button>
+
+              <button
+                className="small-action"
+                onClick={() => setOfflineModalOpen(false)}
+                type="button"
+              >
+                Đóng
+              </button>
+
+              <button
+                className="button button-primary"
+                disabled={!effectiveOnline || isSyncing}
+                onClick={handleSyncNow}
+                style={{ padding: '8px 18px', fontWeight: 700 }}
+                type="button"
+              >
+                {isSyncing ? 'Đang gửi dữ liệu...' : 'Đồng bộ ngay lên máy chủ ⟳'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: Mobile App Installation Guide (QR Code) ────────── */}
+      {installGuideOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setInstallGuideOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '20px',
+              maxWidth: '620px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px 28px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 800 }}>
+                  📱 Hướng dẫn cài đặt Ứng dụng ISOCAL Tech lên Điện thoại
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                  Cài đặt dưới dạng Progressive Web App (PWA) — Chạy offline như app tải từ App Store / CH Play
+                </p>
+              </div>
+              <button
+                onClick={() => setInstallGuideOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#64748b' }}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* QR Code & Direct Link */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '20px',
+                alignItems: 'center',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '16px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <img
+                  alt="QR Code"
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
+                    typeof window !== 'undefined'
+                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                      : `http://${lanIp}:5173/mobile/technician`,
+                  )}`}
+                  style={{ width: '130px', height: '130px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                />
+                <div style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, marginTop: '4px' }}>
+                  Quét bằng Camera điện thoại
+                </div>
               </div>
               <p className="measurement-disclaimer">
                 {selectedTask.kind === 'Kiểm định'
@@ -381,12 +641,96 @@ function TechnicianPage() {
 
             <div className="submit-review-bar">
               <div>
-                <strong>{selectedTask.submitted ? 'Hồ sơ đã được trình' : 'Hoàn tất và trình soát xét'}</strong>
-                <span>
-                  {selectedTask.submitted
-                    ? 'Bản ghi đã ký số mô phỏng và đang chờ Reviewer.'
-                    : 'Hệ thống sẽ ký số mô phỏng bản ghi đo trước khi trình Reviewer.'}
-                </span>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', marginBottom: '4px' }}>
+                  1. Mở liên kết trên điện thoại (Cùng mạng Wifi):
+                </div>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    color: '#0284c7',
+                    fontWeight: 700,
+                    wordBreak: 'break-all',
+                    marginBottom: '8px',
+                  }}
+                >
+                  {typeof window !== 'undefined'
+                    ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                    : `http://${lanIp}:5173/mobile/technician`}
+                </div>
+                <button
+                  onClick={() => {
+                    const url = typeof window !== 'undefined'
+                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                      : `http://${lanIp}:5173/mobile/technician`;
+                    navigator.clipboard?.writeText(url);
+                    alert('Đã sao chép liên kết vào bộ nhớ tạm!');
+                  }}
+                  style={{
+                    background: '#e2e8f0',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: '#334155',
+                  }}
+                  type="button"
+                >
+                  📋 Sao chép liên kết
+                </button>
+              </div>
+            </div>
+
+            {/* Step-by-step for Android & iOS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+              {/* Android */}
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  fontSize: '0.75rem',
+                  color: '#166534',
+                }}
+              >
+                <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🤖</span> Điện thoại Android (Chrome)
+                </div>
+                <ol style={{ margin: 0, paddingLeft: '16px', lineHeight: 1.6 }}>
+                  <li>Mở link bằng <strong>Google Chrome</strong>.</li>
+                  <li>Bấm vào biểu tượng <strong>ba chấm (⋮)</strong> ở góc trên bên phải.</li>
+                  <li>Chọn <strong>"Cài đặt ứng dụng"</strong> (hoặc "Thêm vào màn hình chính").</li>
+                  <li>Bấm <strong>Cài đặt</strong> để đưa biểu tượng app ra Home Screen.</li>
+                </ol>
+              </div>
+
+              {/* iPhone iOS */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  fontSize: '0.75rem',
+                  color: '#1e293b',
+                }}
+              >
+                <div style={{ fontWeight: 800, fontSize: '0.85rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🍎</span> Điện thoại iPhone (Safari)
+                </div>
+                <ol style={{ margin: 0, paddingLeft: '16px', lineHeight: 1.6 }}>
+                  <li>Mở link bằng trình duyệt <strong>Safari</strong>.</li>
+                  <li>Bấm nút <strong>Chia sẻ (hình vuông có mũi tên ↑)</strong> ở thanh dưới.</li>
+                  <li>Cuộn xuống chọn <strong>"Thêm vào MH chính" (Add to Home Screen)</strong>.</li>
+                  <li>Bấm <strong>Thêm (Add)</strong> ở góc trên bên phải.</li>
+                </ol>
               </div>
               <button
                 className="button button-primary"

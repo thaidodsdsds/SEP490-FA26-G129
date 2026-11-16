@@ -1,3 +1,5 @@
+import path from 'node:path';
+import os from 'node:os';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -49,6 +51,33 @@ app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+app.get(`${API_PREFIX}/system/lan-ip`, (req, res) => {
+  const ifaces = os.networkInterfaces();
+  let lanIp = '192.168.1.7';
+  for (const dev in ifaces) {
+    const list = ifaces[dev];
+    if (list) {
+      for (const details of list) {
+        if (
+          details.family === 'IPv4' &&
+          !details.internal &&
+          (details.address.startsWith('192.168.') ||
+            details.address.startsWith('10.') ||
+            details.address.startsWith('172.'))
+        ) {
+          lanIp = details.address;
+          break;
+        }
+      }
+    }
+  }
+  res.status(200).json(
+    buildSuccessResponse({
+      lanIp,
+    }),
+  );
 });
 
 app.get(`${API_PREFIX}/secure-check`, authenticate, (req, res) => {
