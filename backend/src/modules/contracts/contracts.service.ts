@@ -27,6 +27,7 @@ export const CONTRACT_STATUSES = [
   'Signed',
   'Liquidated',
   'Cancelled',
+  'Rejected',
 ] as const;
 
 export const EDITABLE_STATUSES = ['Draft', 'PendingApproval'] as const;
@@ -162,6 +163,9 @@ export interface ContractDetail extends ContractSummary {
   approved_at: Date | null;
   liquidated_by: number | null;
   liquidated_at: Date | null;
+  rejection_reason: string | null;
+  rejected_by: number | null;
+  rejected_at: Date | null;
   draft_file_url: string | null;
   signed_file_url: string | null;
   items: ContractItemResult[];
@@ -169,6 +173,7 @@ export interface ContractDetail extends ContractSummary {
   can_edit: boolean;
   can_submit: boolean;
   can_approve: boolean;
+  can_reject: boolean;
   can_sign_customer: boolean;
   can_cancel: boolean;
   show_cancel: boolean;
@@ -399,6 +404,9 @@ const mapContract = (
     approved_at: contract.approved_at ?? null,
     liquidated_by: contract.liquidated_by ?? null,
     liquidated_at: contract.liquidated_at ?? null,
+    rejection_reason: contract.rejection_reason ?? null,
+    rejected_by: contract.rejected_by ?? null,
+    rejected_at: contract.rejected_at ?? null,
     draft_file_url: contract.draft_file_url ?? null,
     signed_file_url: contract.signed_file_url ?? null,
     created_at: contract.created_at,
@@ -407,11 +415,12 @@ const mapContract = (
       .map(mapItem),
     signatures,
     can_edit:
-      status !== 'Cancelled' &&
+      !['Cancelled', 'Rejected'].includes(status) &&
       (isAdmin ? ['Draft', 'PendingApproval'].includes(status) : isSales && isOwner && status === 'Draft'),
     can_submit:
       status === 'Draft' && ((isSales && isOwner) || isAdmin),
     can_approve: status === 'PendingApproval' && (isAdmin || actor?.role === 'CEO'),
+    can_reject: status === 'PendingApproval' && (isAdmin || actor?.role === 'CEO'),
     can_sign_customer:
       status === 'Approved' &&
       actor?.role === 'Customer' &&
@@ -421,7 +430,7 @@ const mapContract = (
       (isAdmin || (isSales && isOwner && ['Draft', 'PendingApproval'].includes(status))),
     // Vẫn hiện nút Huỷ (ở dạng xám, không bấm được) để người dùng biết hành động này bị chặn
     show_cancel:
-      !['Cancelled', 'Liquidated'].includes(status) && (isAdmin || (isSales && isOwner)),
+      !['Cancelled', 'Liquidated', 'Rejected'].includes(status) && (isAdmin || (isSales && isOwner)),
     can_liquidate:
       ['Approved', 'Signed'].includes(status) && (isAdmin || actor?.role === 'Accountant'),
   };
@@ -1119,6 +1128,42 @@ export const approveContract = async (
   });
 
   return getContractDetail(id, actor);
+};
+
+/**
+ * SRS v1.5 màn 14: Admin/CEO từ chối hợp đồng đang chờ duyệt, bắt buộc có lý do.
+ * Khác với cancelContract (Sales huỷ hợp đồng của mình).
+ */
+export const rejectContract = async (
+  id: number,
+  actor: ContractActor,
+  reason: unknown,
+): Promise<ContractDetail> => {
+  if (!['Admin', 'CEO'].includes(actor.role)) {
+    throw new AppError('Bạn không có quyền từ chối hợp đồng.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const text = typeof reason === 'string' ? reason.trim() : '';
+  if (!text) {
+    throw new AppError('Vui lòng nhập lý do từ chối hợp đồng.', 400, ERROR_CODES.VALIDATION_ERROR);
+  }
+  if (text.length > 1000) {
+    throw new AppError('Lý do từ chối không được vượt quá 1000 ký tự.', 400, ERROR_CODES.VALIDATION_ERROR);
+  }
+
+  return transition(
+    id,
+    actor,
+    ['Admin', 'CEO'],
+    ['PendingApproval'],
+    'Rejected',
+    false,
+    {
+      rejection_reason: text,
+      rejected_by: actor.id,
+      rejected_at: new Date(),
+    },
+  );
 };
 
 export const signContractAsCustomer = async (

@@ -13,6 +13,7 @@ import {
   liquidateContractHandler,
   listAvailableQuotationsHandler,
   listContractsHandler,
+  rejectContractHandler,
   submitContractHandler,
   updateContractHandler,
 } from './contracts.controller.js';
@@ -35,6 +36,7 @@ contractsRoutes.get('/:contractId/signed-file', getSignedContractFileHandler);
 contractsRoutes.patch('/:contractId', updateContractHandler);
 contractsRoutes.post('/:contractId/submit', authorize('Sales', 'Admin'), submitContractHandler);
 contractsRoutes.post('/:contractId/approve', authorize('Admin', 'CEO'), approveContractHandler);
+contractsRoutes.post('/:contractId/reject', authorize('Admin', 'CEO'), rejectContractHandler);
 contractsRoutes.post('/:contractId/customer-sign', authorize('Customer'), customerSignContractHandler);
 contractsRoutes.post('/:contractId/cancel', authorize('Sales', 'Admin'), cancelContractHandler);
 contractsRoutes.post('/:contractId/liquidate', authorize('Accountant', 'Admin'), liquidateContractHandler);

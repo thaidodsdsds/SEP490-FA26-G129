@@ -14,6 +14,7 @@ import {
   liquidateContract,
   listAvailableQuotations,
   listContracts,
+  rejectContract,
   signContractAsCustomer,
   submitContract,
   updateContract,
@@ -250,6 +251,25 @@ export const approveContractHandler = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => runTransition(req, res, next, approveContract);
+
+export const rejectContractHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const contractId = Number(req.params.contractId);
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      throw new AppError('contractId không hợp lệ.', 400, ERROR_CODES.VALIDATION_ERROR);
+    }
+
+    const payload = (req.body ?? {}) as { reason?: unknown };
+    const contract = await rejectContract(contractId, getActor(req), payload.reason);
+    res.status(200).json(buildSuccessResponse(contract));
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const cancelContractHandler = async (
   req: Request,

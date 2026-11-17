@@ -151,20 +151,38 @@ export interface RecordVerificationLogInput {
   userAgent: string | null;
 }
 
-/** Ghi log sau khi đã gửi response để không làm chậm lượt tra cứu công khai. */
-export const recordVerificationLog = async (
-  input: RecordVerificationLogInput,
+/** Ghi nhiều log trong 1 câu query (dùng cho flush theo batch). */
+export const recordVerificationLogs = async (
+  inputs: RecordVerificationLogInput[],
 ): Promise<void> => {
-  await dataSource.query(
-    `INSERT INTO seal_verification_logs
-       (seal_id, seal_code, verification_result, source_ip, user_agent)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [
+  if (inputs.length === 0) return;
+
+  const values: string[] = [];
+  const params: unknown[] = [];
+
+  for (const input of inputs) {
+    const offset = params.length;
+    values.push(
+      `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`,
+    );
+    params.push(
       input.sealId,
       input.sealCode.slice(0, 50),
       input.result,
       input.sourceIp?.slice(0, 45) ?? null,
       input.userAgent?.slice(0, 255) ?? null,
-    ],
+    );
+  }
+
+  await dataSource.query(
+    `INSERT INTO seal_verification_logs
+       (seal_id, seal_code, verification_result, source_ip, user_agent)
+     VALUES ${values.join(', ')}`,
+    params,
   );
 };
+
+/** Ghi 1 log (giữ lại cho các luồng không đi qua hàng đợi). */
+export const recordVerificationLog = async (
+  input: RecordVerificationLogInput,
+): Promise<void> => recordVerificationLogs([input]);

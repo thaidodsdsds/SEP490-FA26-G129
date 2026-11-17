@@ -826,6 +826,15 @@ export class Contract {
   @Column({ type: 'varchar', length: 20, default: 'Draft' })
   status!: string;
 
+  @Column({ type: 'text', nullable: true })
+  rejection_reason!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  rejected_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  rejected_at!: Date | null;
+
   @Column({ type: 'varchar', length: 255, default: '' })
   party_a_name!: string;
 
