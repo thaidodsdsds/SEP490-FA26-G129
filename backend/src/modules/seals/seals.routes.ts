@@ -28,10 +28,14 @@ const MANAGE_ROLES = [
 
 const REVOCATION_DECISION_ROLES = ['CEO', 'Admin'];
 
-/** SRS v1.5 mục 8: màn hình List SealVerificationLog dành cho Admin, Reviewer. */
+/**
+ * SRS v1.5 mục 8: màn hình List SealVerificationLog dành cho Admin, Reviewer.
+ * DB thực tế không có role 'Reviewer' (được realign thành 'HeadTechnician'),
+ * nên cần cho cả HeadTechnician/CEO để khớp allowedRoles của router frontend.
+ */
 sealsRoutes.get(
   '/verification-logs',
-  authorize('Admin', 'Reviewer'),
+  authorize('Admin', 'Reviewer', 'HeadTechnician', 'CEO'),
   controller.listVerificationLogsHandler,
 );
 
