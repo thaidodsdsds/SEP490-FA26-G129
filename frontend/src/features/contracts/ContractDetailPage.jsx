@@ -8,6 +8,7 @@ import {
   extractApiErrorMessage,
   getContractDetailApi,
   liquidateContractApi,
+  rejectContractApi,
   submitContractApi,
 } from '../../services/contract-service.js';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
@@ -86,6 +87,9 @@ function ContractDetailPage({ basePath }) {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,6 +117,28 @@ function ContractDetailPage({ basePath }) {
       setContract(updated);
     } catch (actionFailure) {
       setActionError(extractApiErrorMessage(actionFailure, 'Thao tác không thành công.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError('Vui lòng nhập lý do từ chối.');
+      return;
+    }
+
+    setBusy(true);
+    setRejectError('');
+    setActionError('');
+    try {
+      const updated = await rejectContractApi(contract.id, reason);
+      setContract(updated);
+      setRejectOpen(false);
+      setRejectReason('');
+    } catch (rejectFailure) {
+      setRejectError(extractApiErrorMessage(rejectFailure, 'Không thể từ chối hợp đồng.'));
     } finally {
       setBusy(false);
     }
@@ -224,6 +250,22 @@ function ContractDetailPage({ basePath }) {
             </button>
           )}
 
+          {contract.can_reject && (
+            <button
+              className="button button-danger"
+              disabled={busy}
+              onClick={() => {
+                setRejectReason('');
+                setRejectError('');
+                setActionError('');
+                setRejectOpen(true);
+              }}
+              type="button"
+            >
+              Từ chối
+            </button>
+          )}
+
           {contract.can_sign_customer && (
             <button
               className="button button-success"
@@ -274,7 +316,62 @@ function ContractDetailPage({ basePath }) {
         </div>
       </div>
 
+      {rejectOpen && (
+        <div className="ct-modal-backdrop ct-no-print">
+          <div
+            aria-labelledby="ct-reject-title"
+            aria-modal="true"
+            className="ct-modal"
+            role="dialog"
+          >
+            <h3 id="ct-reject-title">Từ chối hợp đồng</h3>
+            <p>
+              Hợp đồng {contract.contract_code} sẽ chuyển sang trạng thái Bị từ chối. Vui lòng nêu
+              rõ lý do để Bên A biết cần điều chỉnh gì.
+            </p>
+            <textarea
+              aria-label="Lý do từ chối hợp đồng"
+              autoFocus
+              maxLength={1000}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Ví dụ: Phạm vi công việc chưa khớp với báo giá..."
+              value={rejectReason}
+            />
+            {rejectError ? (
+              <p className="ct-error-banner" role="alert">
+                {rejectError}
+              </p>
+            ) : null}
+            <div className="ct-modal-actions">
+              <button
+                className="button button-secondary"
+                disabled={busy}
+                onClick={() => {
+                  setRejectOpen(false);
+                  setRejectError('');
+                }}
+                type="button"
+              >
+                Huỷ
+              </button>
+              <button
+                className="button button-danger"
+                disabled={busy}
+                onClick={submitReject}
+                type="button"
+              >
+                {busy ? 'Đang xử lý…' : 'Xác nhận từ chối'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {actionError && <div className="ct-error-banner ct-no-print">{actionError}</div>}
+
+      {contract.status === 'Rejected' && contract.rejection_reason ? (
+        <div className="ct-error-banner">Lý do từ chối: {contract.rejection_reason}</div>
+      ) : null}
 
       <article className="ct-document">
         <div className="ct-doc-top">
