@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { getDigitalSignaturesApi } from '../../../../services/work-order-service.js';
-import { digitalSignatures } from '../../mockData.js';
 import DataTable from '../../shared/DataTable.jsx';
 import ReviewerPageShell from '../../shared/ReviewerPageShell.jsx';
 import StatusPill from '../../shared/StatusPill.jsx';
@@ -9,13 +8,17 @@ import useReviewerWorkspace from '../../useReviewerWorkspace.js';
 function SignaturesPage() {
   const { matches, query, setQuery, feedback, setFeedback } = useReviewerWorkspace();
   const [dbSignatures, setDbSignatures] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError('');
     getDigitalSignaturesApi()
       .then((list) => {
-        if (!active || !Array.isArray(list)) return;
-        const mapped = list.map((item) => ({
+        if (!active) return;
+        const mapped = (Array.isArray(list) ? list : []).map((item) => ({
           id: `DS-${item.id}`,
           purpose: item.purpose,
           reference: item.calibration_record_id
@@ -32,16 +35,23 @@ function SignaturesPage() {
         }));
         setDbSignatures(mapped);
       })
-      .catch(() => {
-        // Fallback to mock if offline
+      .catch((error) => {
+        if (!active) return;
+        setDbSignatures([]);
+        setLoadError(
+          error?.response?.data?.error?.message ||
+            'Không tải được nhật ký chữ ký số từ máy chủ.',
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, []);
 
-  const combinedSignatures = [...dbSignatures, ...digitalSignatures];
-  const rows = combinedSignatures.filter((item) =>
+  const rows = dbSignatures.filter((item) =>
     matches(`${item.id} ${item.purpose} ${item.reference} ${item.signer} ${item.status} ${item.hash}`),
   );
 
@@ -60,7 +70,13 @@ function SignaturesPage() {
             <h2>DigitalSignature</h2>
             <p>Nhật ký băm tài liệu (SHA-256) và giao dịch qua hệ thống chứng thư số nội bộ & CA.</p>
           </div>
+          {loading && <span className="reviewer-muted">Đang tải…</span>}
         </div>
+        {loadError ? (
+          <p className="reviewer-inline-error" role="alert">
+            {loadError}
+          </p>
+        ) : null}
         <DataTable
           columns={[
             { key: 'id', label: 'Mã ký' },

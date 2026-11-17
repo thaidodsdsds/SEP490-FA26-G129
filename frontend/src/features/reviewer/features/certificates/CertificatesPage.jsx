@@ -40,7 +40,7 @@ function CertificatesPage() {
   const [data, setData] = useState({
     items: [],
     total: 0,
-    summary: { total: 0, draft: 0, released: 0 },
+    summary: { total: 0, draft: 0, pending_payment: 0, released: 0 },
   });
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -64,7 +64,7 @@ function CertificatesPage() {
       setData({
         items: Array.isArray(result.items) ? result.items : [],
         total: result.total ?? 0,
-        summary: result.summary ?? { total: 0, draft: 0, released: 0 },
+        summary: result.summary ?? { total: 0, draft: 0, pending_payment: 0, released: 0 },
       });
     } catch (loadErr) {
       setLoadError(errorMessage(loadErr));
@@ -96,6 +96,7 @@ function CertificatesPage() {
     return {
       total: summary.total ?? data.items.length,
       draft: summary.draft ?? 0,
+      pending_payment: summary.pending_payment ?? 0,
       released: summary.released ?? 0,
     };
   }, [data.summary, data.items.length]);
@@ -277,6 +278,7 @@ function CertificatesPage() {
           {[
             ['all', `Tất cả (${counts.total})`],
             ['Draft', `◷ Bản nháp (${counts.draft})`],
+            ['PendingPayment', `⏳ Chờ thanh toán (${counts.pending_payment})`],
             ['Released', `✓ Đã phát hành (${counts.released})`],
           ].map(([value, label]) => (
             <button

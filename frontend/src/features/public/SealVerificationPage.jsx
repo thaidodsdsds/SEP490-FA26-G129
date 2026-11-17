@@ -47,11 +47,21 @@ function SealVerificationPage() {
   const [loading, setLoading] = useState(Boolean(sealCode));
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  // Tăng giá trị để bấm lại cùng 1 mã vẫn gọi lại API (retry sau lỗi mạng).
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    if (!sealCode) return undefined;
+    // Đổi mã (Back/Forward) hoặc retry thì xóa kết quả/lỗi cũ trước khi fetch.
+    setData(null);
+    setError('');
+    setInput(sealCode ?? '');
+    if (!sealCode) {
+      setLoading(false);
+      return undefined;
+    }
 
     let isMounted = true;
+    setLoading(true);
     verifySealApi(sealCode)
       .then((result) => {
         if (isMounted) setData(result);
@@ -70,16 +80,25 @@ function SealVerificationPage() {
     return () => {
       isMounted = false;
     };
-  }, [sealCode]);
+  }, [sealCode, retryKey]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
     const code = input.trim();
-    if (!code) return;
+    if (!code) {
+      setError('Vui lòng nhập mã tem trước khi kiểm tra.');
+      return;
+    }
     setInput(code);
+    setError('');
+    if (code === sealCode) {
+      // Cùng mã → chỉ tăng retryKey để effect fetch lại.
+      setRetryKey((value) => value + 1);
+      return;
+    }
+    setRetryKey(0);
     setLoading(true);
     setData(null);
-    setError('');
     navigate(`/verify/${encodeURIComponent(code)}`);
   };
 

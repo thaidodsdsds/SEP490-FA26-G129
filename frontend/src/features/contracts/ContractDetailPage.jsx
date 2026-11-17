@@ -343,7 +343,7 @@ function ContractDetailPage({ basePath }) {
               </tr>
             </thead>
             <tbody>
-              {contract.items.map((item) => (
+              {(contract.items ?? []).map((item) => (
                 <tr key={item.id || item.line_no}>
                   <td className="center">{item.line_no}</td>
                   <td>

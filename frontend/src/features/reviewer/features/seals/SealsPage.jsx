@@ -580,6 +580,8 @@ function SealsPage() {
       {revocationState.open ? (
         <RevocationModal
           canDecide={
+            Number(currentUserId) > 0 &&
+            Number(revocationState.pending?.requested_by) > 0 &&
             Number(currentUserId) !== Number(revocationState.pending?.requested_by)
           }
           mode={revocationState.mode}

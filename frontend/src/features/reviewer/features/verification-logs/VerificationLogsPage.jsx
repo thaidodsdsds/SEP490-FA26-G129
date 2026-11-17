@@ -15,7 +15,10 @@ function VerificationLogsPage() {
     setLoading(true);
     getVerificationLogsApi({ q: query, limit: 100 })
       .then((data) => {
-        if (isMounted) setRows(data.items || []);
+        if (!isMounted) return;
+        setRows(data.items || []);
+        // Query mới thành công → dọn banner lỗi của lần trước.
+        setFeedback('');
       })
       .catch((error) => {
         if (!isMounted) return;

@@ -32,6 +32,12 @@ function CertificateDetailModal({
   const measurements = certificate?.measurements ?? [];
   const signatures = certificate?.signatures ?? [];
   const isReleased = certificate?.status === 'Released';
+  const isPendingPayment = certificate?.status === 'PendingPayment';
+  const statusLabel = isReleased
+    ? '✓ Chứng nhận đã phát hành (Released)'
+    : isPendingPayment
+      ? '⏳ Chứng nhận chờ thanh toán (PendingPayment)'
+      : '◷ Chứng nhận đang ở bản nháp (Draft)';
 
   return (
     <Modal
@@ -61,7 +67,7 @@ function CertificateDetailModal({
             }}
           >
             <strong style={{ display: 'block', fontSize: '0.88rem', marginBottom: '2px' }}>
-              {isReleased ? '✓ Chứng nhận đã phát hành (Released)' : '◷ Chứng nhận đang ở bản nháp (Draft)'}
+              {statusLabel}
             </strong>
             {isReleased ? (
               <span>
