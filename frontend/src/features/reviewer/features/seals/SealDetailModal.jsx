@@ -57,6 +57,12 @@ function SealDetailModal({
   onOpenCertificatePdf,
   pdfLoading,
   certificatePdfLoading,
+  canRequestRevocation = false,
+  canDecideRevocation = false,
+  currentUserId = null,
+  onRequestRevocation,
+  onDecideRevocation,
+  revocationLoading = false,
 }) {
   const [qrUrl, setQrUrl] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
@@ -98,6 +104,11 @@ function SealDetailModal({
   const theme = bannerTheme(seal);
   const revocations = seal?.revocations ?? [];
   const verificationLogs = seal?.verification?.recent ?? [];
+  const pendingRevocation = seal?.pending_revocation ?? null;
+  const canDecidePending =
+    Boolean(pendingRevocation) &&
+    canDecideRevocation &&
+    Number(currentUserId) !== Number(pendingRevocation.requested_by);
 
   return (
     <Modal
@@ -135,6 +146,58 @@ function SealDetailModal({
               {seal.revocation?.reason ? ` · Lý do: ${seal.revocation.reason}` : ''}
             </span>
           </div>
+
+          {pendingRevocation ? (
+            <div
+              style={{
+                marginBottom: '14px',
+                padding: '12px 14px',
+                borderRadius: '9px',
+                border: '1px solid #fde68a',
+                background: '#fffbeb',
+                color: '#92400e',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ display: 'block', fontSize: '0.8rem', marginBottom: '3px' }}>
+                    ◷ Yêu cầu thu hồi đang chờ ký quyết định
+                  </strong>
+                  <span style={{ display: 'block', fontSize: '0.74rem' }}>
+                    {pendingRevocation.reason || '—'}
+                  </span>
+                  <small style={{ display: 'block', marginTop: '3px', fontSize: '0.67rem' }}>
+                    Do {pendingRevocation.requested_by_name || `#${pendingRevocation.requested_by}`} gửi lúc{' '}
+                    {pendingRevocation.created_at_formatted || '—'} · #{pendingRevocation.id}
+                  </small>
+                </div>
+                {canDecidePending ? (
+                  <button
+                    className="button button-danger button-compact"
+                    disabled={revocationLoading}
+                    onClick={() => onDecideRevocation(seal)}
+                    type="button"
+                  >
+                    Ký quyết định
+                  </button>
+                ) : (
+                  <small style={{ fontSize: '0.67rem' }}>
+                    {canDecideRevocation && Number(currentUserId) === Number(pendingRevocation.requested_by)
+                      ? 'Bạn là người yêu cầu; cần người khác ký quyết định.'
+                      : 'Bạn không có quyền ký quyết định thu hồi.'}
+                  </small>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <div className="review-record-summary">
             <div>
@@ -344,6 +407,27 @@ function SealDetailModal({
                       </div>
                     ),
                   },
+                  {
+                    key: 'signature',
+                    label: 'Chữ ký số',
+                    render: (row) =>
+                      row.signature ? (
+                        <div>
+                          <code style={{ fontSize: '0.65rem', color: '#0369a1' }}>
+                            {row.signature.transaction_id || '—'}
+                          </code>
+                          <small style={{ display: 'block', color: '#64748b' }}>
+                            {row.signature.signer_name || '—'}
+                            {row.signature.signed_at_formatted &&
+                            row.signature.signed_at_formatted !== '—'
+                              ? ` · ${row.signature.signed_at_formatted}`
+                              : ''}
+                          </small>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>—</span>
+                      ),
+                  },
                 ]}
                 empty="Chưa có yêu cầu thu hồi nào."
                 rows={revocations}
@@ -353,13 +437,24 @@ function SealDetailModal({
 
           <p className="mock-note">
             <strong>Lưu ý:</strong> tem PDF khổ A6 có QR được phát hành riêng sau khi chứng nhận đã ký. File chứng
-            nhận đã ký số được giữ nguyên để bảo toàn giá trị pháp lý và hash chữ ký.
+            nhận đã ký số được giữ nguyên để bảo toàn giá trị pháp lý và hash chữ ký. Quyết định thu hồi cũng được
+            ký số riêng (<code>SealRevocation</code>) bởi người khác người yêu cầu.
           </p>
 
           <div className="modal-actions" style={{ marginTop: '18px' }}>
             <button className="button button-secondary" onClick={onClose} type="button">
               Đóng
             </button>
+            {canRequestRevocation && seal.can_revoke ? (
+              <button
+                className="button button-danger"
+                disabled={revocationLoading}
+                onClick={() => onRequestRevocation(seal)}
+                type="button"
+              >
+                ⛔ Yêu cầu thu hồi
+              </button>
+            ) : null}
             <button
               className="button button-secondary"
               disabled={certificatePdfLoading}

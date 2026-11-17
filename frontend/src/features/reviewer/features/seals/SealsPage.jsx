@@ -4,20 +4,24 @@ import { useAppContext } from '../../../../app/providers.jsx';
 import { openCertificatePdfApi } from '../../../../services/certificate-service.js';
 import {
   createSealApi,
+  decideSealRevocationApi,
   getEligibleCertificatesApi,
   getSealDetailApi,
   getSealsApi,
   openSealPdfApi,
+  requestSealRevocationApi,
 } from '../../../../services/seal-service.js';
 import DataTable from '../../shared/DataTable.jsx';
 import ReviewerPageShell from '../../shared/ReviewerPageShell.jsx';
 import StatusPill from '../../shared/StatusPill.jsx';
 import CreateSealModal from './CreateSealModal.jsx';
+import RevocationModal from './RevocationModal.jsx';
 import SealDetailModal from './SealDetailModal.jsx';
 
 const normalizeRole = (value) => String(value || '').toLowerCase().replace(/[^a-z]/g, '');
 
 const MANAGER_ROLES = ['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'ceo'];
+const DECISION_ROLES = ['ceo', 'admin'];
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -53,6 +57,12 @@ function SealsPage() {
 
   const role = normalizeRole(session?.role);
   const canManage = MANAGER_ROLES.includes(role);
+  const canDecide = DECISION_ROLES.includes(role);
+  const currentUserId = session?.user?.id;
+  const isRevocationAllowed = (seal) =>
+    canManage &&
+    (seal?.status === 'Active' || seal?.status === 'Expired') &&
+    seal?.revocation?.status !== 'Pending';
 
   const [data, setData] = useState({ items: [], total: 0, summary: EMPTY_SUMMARY });
   const [loading, setLoading] = useState(false);
@@ -66,6 +76,13 @@ function SealsPage() {
     error: '',
     seal: null,
   });
+  const [revocationState, setRevocationState] = useState({
+    open: false,
+    mode: 'request',
+    seal: null,
+    pending: null,
+  });
+  const [revocationSubmitting, setRevocationSubmitting] = useState(false);
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
   const [certificatePdfLoadingId, setCertificatePdfLoadingId] = useState(null);
 
@@ -150,6 +167,60 @@ function SealsPage() {
         loading: false,
         error: errorMessage(detailError),
       }));
+    }
+  };
+
+  const closeDetail = () =>
+    setDetailState({ open: false, loading: false, error: '', seal: null });
+
+  const openRequestRevocation = (seal) => {
+    if (!isRevocationAllowed(seal)) return;
+    closeDetail();
+    setRevocationState({ open: true, mode: 'request', seal, pending: null });
+  };
+
+  const openDecisionRevocation = (seal) => {
+    const pending = seal?.pending_revocation ?? null;
+    if (!pending) {
+      setFeedback('Tem này không có yêu cầu thu hồi đang chờ quyết định.', 'error');
+      return;
+    }
+    closeDetail();
+    setRevocationState({ open: true, mode: 'decision', seal, pending });
+  };
+
+  const handleRevocationSubmit = async (payload) => {
+    const { mode, seal, pending } = revocationState;
+    if (!seal) return;
+
+    setRevocationSubmitting(true);
+    try {
+      const updated =
+        mode === 'decision'
+          ? await decideSealRevocationApi(seal.id, pending.id, payload)
+          : await requestSealRevocationApi(seal.id, payload);
+
+      setRevocationState({ open: false, mode: 'request', seal: null, pending: null });
+      setStatusFilter('all');
+
+      if (mode === 'decision') {
+        setFeedback(
+          payload.decision === 'Approved'
+            ? `Đã ký quyết định thu hồi tem ${updated.seal_code}. Tem chuyển sang Revoked và thiết bị được đưa vào kiểm tra.`
+            : `Đã ký từ chối yêu cầu thu hồi tem ${updated.seal_code}. Tem giữ nguyên trạng thái ${updated.status}.`,
+        );
+      } else {
+        setFeedback(
+          `Đã gửi yêu cầu thu hồi tem ${updated.seal_code}. Chờ người có thẩm quyền ký quyết định.`,
+        );
+      }
+
+      await loadSeals();
+    } catch (revocationError) {
+      setFeedback(errorMessage(revocationError), 'error');
+      throw revocationError;
+    } finally {
+      setRevocationSubmitting(false);
     }
   };
 
@@ -457,6 +528,15 @@ function SealsPage() {
                     >
                       {pdfLoadingId === row.id ? 'Đang tải...' : 'In tem'}
                     </button>
+                    {isRevocationAllowed(row) ? (
+                      <button
+                        className="small-action"
+                        onClick={() => openRequestRevocation(row)}
+                        type="button"
+                      >
+                        Thu hồi
+                      </button>
+                    ) : null}
                   </div>
                 ),
               },
@@ -469,7 +549,8 @@ function SealsPage() {
         <p className="mock-note">
           <strong>Quy trình:</strong> tem chỉ được phát hành khi chứng nhận đã Released và có chữ ký số
           CertificateRelease. Tem mặc định có hiệu lực 12 tháng; khi quá hạn, hệ thống tự chuyển sang Expired và
-          đồng bộ trạng thái thiết bị. Yêu cầu thu hồi và phê duyệt thu hồi sẽ được bổ sung ở bước tiếp theo.
+          đồng bộ trạng thái thiết bị. Yêu cầu thu hồi được ký quyết định bởi người khác người gửi; phê duyệt
+          chuyển tem sang Revoked và thiết bị sang InRepair để đo lại.
         </p>
       </section>
 
@@ -479,14 +560,36 @@ function SealsPage() {
 
       {detailState.open ? (
         <SealDetailModal
+          canDecideRevocation={canDecide}
+          canRequestRevocation={isRevocationAllowed(detailState.seal)}
           certificatePdfLoading={certificatePdfLoadingId === detailState.seal?.id}
+          currentUserId={currentUserId}
           error={detailState.error}
           loading={detailState.loading}
-          onClose={() => setDetailState({ open: false, loading: false, error: '', seal: null })}
+          onClose={closeDetail}
+          onDecideRevocation={openDecisionRevocation}
           onOpenCertificatePdf={handleOpenCertificatePdf}
           onOpenPdf={handleOpenSealPdf}
+          onRequestRevocation={openRequestRevocation}
           pdfLoading={pdfLoadingId === detailState.seal?.id}
+          revocationLoading={revocationSubmitting}
           seal={detailState.seal}
+        />
+      ) : null}
+
+      {revocationState.open ? (
+        <RevocationModal
+          canDecide={
+            Number(currentUserId) !== Number(revocationState.pending?.requested_by)
+          }
+          mode={revocationState.mode}
+          onClose={() =>
+            setRevocationState({ open: false, mode: 'request', seal: null, pending: null })
+          }
+          onSubmit={handleRevocationSubmit}
+          pending={revocationState.pending}
+          seal={revocationState.seal}
+          submitting={revocationSubmitting}
         />
       ) : null}
     </ReviewerPageShell>

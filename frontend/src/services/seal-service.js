@@ -61,6 +61,33 @@ export const createSealApi = async (payload) => {
 };
 
 /**
+ * Gửi yêu cầu thu hồi tem. Tem chỉ đổi trạng thái sau khi có quyết định được ký số.
+ * @param {number|string} sealId
+ * @param {{ reason: string, note?: string }} payload
+ */
+export const requestSealRevocationApi = async (sealId, payload) => {
+  const id = toNumericId(sealId);
+  const response = await apiClient.post(`/seals/${id}/revocations`, payload);
+  return response.data?.data;
+};
+
+/**
+ * Ký quyết định thu hồi/từ chối. Người ký phải khác người gửi yêu cầu.
+ * @param {number|string} sealId
+ * @param {number|string} revocationId
+ * @param {{ decision: 'Approved'|'Rejected', decision_note?: string }} payload
+ */
+export const decideSealRevocationApi = async (sealId, revocationId, payload) => {
+  const id = toNumericId(sealId);
+  const revocation = toNumericId(revocationId);
+  const response = await apiClient.post(
+    `/seals/${id}/revocations/${revocation}/decision`,
+    payload,
+  );
+  return response.data?.data;
+};
+
+/**
  * Tải ảnh QR của tem dưới dạng Blob (có kèm JWT)
  * @param {number|string} sealId
  */

@@ -257,14 +257,17 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: (
-      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'ceo']} portalType="staff">
         <HeadOfTechLayout />
       </ProtectedRoute>
     ),
     children: [
       {
         element: (
-          <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+          <RoleDashboardGate
+            allowedDashboardPaths={['/internal/head-of-tech', '/internal/admin', '/internal']}
+            dashboardPath="/internal/head-of-tech"
+          >
             <ReviewerWorkspaceProvider />
           </RoleDashboardGate>
         ),
