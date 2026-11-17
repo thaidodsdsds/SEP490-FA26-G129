@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   '/review-queue',
   authenticate,
-  authorize('reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'technician'),
+  authorize('reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'technician', 'ceo'),
   controller.getReviewQueueHandler,
 );
 
