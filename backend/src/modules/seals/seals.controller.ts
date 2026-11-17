@@ -22,10 +22,14 @@ const getActor = (req: Request): service.SealActor => {
   };
 };
 
-const parseId = (value: string): number => {
+const parseId = (value: string, label = 'Mã tem'): number => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new AppError('Mã tem không hợp lệ.', 400, ERROR_CODES.VALIDATION_ERROR);
+    throw new AppError(
+      `${label} không hợp lệ.`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
   }
   return parsed;
 };
@@ -93,6 +97,55 @@ export const createSealHandler = async (
       getActor(req),
     );
     res.status(201).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const requestSealRevocationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const sealId = parseId(req.params.id);
+    const { reason, note } = req.body ?? {};
+    const result = await service.requestSealRevocation(
+      sealId,
+      {
+        reason: reason === undefined || reason === null ? '' : String(reason),
+        note: note === undefined || note === null ? null : String(note),
+      },
+      getActor(req),
+    );
+    res.status(201).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const decideSealRevocationHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const sealId = parseId(req.params.id);
+    const revocationId = parseId(req.params.revocationId, 'Mã yêu cầu thu hồi');
+    const { decision, decision_note } = req.body ?? {};
+    const result = await service.decideSealRevocation(
+      sealId,
+      revocationId,
+      {
+        decision: decision === undefined || decision === null ? '' : String(decision),
+        decision_note:
+          decision_note === undefined || decision_note === null
+            ? null
+            : String(decision_note),
+      },
+      getActor(req),
+    );
+    res.status(200).json(buildSuccessResponse(result));
   } catch (error) {
     next(error);
   }

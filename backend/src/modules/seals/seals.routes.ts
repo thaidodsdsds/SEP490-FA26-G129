@@ -26,6 +26,8 @@ const MANAGE_ROLES = [
   'CEO',
 ];
 
+const REVOCATION_DECISION_ROLES = ['CEO', 'Admin'];
+
 sealsRoutes.get(
   '/eligible-certificates',
   authorize(...MANAGE_ROLES),
@@ -39,6 +41,18 @@ sealsRoutes.get(
 );
 
 sealsRoutes.post('/', authorize(...MANAGE_ROLES), controller.createSealHandler);
+
+sealsRoutes.post(
+  '/:id/revocations',
+  authorize(...MANAGE_ROLES),
+  controller.requestSealRevocationHandler,
+);
+
+sealsRoutes.post(
+  '/:id/revocations/:revocationId/decision',
+  authorize(...REVOCATION_DECISION_ROLES),
+  controller.decideSealRevocationHandler,
+);
 
 sealsRoutes.get(
   '/:id',

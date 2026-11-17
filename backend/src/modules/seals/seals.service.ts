@@ -28,6 +28,16 @@ export interface CreateSealInput {
   due_date?: string | null;
 }
 
+export interface CreateRevocationInput {
+  reason: string;
+  note?: string | null;
+}
+
+export interface DecideRevocationInput {
+  decision: string;
+  decision_note?: string | null;
+}
+
 interface SealRow {
   id: number;
   seal_code: string;
@@ -476,10 +486,29 @@ const loadRevocations = async (sealId: number) => {
        r.decision_note,
        r.created_at,
        requester.full_name AS requested_by_name,
-       decider.full_name AS decided_by_name
+       decider.full_name AS decided_by_name,
+       sig.id AS signature_id,
+       sig.provider_transaction_id AS signature_transaction_id,
+       sig.document_hash AS signature_document_hash,
+       sig.signer_name AS signature_signer_name,
+       sig.signed_at AS signature_signed_at
      FROM seal_revocations r
      LEFT JOIN accounts requester ON requester.id = r.requested_by
      LEFT JOIN accounts decider ON decider.id = r.decided_by
+     LEFT JOIN LATERAL (
+       SELECT
+         ds.id,
+         ds.provider_transaction_id,
+         ds.document_hash,
+         ds.signer_name,
+         ds.signed_at
+       FROM digital_signatures ds
+       WHERE ds.seal_revocation_id = r.id
+         AND ds.purpose = 'SealRevocation'
+         AND ds.status = 'Signed'
+       ORDER BY ds.id DESC
+       LIMIT 1
+     ) sig ON true
      WHERE r.seal_id = $1
      ORDER BY r.id DESC`,
     [sealId],
@@ -497,6 +526,16 @@ const loadRevocations = async (sealId: number) => {
     decided_at: row.decided_at,
     decided_at_formatted: formatDateTime(row.decided_at),
     decision_note: row.decision_note,
+    signature: row.signature_id
+      ? {
+          id: Number(row.signature_id),
+          transaction_id: row.signature_transaction_id,
+          document_hash: row.signature_document_hash,
+          signer_name: row.signature_signer_name,
+          signed_at: row.signature_signed_at,
+          signed_at_formatted: formatDateTime(row.signature_signed_at),
+        }
+      : null,
     created_at: row.created_at,
     created_at_formatted: formatDateTime(row.created_at),
   }));
@@ -840,6 +879,360 @@ export const createSeal = async (input: CreateSealInput, actor: SealActor) => {
     if (isUniqueViolation(error)) {
       throw new AppError(
         'Tem cho chứng nhận này đã tồn tại, vui lòng tải lại danh sách.',
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
+
+  return getSealDetail(sealId, actor);
+};
+
+const readRequiredText = (
+  value: unknown,
+  label: string,
+  maxLength = 2000,
+): string => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) {
+    throw new AppError(
+      `Vui lòng nhập ${label}.`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+  if (text.length > maxLength) {
+    throw new AppError(
+      `${label} không được vượt quá ${maxLength} ký tự.`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+  return text;
+};
+
+const readOptionalText = (
+  value: unknown,
+  label: string,
+  maxLength = 2000,
+): string | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') {
+    throw new AppError(
+      `${label} không hợp lệ.`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+  const text = value.trim();
+  if (!text) return null;
+  if (text.length > maxLength) {
+    throw new AppError(
+      `${label} không được vượt quá ${maxLength} ký tự.`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+  return text;
+};
+
+const resolveSealSignerName = async (
+  actor: SealActor,
+): Promise<string | null> => {
+  if (actor.full_name) return actor.full_name;
+  const rows = await dataSource.query(
+    `SELECT full_name FROM accounts WHERE id = $1 LIMIT 1`,
+    [actor.id],
+  );
+  return Array.isArray(rows) && rows.length > 0 ? rows[0].full_name : null;
+};
+
+/**
+ * FR-F9: tạo yêu cầu thu hồi tem. Tem chỉ đổi trạng thái sau khi có quyết định
+ * được ký số bởi một người khác người yêu cầu.
+ */
+export const requestSealRevocation = async (
+  sealId: number,
+  input: CreateRevocationInput,
+  actor: SealActor,
+) => {
+  const reason = readRequiredText(input.reason, 'lý do thu hồi');
+  const note = readOptionalText(input.note, 'ghi chú');
+  const fullReason = note ? `${reason} — ${note}` : reason;
+
+  await expireOverdueSeals();
+
+  const queryRunner = dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  try {
+    const sealRows = await queryRunner.query(
+      `SELECT id, seal_code, status FROM seals WHERE id = $1 FOR UPDATE`,
+      [sealId],
+    );
+
+    if (!Array.isArray(sealRows) || sealRows.length === 0) {
+      throw new AppError(
+        `Không tìm thấy tem #${sealId}.`,
+        404,
+        ERROR_CODES.NOT_FOUND,
+      );
+    }
+
+    const seal = sealRows[0];
+    if (seal.status !== 'Active' && seal.status !== 'Expired') {
+      throw new AppError(
+        `Tem ${seal.seal_code} đang ở trạng thái ${seal.status}, không thể yêu cầu thu hồi.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    const pendingRows = await queryRunner.query(
+      `SELECT id FROM seal_revocations
+       WHERE seal_id = $1 AND status = 'Pending'
+       LIMIT 1`,
+      [sealId],
+    );
+
+    if (Array.isArray(pendingRows) && pendingRows.length > 0) {
+      throw new AppError(
+        `Tem ${seal.seal_code} đã có yêu cầu thu hồi đang chờ quyết định.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    await queryRunner.query(
+      `INSERT INTO seal_revocations (
+         seal_id,
+         requested_by,
+         reason,
+         status,
+         created_at
+       ) VALUES ($1, $2, $3, 'Pending', NOW())`,
+      [sealId, actor.id, fullReason],
+    );
+
+    await queryRunner.commitTransaction();
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
+
+  return getSealDetail(sealId, actor);
+};
+
+/**
+ * FR-F9: quyết định thu hồi tem. Mọi quyết định đều được ký số và lưu vào
+ * digital_signatures với purpose = 'SealRevocation'.
+ */
+export const decideSealRevocation = async (
+  sealId: number,
+  revocationId: number,
+  input: DecideRevocationInput,
+  actor: SealActor,
+) => {
+  const decision = typeof input.decision === 'string' ? input.decision.trim() : '';
+  if (decision !== 'Approved' && decision !== 'Rejected') {
+    throw new AppError(
+      'Quyết định không hợp lệ (chấp nhận Approved hoặc Rejected).',
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  const decisionNote = readOptionalText(
+    input.decision_note,
+    'ghi chú quyết định',
+  );
+
+  await expireOverdueSeals();
+
+  const signerName = await resolveSealSignerName(actor);
+  const signedAt = new Date();
+  const snapshot = {
+    seal_revocation_id: revocationId,
+    seal_id: sealId,
+    decision,
+    decided_by: actor.id,
+    decided_at: signedAt.toISOString(),
+  };
+  const documentHash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(snapshot))
+    .digest('hex');
+  const signatureValue = crypto
+    .createHash('sha256')
+    .update(`${documentHash}:${actor.id}:${signedAt.getTime()}`)
+    .digest('hex');
+  const transactionId = `REV-${new Date().getFullYear()}-${crypto
+    .randomBytes(4)
+    .toString('hex')
+    .toUpperCase()}`;
+
+  const queryRunner = dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  try {
+    const lockedRows = await queryRunner.query(
+      `SELECT
+         r.id,
+         r.seal_id,
+         r.status,
+         r.requested_by,
+         r.reason,
+         s.seal_code,
+         s.device_id,
+         s.status AS seal_status
+       FROM seal_revocations r
+       JOIN seals s ON s.id = r.seal_id
+       WHERE r.id = $1 AND r.seal_id = $2
+       FOR UPDATE OF r, s`,
+      [revocationId, sealId],
+    );
+
+    if (!Array.isArray(lockedRows) || lockedRows.length === 0) {
+      throw new AppError(
+        `Không tìm thấy yêu cầu thu hồi #${revocationId} của tem #${sealId}.`,
+        404,
+        ERROR_CODES.NOT_FOUND,
+      );
+    }
+
+    const revocation = lockedRows[0];
+
+    if (Number(revocation.requested_by) === Number(actor.id)) {
+      throw new AppError(
+        'Người duyệt phải khác người đã gửi yêu cầu thu hồi.',
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    if (revocation.status !== 'Pending') {
+      throw new AppError(
+        `Yêu cầu thu hồi này đã được xử lý (${revocation.status}).`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    if (decision === 'Approved' && revocation.seal_status === 'Revoked') {
+      throw new AppError(
+        `Tem ${revocation.seal_code} đã bị thu hồi.`,
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    const signatureRows = await queryRunner.query(
+      `SELECT id FROM digital_signatures
+       WHERE seal_revocation_id = $1 AND purpose = 'SealRevocation'
+       LIMIT 1`,
+      [revocationId],
+    );
+
+    if (Array.isArray(signatureRows) && signatureRows.length > 0) {
+      throw new AppError(
+        'Yêu cầu thu hồi này đã có chữ ký số quyết định.',
+        409,
+        ERROR_CODES.CONFLICT,
+      );
+    }
+
+    await queryRunner.query(
+      `INSERT INTO digital_signatures (
+         seal_revocation_id,
+         purpose,
+         signer_id,
+         signer_name,
+         provider,
+         provider_transaction_id,
+         document_hash,
+         signature_value,
+         signature_metadata,
+         status,
+         signed_at,
+         created_at
+       ) VALUES ($1, 'SealRevocation', $2, $3, 'ISOCAL-PKI-SHA256',
+         $4, $5, $6, $7::jsonb, 'Signed', $8, $8)`,
+      [
+        revocationId,
+        actor.id,
+        signerName,
+        transactionId,
+        documentHash,
+        signatureValue,
+        JSON.stringify({
+          purpose: 'SealRevocation',
+          seal_revocation_id: revocationId,
+          seal_id: sealId,
+          seal_code: revocation.seal_code,
+          decision,
+          reason: revocation.reason,
+          snapshot_hash: documentHash,
+          signed_at: signedAt.toISOString(),
+        }),
+        signedAt,
+      ],
+    );
+
+    await queryRunner.query(
+      `UPDATE seal_revocations
+       SET status = $3,
+           decided_by = $4,
+           decided_at = $5,
+           decision_note = $6
+       WHERE id = $1 AND seal_id = $2`,
+      [
+        revocationId,
+        sealId,
+        decision,
+        actor.id,
+        signedAt,
+        decisionNote,
+      ],
+    );
+
+    if (decision === 'Approved') {
+      await queryRunner.query(
+        `UPDATE seals SET status = 'Revoked' WHERE id = $1`,
+        [sealId],
+      );
+
+      // Không có trạng thái "Recalled" trên devices; InRepair là trạng thái
+      // đưa thiết bị ra khỏi vận hành để kiểm tra/đo lại. Chỉ thu hồi thiết bị
+      // nếu không còn tem Active/PendingPayment khác.
+      await queryRunner.query(
+        `UPDATE devices d
+         SET status = 'InRepair'
+         WHERE d.id = $1
+           AND d.status <> 'InRepair'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM seals s
+             WHERE s.device_id = d.id
+               AND s.id <> $2
+               AND s.status IN ('Active', 'PendingPayment')
+           )`,
+        [revocation.device_id, sealId],
+      );
+    }
+
+    await queryRunner.commitTransaction();
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    if (isUniqueViolation(error)) {
+      throw new AppError(
+        'Yêu cầu thu hồi này đã có chữ ký số quyết định.',
         409,
         ERROR_CODES.CONFLICT,
       );
