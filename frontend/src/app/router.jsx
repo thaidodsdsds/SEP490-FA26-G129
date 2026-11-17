@@ -58,6 +58,7 @@ import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
+import SealVerificationPage from '../features/public/SealVerificationPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
 import DeviceListPage from '../features/devices/DeviceListPage.jsx';
 import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
@@ -73,6 +74,9 @@ const publicRoutes = [
   // Standalone Mobile PWA routes for Technician Offline App
   { path: '/mobile/technician', element: <MobileTechnicianApp /> },
   { path: '/mobile', element: <Navigate to="/mobile/technician" replace /> },
+  // Public Seal Verification — khớp URL QR được sinh trên tem/sticker
+  { path: '/verify', element: <SealVerificationPage /> },
+  { path: '/verify/:sealCode', element: <SealVerificationPage /> },
   {
     path: '/',
     element: <PublicLayout />,
