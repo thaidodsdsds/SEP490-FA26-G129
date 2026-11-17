@@ -562,6 +562,79 @@ const loadVerificationLogs = async (sealId: number) => {
   }));
 };
 
+export interface VerificationLogFilter {
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Danh sách lượt tra cứu công khai cho màn hình nội bộ (Admin, Reviewer). */
+export const listVerificationLogs = async (filter: VerificationLogFilter) => {
+  const q = filter.q?.trim() ?? '';
+  const page =
+    Number.isInteger(filter.page) && Number(filter.page) > 0 ? Number(filter.page) : 1;
+  const requestedLimit = Number(filter.limit);
+  const limit =
+    Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 200)
+      : 50;
+  const offset = (page - 1) * limit;
+
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+  if (q) {
+    params.push(`%${q}%`);
+    conditions.push(
+      `(l.seal_code ILIKE $${params.length} OR l.source_ip ILIKE $${params.length} OR l.verification_result ILIKE $${params.length})`,
+    );
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countRows = await dataSource.query(
+    `SELECT COUNT(*)::int AS total
+     FROM seal_verification_logs l
+     ${where}`,
+    params,
+  );
+  const total = Number(Array.isArray(countRows) ? countRows[0]?.total ?? 0 : 0);
+
+  const rows = await dataSource.query(
+    `SELECT
+       l.id,
+       l.seal_id,
+       l.seal_code,
+       l.verification_result,
+       l.source_ip,
+       l.user_agent,
+       l.verified_at,
+       s.status AS seal_status
+     FROM seal_verification_logs l
+     LEFT JOIN seals s ON s.id = l.seal_id
+     ${where}
+     ORDER BY l.verified_at DESC, l.id DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
+  );
+
+  return {
+    items: (Array.isArray(rows) ? rows : []).map((row) => ({
+      id: Number(row.id),
+      seal_id: row.seal_id === null || row.seal_id === undefined ? null : Number(row.seal_id),
+      seal_code: row.seal_code,
+      verification_result: row.verification_result,
+      source_ip: row.source_ip,
+      user_agent: row.user_agent,
+      verified_at: row.verified_at,
+      verified_at_formatted: formatDateTime(row.verified_at),
+      seal_status: row.seal_status ?? null,
+    })),
+    total,
+    page,
+    limit,
+    totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+  };
+};
+
 export const getSealDetail = async (sealId: number, actor?: SealActor) => {
   await expireOverdueSeals();
 

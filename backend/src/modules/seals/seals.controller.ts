@@ -68,6 +68,23 @@ export const listEligibleCertificatesHandler = async (
   }
 };
 
+export const listVerificationLogsHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await service.listVerificationLogs({
+      q: req.query.q ? String(req.query.q) : undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    res.status(200).json(buildSuccessResponse(result));
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getSealDetailHandler = async (
   req: Request,
   res: Response,

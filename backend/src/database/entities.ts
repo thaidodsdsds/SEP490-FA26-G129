@@ -1279,7 +1279,7 @@ export class SealRevocation {
 @Index('IDX_seal_verification_logs_verified_at', ['verified_at'])
 @Check(
   'CHK_seal_verification_logs_result',
-  `"verification_result" IN ('Valid', 'Expired', 'Revoked', 'NotFound')`,
+  `"verification_result" IN ('Valid', 'Invalid', 'Expired', 'Revoked')`,
 )
 export class SealVerificationLog {
   @PrimaryGeneratedColumn()
@@ -1302,7 +1302,7 @@ export class SealVerificationLog {
   seal_code!: string;
 
   @Column({ type: 'varchar', length: 20 })
-  verification_result!: 'Valid' | 'Expired' | 'Revoked' | 'NotFound';
+  verification_result!: 'Valid' | 'Invalid' | 'Expired' | 'Revoked';
 
   @Column({ type: 'varchar', length: 45, nullable: true })
   source_ip!: string | null;
