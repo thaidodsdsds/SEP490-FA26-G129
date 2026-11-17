@@ -88,6 +88,18 @@ function TechnicianPage() {
   const [offlineModalOpen, setOfflineModalOpen] = useState(false);
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [lanIp, setLanIp] = useState('192.168.1.7');
+
+  useEffect(() => {
+    fetch('/api/v1/system/lan-ip')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data?.lanIp) {
+          setLanIp(data.data.lanIp);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // ─── Mobile View State ────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(
@@ -2200,8 +2212,8 @@ function TechnicianPage() {
                   alt="QR Code"
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
                     typeof window !== 'undefined'
-                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? '192.168.1.8' : window.location.hostname}:${window.location.port}/mobile/technician`
-                      : 'http://192.168.1.8:5173/mobile/technician',
+                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                      : `http://${lanIp}:5173/mobile/technician`,
                   )}`}
                   style={{ width: '130px', height: '130px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
                 />
@@ -2229,14 +2241,14 @@ function TechnicianPage() {
                   }}
                 >
                   {typeof window !== 'undefined'
-                    ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? '192.168.1.8' : window.location.hostname}:${window.location.port}/mobile/technician`
-                    : 'http://192.168.1.8:5173/mobile/technician'}
+                    ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                    : `http://${lanIp}:5173/mobile/technician`}
                 </div>
                 <button
                   onClick={() => {
                     const url = typeof window !== 'undefined'
-                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? '192.168.1.8' : window.location.hostname}:${window.location.port}/mobile/technician`
-                      : 'http://192.168.1.8:5173/mobile/technician';
+                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
+                      : `http://${lanIp}:5173/mobile/technician`;
                     navigator.clipboard?.writeText(url);
                     alert('Đã sao chép liên kết vào bộ nhớ tạm!');
                   }}
