@@ -1,3 +1,5 @@
+import path from 'node:path';
+import os from 'node:os';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,14 +22,41 @@ import serviceRequestsRoutes from './modules/service-requests/service-requests.r
 import quotationsRoutes from './modules/quotations/quotations.routes.js';
 import contractsRoutes from './modules/contracts/contracts.routes.js';
 import devicesRoutes from './modules/devices/devices.routes.js';
+import workOrdersRoutes from './modules/work-orders/work-orders.routes.js';
+import uploadsRoutes from './modules/uploads/uploads.routes.js';
+import calibrationRecordsRoutes from './modules/calibration-records/calibration-records.routes.js';
 
 const app = express();
 
-app.use(helmet());
-app.use(cors({ origin: env.frontendUrl, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        origin === env.frontendUrl ||
+        env.nodeEnv !== 'production' ||
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(
+          origin,
+        )
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, env.frontendUrl);
+      }
+    },
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(requestLogger);
+
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.use(`${API_PREFIX}/auth`, authRouter);
 app.use(`${API_PREFIX}/profile`, profileRouter);
@@ -40,6 +69,9 @@ app.use(`${API_PREFIX}/service-requests`, serviceRequestsRoutes);
 app.use(`${API_PREFIX}/quotations`, quotationsRoutes);
 app.use(`${API_PREFIX}/contracts`, contractsRoutes);
 app.use(`${API_PREFIX}/devices`, devicesRoutes);
+app.use(`${API_PREFIX}/work-orders`, workOrdersRoutes);
+app.use(`${API_PREFIX}/uploads`, uploadsRoutes);
+app.use(`${API_PREFIX}/calibration-records`, calibrationRecordsRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {
@@ -53,6 +85,33 @@ app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+app.get(`${API_PREFIX}/system/lan-ip`, (req, res) => {
+  const ifaces = os.networkInterfaces();
+  let lanIp = '192.168.1.7';
+  for (const dev in ifaces) {
+    const list = ifaces[dev];
+    if (list) {
+      for (const details of list) {
+        if (
+          details.family === 'IPv4' &&
+          !details.internal &&
+          (details.address.startsWith('192.168.') ||
+            details.address.startsWith('10.') ||
+            details.address.startsWith('172.'))
+        ) {
+          lanIp = details.address;
+          break;
+        }
+      }
+    }
+  }
+  res.status(200).json(
+    buildSuccessResponse({
+      lanIp,
+    }),
+  );
 });
 
 app.get(`${API_PREFIX}/secure-check`, authenticate, (req, res) => {

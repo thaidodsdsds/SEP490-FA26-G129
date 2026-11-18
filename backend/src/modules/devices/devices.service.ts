@@ -3,7 +3,7 @@ import {
   type SelectQueryBuilder,
 } from 'typeorm';
 import dataSource from '../../database/dataSource.js';
-import { Customer, Device, ServiceRequestItem } from '../../database/entities.js';
+import { Customer, Device, DeviceOwnershipHistory, ServiceRequestItem } from '../../database/entities.js';
 import { AppError } from '../../common/errors.js';
 import { ERROR_CODES } from '../../common/constants.js';
 
@@ -304,12 +304,21 @@ export const getDeviceById = async (
     },
   ];
 
+  // Lấy lịch sử chuyển quyền sở hữu (DeviceOwnershipHistory)
+  const historyRepo = dataSource.getRepository(DeviceOwnershipHistory);
+  const ownershipHistories = await historyRepo.find({
+    where: { device_id: deviceId },
+    relations: ['previous_customer', 'new_customer', 'transferred_by_account'],
+    order: { transferred_at: 'DESC', id: 'DESC' },
+  });
+
   return {
     ...device,
     seal_history: sealHistory,
     calibration_history: calibrationHistory,
     measurement_results: measurementResults,
     certificates,
+    ownership_history: ownershipHistories,
   };
 };
 
@@ -571,4 +580,183 @@ export const updateDevice = async (
       : null,
   };
 };
+
+export interface TransferOwnershipInput {
+  new_customer_id: number;
+  transfer_reason: string;
+  notes?: string | null;
+}
+
+/**
+ * 1. Lấy lịch sử sở hữu của thiết bị (View Device Ownership History):
+ * Cho phép xem thiết bị trước đây thuộc về Customer nào và đã chuyển qua những chủ sở hữu nào.
+ * Phân quyền: Sales, Admin (nội bộ).
+ */
+export const getDeviceOwnershipHistory = async (
+  deviceId: number,
+  requestingUser?: {
+    id?: number;
+    role?: string;
+    customer_id?: number | null;
+  },
+) => {
+  const allowedRoles = ['Sales', 'Admin', 'sales', 'admin'];
+  if (!requestingUser?.role || !allowedRoles.includes(requestingUser.role)) {
+    throw new AppError(
+      'Chỉ nhân viên nội bộ (Sales, Admin) mới có quyền xem lịch sử sở hữu thiết bị.',
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
+  }
+
+  const deviceRepo = dataSource.getRepository(Device);
+  const device = await deviceRepo.findOne({
+    where: { id: deviceId },
+    relations: ['customer'],
+  });
+
+  if (!device) {
+    throw new AppError('Không tìm thấy thiết bị.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  const historyRepo = dataSource.getRepository(DeviceOwnershipHistory);
+  const histories = await historyRepo.find({
+    where: { device_id: deviceId },
+    relations: ['previous_customer', 'new_customer', 'transferred_by_account'],
+    order: { transferred_at: 'DESC', id: 'DESC' },
+  });
+
+  return {
+    device_id: device.id,
+    device_name: device.name,
+    internal_code: device.internal_code,
+    serial_number: device.serial_number,
+    current_owner: {
+      id: device.customer?.id,
+      company_name: device.customer?.company_name,
+      tax_code: device.customer?.tax_code,
+      address: device.customer?.address,
+      industry: device.customer?.industry,
+    },
+    histories: histories.map((h) => ({
+      id: h.id,
+      transferred_at: h.transferred_at,
+      previous_customer: h.previous_customer
+        ? {
+            id: h.previous_customer.id,
+            company_name: h.previous_customer.company_name,
+            tax_code: h.previous_customer.tax_code,
+          }
+        : null,
+      new_customer: {
+        id: h.new_customer?.id,
+        company_name: h.new_customer?.company_name,
+        tax_code: h.new_customer?.tax_code,
+      },
+      transferred_by: h.transferred_by_account
+        ? {
+            id: h.transferred_by_account.id,
+            full_name: h.transferred_by_account.full_name,
+            email: h.transferred_by_account.email,
+          }
+        : null,
+      transfer_reason: h.transfer_reason,
+      notes: h.notes,
+      status: h.status,
+    })),
+  };
+};
+
+/**
+ * 2. Chuyển quyền sở hữu thiết bị (Transfer Device Ownership):
+ * Cho phép chuyển quyền sở hữu một thiết bị từ Customer hiện tại sang Customer mới.
+ * Cập nhật Device và ghi nhận vào DeviceOwnershipHistory.
+ * Phân quyền: Sales, Admin (nội bộ).
+ */
+export const transferDeviceOwnership = async (
+  deviceId: number,
+  input: TransferOwnershipInput,
+  requestingUser?: {
+    id?: number;
+    role?: string;
+    customer_id?: number | null;
+  },
+) => {
+  const allowedRoles = ['Sales', 'Admin', 'sales', 'admin'];
+  if (!requestingUser?.role || !allowedRoles.includes(requestingUser.role)) {
+    throw new AppError(
+      'Chỉ nhân viên nội bộ (Sales, Admin) mới có quyền thực hiện chuyển quyền sở hữu thiết bị.',
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
+  }
+
+  const newCustomerId = Number(input.new_customer_id);
+  if (!Number.isInteger(newCustomerId) || newCustomerId <= 0) {
+    throw new AppError('Khách hàng tiếp nhận sở hữu là bắt buộc.', 400, ERROR_CODES.BAD_REQUEST);
+  }
+
+  const transferReason = input.transfer_reason?.trim();
+  if (!transferReason) {
+    throw new AppError('Lý do chuyển quyền sở hữu là bắt buộc.', 400, ERROR_CODES.BAD_REQUEST);
+  }
+
+  const customerRepo = dataSource.getRepository(Customer);
+  const newCustomer = await customerRepo.findOne({
+    where: { id: newCustomerId },
+  });
+
+  if (!newCustomer) {
+    throw new AppError('Khách hàng mới không tồn tại trong hệ thống.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  const deviceRepo = dataSource.getRepository(Device);
+  const device = await deviceRepo.findOne({
+    where: { id: deviceId },
+    relations: ['customer'],
+  });
+
+  if (!device) {
+    throw new AppError('Không tìm thấy thiết bị.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (device.customer_id === newCustomerId) {
+    throw new AppError(
+      'Khách hàng tiếp nhận trùng với chủ sở hữu hiện tại của thiết bị.',
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  return await dataSource.transaction(async (manager) => {
+    const historyRepo = manager.getRepository(DeviceOwnershipHistory);
+    const historyEntry = historyRepo.create({
+      device_id: device.id,
+      previous_customer_id: device.customer_id,
+      new_customer_id: newCustomerId,
+      transferred_by: requestingUser?.id || null,
+      transferred_at: new Date(),
+      transfer_reason: transferReason,
+      notes: input.notes?.trim() || null,
+      status: 'Completed',
+    });
+
+    const savedHistory = await historyRepo.save(historyEntry);
+
+    device.customer_id = newCustomerId;
+    await manager.save(device);
+
+    const updatedDevice = await manager.getRepository(Device).findOne({
+      where: { id: device.id },
+      relations: ['customer'],
+    });
+
+    return {
+      device: updatedDevice,
+      history: savedHistory,
+      message: `Chuyển quyền sở hữu thiết bị ${device.name} sang khách hàng ${newCustomer.company_name} thành công.`,
+    };
+  });
+};
+
 

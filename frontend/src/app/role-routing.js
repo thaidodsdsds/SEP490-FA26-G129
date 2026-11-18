@@ -2,6 +2,7 @@ const internalRoles = new Set([
   'admin',
   'accountant',
   'sales',
+  'headsales',
   'warehouse',
   'warehousestaff',
   'signatory',
@@ -19,6 +20,18 @@ export function getAccountRole(account) {
   return typeof role === 'string'
     ? role
     : role?.name || role?.code || account?.role_name || account?.role_code || '';
+}
+
+export function isHeadSalesAccount(account) {
+  if (!account) return false;
+  const role = normalizeRole(getAccountRole(account));
+  return role === 'headsales' || role === 'admin' || role === 'ceo';
+}
+
+export function isSalesStaffOnlyAccount(account) {
+  if (!account) return false;
+  const role = normalizeRole(getAccountRole(account));
+  return role === 'sales';
 }
 
 /**
