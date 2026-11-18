@@ -46,8 +46,6 @@ import ReviewQueuePage from '../features/reviewer/features/review-queue/ReviewQu
 import DriftPage from '../features/reviewer/features/drift/DriftPage.jsx';
 import CertificatesPage from '../features/reviewer/features/certificates/CertificatesPage.jsx';
 import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
-import VerificationLogsPage from '../features/reviewer/features/verification-logs/VerificationLogsPage.jsx';
-import SignaturesPage from '../features/reviewer/features/signatures/SignaturesPage.jsx';
 import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
 import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
 import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
@@ -63,6 +61,7 @@ import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
+import SealVerificationPage from '../features/public/SealVerificationPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
 import DeviceListPage from '../features/devices/DeviceListPage.jsx';
 import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
@@ -78,6 +77,9 @@ const publicRoutes = [
   // Standalone Mobile PWA routes for Technician Offline App
   { path: '/mobile/technician', element: <MobileTechnicianApp /> },
   { path: '/mobile', element: <Navigate to="/mobile/technician" replace /> },
+  // Public Seal Verification — khớp URL QR được sinh trên tem/sticker
+  { path: '/verify', element: <SealVerificationPage /> },
+  { path: '/verify/:sealCode', element: <SealVerificationPage /> },
   {
     path: '/',
     element: <PublicLayout />,
@@ -109,6 +111,8 @@ const customerRoutes = [
       { path: 'devices', element: <DeviceListPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'devices/:id', element: <DeviceDetailPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/customer/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/customer/contracts" /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
@@ -163,6 +167,17 @@ const adminRoutes = [
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
+      {
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/admin">
+            <ReviewerWorkspaceProvider />
+          </RoleDashboardGate>
+        ),
+        children: [
+          { path: 'certificates', element: <CertificatesPage /> },
+          { path: 'seals', element: <SealsPage /> },
+        ],
+      },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -261,14 +276,17 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: (
-      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech']} portalType="staff">
         <HeadOfTechLayout />
       </ProtectedRoute>
     ),
     children: [
       {
         element: (
-          <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+          <RoleDashboardGate
+            allowedDashboardPaths={['/internal/head-of-tech', '/internal']}
+            dashboardPath="/internal/head-of-tech"
+          >
             <ReviewerWorkspaceProvider />
           </RoleDashboardGate>
         ),
@@ -289,8 +307,6 @@ const internalRoutes = [
           { path: 'drift', element: <DriftPage /> },
           { path: 'certificates', element: <CertificatesPage /> },
           { path: 'seals', element: <SealsPage /> },
-          { path: 'verification-logs', element: <VerificationLogsPage /> },
-          { path: 'signatures', element: <SignaturesPage /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'warehouse', element: <WarehousePage /> },

@@ -3,9 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import {
   approveContractApi,
   cancelContractApi,
+  customerSignContractApi,
+  downloadSignedContractApi,
   extractApiErrorMessage,
   getContractDetailApi,
   liquidateContractApi,
+  rejectContractApi,
   submitContractApi,
 } from '../../services/contract-service.js';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
@@ -17,6 +20,19 @@ const formatLongDate = (value) => {
   const [year, month, day] = String(value).slice(0, 10).split('-');
   if (!year || !month || !day) return formatDate(value);
   return `ngày ${day} tháng ${month} năm ${year}`;
+};
+
+const formatSignatureTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 };
 
 const PartyBlock = ({ title, party, showBudgetCode = false }) => (
@@ -71,6 +87,9 @@ function ContractDetailPage({ basePath }) {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +122,48 @@ function ContractDetailPage({ basePath }) {
     }
   };
 
+  const submitReject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError('Vui lòng nhập lý do từ chối.');
+      return;
+    }
+
+    setBusy(true);
+    setRejectError('');
+    setActionError('');
+    try {
+      const updated = await rejectContractApi(contract.id, reason);
+      setContract(updated);
+      setRejectOpen(false);
+      setRejectReason('');
+    } catch (rejectFailure) {
+      setRejectError(extractApiErrorMessage(rejectFailure, 'Không thể từ chối hợp đồng.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadSignedPdf = async () => {
+    setBusy(true);
+    setActionError('');
+    try {
+      const blob = await downloadSignedContractApi(contract.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${contract.contract_code}-signed.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (downloadFailure) {
+      setActionError(extractApiErrorMessage(downloadFailure, 'Không tải được PDF đã ký.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="dash-page ct-page ct-empty">Đang tải hợp đồng…</div>;
   }
@@ -117,6 +178,13 @@ function ContractDetailPage({ basePath }) {
       </div>
     );
   }
+
+  const signatures = contract.signatures ?? [];
+  const companySignature = signatures.find((signature) => signature.purpose === 'CompanyApproval') ?? null;
+  const customerSignature = signatures.find((signature) => signature.purpose === 'CustomerApproval') ?? null;
+
+  // show_cancel: hiện nút Huỷ ở dạng xám khi hợp đồng đã ký (không cho bấm)
+  const showCancelButton = contract.show_cancel ?? contract.can_cancel;
 
   const travelFee = Number(contract.travel_fee) || 0;
   const travelTax = Math.round((travelFee * 8) / 100);
@@ -138,6 +206,17 @@ function ContractDetailPage({ basePath }) {
           <button className="button button-secondary" onClick={() => window.print()} type="button">
             In / Xuất PDF
           </button>
+
+          {contract.signed_file_url ? (
+            <button
+              className="button button-primary"
+              disabled={busy}
+              onClick={downloadSignedPdf}
+              type="button"
+            >
+              Tải PDF đã ký
+            </button>
+          ) : null}
 
           {contract.can_edit && (
             <Link className="button button-secondary" to={`${basePath}/${contract.id}/edit`}>
@@ -162,10 +241,44 @@ function ContractDetailPage({ basePath }) {
             <button
               className="button button-success"
               disabled={busy}
-              onClick={() => runAction(approveContractApi, 'Duyệt hợp đồng này?')}
+              onClick={() =>
+                runAction(approveContractApi, 'Duyệt và ký số cho Bên B? Hợp đồng sẽ chuyển sang trạng thái Đã duyệt.')
+              }
               type="button"
             >
-              Duyệt hợp đồng
+              Duyệt &amp; Ký số
+            </button>
+          )}
+
+          {contract.can_reject && (
+            <button
+              className="button button-danger"
+              disabled={busy}
+              onClick={() => {
+                setRejectReason('');
+                setRejectError('');
+                setActionError('');
+                setRejectOpen(true);
+              }}
+              type="button"
+            >
+              Từ chối
+            </button>
+          )}
+
+          {contract.can_sign_customer && (
+            <button
+              className="button button-success"
+              disabled={busy}
+              onClick={() =>
+                runAction(
+                  customerSignContractApi,
+                  'Ký xác nhận hợp đồng với tư cách Bên A? Sau khi ký, hợp đồng không thể chỉnh sửa.',
+                )
+              }
+              type="button"
+            >
+              Ký xác nhận (Bên A)
             </button>
           )}
 
@@ -180,10 +293,15 @@ function ContractDetailPage({ basePath }) {
             </button>
           )}
 
-          {contract.can_cancel && (
+          {showCancelButton && (
             <button
               className="button button-danger"
-              disabled={busy}
+              disabled={busy || !contract.can_cancel}
+              title={
+                contract.can_cancel
+                  ? undefined
+                  : 'Không thể huỷ: hợp đồng đã được ký, đã huỷ hoặc đã thanh lý.'
+              }
               onClick={() =>
                 runAction(
                   cancelContractApi,
@@ -198,7 +316,62 @@ function ContractDetailPage({ basePath }) {
         </div>
       </div>
 
+      {rejectOpen && (
+        <div className="ct-modal-backdrop ct-no-print">
+          <div
+            aria-labelledby="ct-reject-title"
+            aria-modal="true"
+            className="ct-modal"
+            role="dialog"
+          >
+            <h3 id="ct-reject-title">Từ chối hợp đồng</h3>
+            <p>
+              Hợp đồng {contract.contract_code} sẽ chuyển sang trạng thái Bị từ chối. Vui lòng nêu
+              rõ lý do để Bên A biết cần điều chỉnh gì.
+            </p>
+            <textarea
+              aria-label="Lý do từ chối hợp đồng"
+              autoFocus
+              maxLength={1000}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Ví dụ: Phạm vi công việc chưa khớp với báo giá..."
+              value={rejectReason}
+            />
+            {rejectError ? (
+              <p className="ct-error-banner" role="alert">
+                {rejectError}
+              </p>
+            ) : null}
+            <div className="ct-modal-actions">
+              <button
+                className="button button-secondary"
+                disabled={busy}
+                onClick={() => {
+                  setRejectOpen(false);
+                  setRejectError('');
+                }}
+                type="button"
+              >
+                Huỷ
+              </button>
+              <button
+                className="button button-danger"
+                disabled={busy}
+                onClick={submitReject}
+                type="button"
+              >
+                {busy ? 'Đang xử lý…' : 'Xác nhận từ chối'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {actionError && <div className="ct-error-banner ct-no-print">{actionError}</div>}
+
+      {contract.status === 'Rejected' && contract.rejection_reason ? (
+        <div className="ct-error-banner">Lý do từ chối: {contract.rejection_reason}</div>
+      ) : null}
 
       <article className="ct-document">
         <div className="ct-doc-top">
@@ -267,7 +440,7 @@ function ContractDetailPage({ basePath }) {
               </tr>
             </thead>
             <tbody>
-              {contract.items.map((item) => (
+              {(contract.items ?? []).map((item) => (
                 <tr key={item.id || item.line_no}>
                   <td className="center">{item.line_no}</td>
                   <td>
@@ -414,15 +587,37 @@ function ContractDetailPage({ basePath }) {
           <div className="ct-signature-box">
             <strong>Đại diện Bên A</strong>
             <small>(Ký, ghi rõ họ tên, đóng dấu)</small>
-            <div className="ct-signature-space" />
-            <div className="ct-signature-name">{contract.party_a.representative || '........................................'}</div>
+            <div className={`ct-signature-space${customerSignature ? ' has-signature' : ''}`}>
+              {customerSignature ? (
+                <div className="ct-signature-stamp">
+                  <span className="ct-signature-script">{customerSignature.signer_name}</span>
+                  <span className="ct-signature-verified">Đã ký số</span>
+                  <small>{formatSignatureTime(customerSignature.signed_at)}</small>
+                  <small>{customerSignature.provider_transaction_id}</small>
+                </div>
+              ) : null}
+            </div>
+            <div className="ct-signature-name">
+              {customerSignature?.signer_name || contract.party_a.representative || '........................................'}
+            </div>
             {contract.party_a.position ? <small>{contract.party_a.position}</small> : null}
           </div>
           <div className="ct-signature-box">
             <strong>Đại diện Bên B</strong>
             <small>(Ký, ghi rõ họ tên, đóng dấu)</small>
-            <div className="ct-signature-space" />
-            <div className="ct-signature-name">{contract.party_b.representative || '........................................'}</div>
+            <div className={`ct-signature-space${companySignature ? ' has-signature' : ''}`}>
+              {companySignature ? (
+                <div className="ct-signature-stamp">
+                  <span className="ct-signature-script">{companySignature.signer_name}</span>
+                  <span className="ct-signature-verified">Đã ký số</span>
+                  <small>{formatSignatureTime(companySignature.signed_at)}</small>
+                  <small>{companySignature.provider_transaction_id}</small>
+                </div>
+              ) : null}
+            </div>
+            <div className="ct-signature-name">
+              {companySignature?.signer_name || contract.party_b.representative || '........................................'}
+            </div>
             {contract.party_b.position ? <small>{contract.party_b.position}</small> : null}
           </div>
         </div>

@@ -170,14 +170,6 @@ export const verifyCalibrationSignatureApi = async (serviceRequestItemId) => {
 };
 
 /**
- * Lấy danh sách nhật ký chữ ký số từ CSDL
- */
-export const getDigitalSignaturesApi = async () => {
-  const response = await apiClient.get('/work-orders/digital-signatures');
-  return response.data?.data ?? [];
-};
-
-/**
  * Tính mã băm SHA-256 trên trình duyệt (Web Crypto API) cho dữ liệu biên bản đo của KTV
  */
 export const computeClientTaskSha256 = async (task) => {

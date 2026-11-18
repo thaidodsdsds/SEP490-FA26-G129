@@ -25,8 +25,14 @@ import devicesRoutes from './modules/devices/devices.routes.js';
 import workOrdersRoutes from './modules/work-orders/work-orders.routes.js';
 import uploadsRoutes from './modules/uploads/uploads.routes.js';
 import calibrationRecordsRoutes from './modules/calibration-records/calibration-records.routes.js';
+import certificatesRoutes from './modules/certificates/certificates.routes.js';
+import sealsRoutes from './modules/seals/seals.routes.js';
+import verificationRoutes from './modules/verification/verification.routes.js';
 
 const app = express();
+
+// Lấy đúng IP client khi chạy sau reverse proxy cho SealVerificationLog.source_ip.
+app.set('trust proxy', 1);
 
 app.use(
   helmet({
@@ -72,6 +78,9 @@ app.use(`${API_PREFIX}/devices`, devicesRoutes);
 app.use(`${API_PREFIX}/work-orders`, workOrdersRoutes);
 app.use(`${API_PREFIX}/uploads`, uploadsRoutes);
 app.use(`${API_PREFIX}/calibration-records`, calibrationRecordsRoutes);
+app.use(`${API_PREFIX}/certificates`, certificatesRoutes);
+app.use(`${API_PREFIX}/seals`, sealsRoutes);
+app.use(`${API_PREFIX}/verify`, verificationRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {

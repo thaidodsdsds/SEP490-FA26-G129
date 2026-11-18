@@ -28,6 +28,15 @@
   gap: 10px;
 }
 
+/* Nút huỷ hợp đồng khi bị khoá (đã ký / không đủ quyền) → xám và không bấm được */
+.ct-action-right .button-danger:disabled {
+  border-color: #d8e0e7;
+  background: #eef2f5;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .ct-back-link {
   display: inline-flex;
   align-items: center;
@@ -545,6 +554,42 @@
 
 .ct-signature-space {
   height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ct-signature-space.has-signature {
+  border-bottom: 1px dashed #bfdbfe;
+}
+
+.ct-signature-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.ct-signature-script {
+  font-family: 'Segoe Script', 'Brush Script MT', 'Lucida Handwriting', cursive;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.ct-signature-verified {
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #047857;
+}
+
+.ct-signature-stamp small {
+  color: #6b7280;
+  font-size: 0.64rem;
+  font-style: normal;
 }
 
 .ct-signature-name {
@@ -556,6 +601,56 @@
   margin: 0 0 10px;
   font-size: 0.78rem;
   font-style: italic;
+}
+
+/* ---------- Reject reason modal ---------- */
+.ct-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.ct-modal {
+  width: min(480px, 100%);
+  padding: 20px;
+  border: 1px solid #dce6ed;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.ct-modal h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.ct-modal p {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.ct-modal textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.ct-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 /* ---------- Responsive ---------- */

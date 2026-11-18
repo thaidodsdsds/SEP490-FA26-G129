@@ -61,6 +61,7 @@ export function getRoleDashboardPath(account) {
   if (role === 'admin' || role.includes('quantri')) return '/internal/admin';
   if (role === 'accountant' || role.includes('ketoan')) return '/internal/accountant';
   if (role === 'technician') return '/internal/technician';
+  if (role === 'ceo' || role === 'signatory') return '/internal/head-of-tech';
   if (role === 'sales' || role.includes('kinhdoanh') || role.includes('sales')) return '/internal/sales';
   if (
     role === 'warehouse'

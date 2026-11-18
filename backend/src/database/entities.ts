@@ -1,3 +1,1327 @@
+import {
+  Check,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  PrimaryColumn,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
+
+// ==================== ROLE ====================
+
+@Entity({ name: 'roles' })
+export class Role {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 100, unique: true })
+  name!: string;
+
+  @OneToMany(() => Account, (account) => account.role)
+  accounts!: Account[];
+}
+
+// ==================== CUSTOMER ====================
+
+@Entity({ name: 'customers' })
+export class Customer {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  company_name!: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tax_code!: string | null;
+
+  @Column({ type: 'text' })
+  address!: string;
+
+  @Column({ type: 'varchar', length: 100 })
+  industry!: string;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'assigned_sales_id' })
+  assigned_sales!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  assigned_sales_id!: number | null;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'assigned_by' })
+  assigned_by_account!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  assigned_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  assigned_at!: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToMany(() => Account, (account) => account.customer)
+  accounts!: Account[];
+
+  @OneToMany(() => Device, (device) => device.customer)
+  devices!: Device[];
+
+  @OneToMany(
+    () => ServiceRequest,
+    (serviceRequest) => serviceRequest.customer,
+  )
+  service_requests!: ServiceRequest[];
+}
+
+// ==================== ACCOUNT ====================
+
+@Entity({ name: 'accounts' })
+export class Account {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Role, (role) => role.accounts, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'role_id' })
+  role!: Role;
+
+  @Column({ type: 'integer' })
+  role_id!: number;
+
+  @ManyToOne(() => Customer, (customer) => customer.accounts, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'customer_id' })
+  customer!: Customer | null;
+
+  @Column({ type: 'integer', nullable: true })
+  customer_id!: number | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  full_name!: string;
+
+  @Column({ type: 'varchar', length: 320, unique: true })
+  email!: string;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  phone!: string | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  password_hash!: string;
+
+  @Column({ type: 'boolean', default: false })
+  is_2fa_enabled!: boolean;
+
+  @Column({ type: 'integer', default: 0 })
+  failed_login_attempts!: number;
+
+  @OneToMany(
+    () => ServiceRequest,
+    (serviceRequest) => serviceRequest.created_by_account,
+  )
+  created_service_requests!: ServiceRequest[];
+}
+
+// ==================== SERVICE TYPE ====================
+
+@Entity({ name: 'service_types' })
+@Index('IDX_service_types_field', ['field'])
+@Index('IDX_service_types_status', ['status'])
+@Unique('service_types_standard_code_key', ['standard_code'])
+@Check('service_types_kind_check', `"kind" IN ('Calibration', 'Verification', 'Repair')`)
+@Check(
+  'service_types_field_check',
+  `"field" IN ('DIEN', 'KHOILUONG', 'DODAI', 'APSUAT', 'NHIET', 'HOA', 'QUANG', 'DET')`,
+)
+@Check('service_types_status_check', `"status" IN ('Active', 'Inactive')`)
+export class ServiceType {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 150 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  kind!: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  field!: string;
+
+  @Column({ type: 'varchar', length: 100 })
+  standard_code!: string;
+
+  @Column({ type: 'text', nullable: true })
+  measuring_range!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Active' })
+  status!: string;
+
+  @OneToMany(
+    () => ServiceRequestItem,
+    (item) => item.service_type,
+  )
+  service_request_items!: ServiceRequestItem[];
+
+ 
+
+  @OneToMany(
+    () => CalibrationProcedure,
+    (procedure) => procedure.service_type,
+  )
+  calibration_procedures!: CalibrationProcedure[];
+}
+
+// ==================== DEVICE ====================
+
+@Entity({ name: 'devices' })
+@Index('IDX_devices_customer_id', ['customer_id'])
+@Index('IDX_devices_status', ['status'])
+@Index('UQ_devices_serial_number', ['serial_number'], {
+  unique: true,
+  where: `"serial_number" IS NOT NULL AND "serial_number" <> ''`,
+})
+@Check(
+  'devices_status_check',
+  `"status" IN ('Active', 'ExpiringSoon', 'Expired', 'InRepair')`,
+)
+export class Device {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Customer, (customer) => customer.devices, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'customer_id', foreignKeyConstraintName: 'FK_devices_customer' })
+  customer!: Customer;
+
+  @Column({ type: 'integer' })
+  customer_id!: number;
+
+  @Column({ type: 'varchar', length: 150 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  model!: string | null;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  manufacturer!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  serial_number!: string | null;
+
+  @Column({ type: 'varchar', length: 50, unique: true })
+  internal_code!: string;
+
+  @Column({ type: 'text', nullable: true })
+  measuring_range!: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  is_group2!: boolean;
+
+  @Column({ type: 'date', nullable: true })
+  next_due_date!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Active' })
+  status!: string;
+
+  @OneToMany(
+    () => ServiceRequestItem,
+    (item) => item.device,
+  )
+  service_request_items!: ServiceRequestItem[];
+
+  @OneToMany(
+    () => DeviceOwnershipHistory,
+    (history) => history.device,
+  )
+  ownership_histories!: DeviceOwnershipHistory[];
+}
+
+// ==================== DEVICE OWNERSHIP HISTORY ====================
+
+@Entity({ name: 'device_ownership_histories' })
+@Index('IDX_device_ownership_histories_device_id', ['device_id'])
+@Index('IDX_device_ownership_histories_prev_customer', ['previous_customer_id'])
+@Index('IDX_device_ownership_histories_new_customer', ['new_customer_id'])
+export class DeviceOwnershipHistory {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @ManyToOne(() => Device, (device) => device.ownership_histories, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'device_id', foreignKeyConstraintName: 'FK_device_ownership_histories_device' })
+  device!: Device;
+
+  @Column({ type: 'integer', nullable: true })
+  previous_customer_id!: number | null;
+
+  @ManyToOne(() => Customer, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'previous_customer_id',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_prev_customer',
+  })
+  previous_customer!: Customer | null;
+
+  @Column({ type: 'integer' })
+  new_customer_id!: number;
+
+  @ManyToOne(() => Customer, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'new_customer_id',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_new_customer',
+  })
+  new_customer!: Customer;
+
+  @Column({ type: 'integer', nullable: true })
+  transferred_by!: number | null;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'transferred_by',
+    foreignKeyConstraintName: 'FK_device_ownership_histories_transferred_by',
+  })
+  transferred_by_account!: Account | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  transferred_at!: Date;
+
+  @Column({ type: 'text' })
+  transfer_reason!: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
+  @Column({ type: 'varchar', length: 50, default: 'Completed' })
+  status!: string;
+}
+
+// ==================== DEVICE TYPE ====================
+
+
+
+// ==================== CALIBRATION PROCEDURE ====================
+
+@Entity({ name: 'calibration_procedures' })
+@Index('IDX_calibration_procedures_service_type_id', ['service_type_id'])
+@Index('IDX_calibration_procedures_status', ['status'])
+@Index('UQ_calibration_procedures_one_active', ['service_type_id'], {
+  unique: true,
+  where: `"status" = 'Active'`,
+})
+@Unique(
+  'UQ_calibration_procedures_service_version',
+  ['service_type_id', 'version'],
+)
+@Check(
+  'CHK_calibration_procedures_status',
+  `"status" IN ('Draft', 'Active', 'Obsolete')`,
+)
+export class CalibrationProcedure {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => ServiceType,
+    (serviceType) => serviceType.calibration_procedures,
+    { nullable: false, onDelete: 'RESTRICT', onUpdate: 'CASCADE' },
+  )
+  @JoinColumn({
+    name: 'service_type_id',
+    foreignKeyConstraintName: 'FK_calibration_procedures_service_type',
+  })
+  service_type!: ServiceType;
+
+  @Column({ type: 'integer' })
+  service_type_id!: number;
+
+  @Column({ type: 'varchar', length: 20 })
+  version!: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  environment_requirement!: Record<string, unknown> | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  required_equipment!: Record<string, unknown> | null;
+
+  @Column({ type: 'date', nullable: true })
+  effective_from!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Draft' })
+  status!: string;
+
+}
+
+// ==================== SERVICE REQUEST ====================
+
+@Entity({ name: 'service_requests' })
+@Index('IDX_service_requests_customer_id', ['customer_id'])
+@Index('IDX_service_requests_created_by', ['created_by'])
+@Check(
+  'service_requests_location_type_check',
+  `"location_type" IN ('In-lab', 'On-site')`,
+)
+@Check(
+  'service_requests_status_check',
+  `"status" IN ('New', 'Quoted', 'Confirmed', 'InProgress', 'Completed', 'Cancelled')`,
+)
+export class ServiceRequest {
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  request_code!: string | null;
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => Customer,
+    (customer) => customer.service_requests,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({ name: 'customer_id', foreignKeyConstraintName: 'FK_service_requests_customer' })
+  customer!: Customer;
+
+  @Column({ type: 'integer' })
+  customer_id!: number;
+
+  @ManyToOne(
+    () => Account,
+    (account) => account.created_service_requests,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({ name: 'created_by', foreignKeyConstraintName: 'FK_service_requests_created_by' })
+  created_by_account!: Account;
+
+  @Column({ type: 'integer' })
+  created_by!: number;
+
+  @Column({ type: 'varchar', length: 20 })
+  location_type!: string;
+
+  @Column({ type: 'date', nullable: true })
+  preferred_date!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  special_notes!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  accessories_note!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'New' })
+  status!: string;
+
+  @CreateDateColumn({ type: 'timestamp' })
+  created_at!: Date;
+
+  @OneToMany(
+    () => ServiceRequestItem,
+    (item) => item.service_request,
+  )
+  items!: ServiceRequestItem[];
+
+  @OneToMany(
+    () => Quotation,
+    (quotation) => quotation.service_request,
+  )
+  quotations!: Quotation[];
+
+  @OneToMany(
+    () => Attachment,
+    (attachment) => attachment.service_request,
+  )
+  attachments!: Attachment[];
+}
+
+// ==================== SERVICE REQUEST ITEM ====================
+
+@Entity({ name: 'service_request_items' })
+@Index('IDX_service_request_items_service_request_id', ['service_request_id'])
+@Index('IDX_service_request_items_device_id', ['device_id'])
+@Index('IDX_service_request_items_service_type_id', ['service_type_id'])
+@Check(
+'service_request_items_status_check',
+`"status" IN ('Pending', 'Inspected', 'Done', 'Rejected')`,
+)
+export class ServiceRequestItem {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => ServiceRequest,
+    (serviceRequest) => serviceRequest.items,
+    { nullable: false, onDelete: 'CASCADE' },
+  )
+  @JoinColumn({
+    name: 'service_request_id',
+    foreignKeyConstraintName: 'FK_service_request_items_service_request',
+  })
+  service_request!: ServiceRequest;
+
+  @Column({ type: 'integer' })
+  service_request_id!: number;
+
+  @ManyToOne(
+    () => Device,
+    (device) => device.service_request_items,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({ name: 'device_id', foreignKeyConstraintName: 'FK_service_request_items_device' })
+  device!: Device;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @ManyToOne(
+    () => ServiceType,
+    (serviceType) => serviceType.service_request_items,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({ name: 'service_type_id', foreignKeyConstraintName: 'FK_service_request_items_service_type' })
+  service_type!: ServiceType;
+
+  @Column({ type: 'integer' })
+  service_type_id!: number;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: string;
+
+  @OneToMany(
+    () => QuotationLineItem,
+    (lineItem) => lineItem.service_request_item,
+  )
+  quotation_line_items!: QuotationLineItem[];
+}
+
+// ==================== QUOTATION ====================
+
+@Entity({ name: 'quotations' })
+@Index('IDX_quotations_service_request_id', ['service_request_id'])
+@Index('IDX_quotations_status', ['status'])
+@Check('quotations_subtotal_check', '"subtotal" >= 0')
+@Check('quotations_discount_amount_check', '"discount_amount" >= 0')
+@Check('quotations_travel_fee_check', '"travel_fee" >= 0')
+@Check('quotations_total_amount_check', '"total_amount" >= 0')
+@Check('CHK_quotations_discount_not_exceed_subtotal', '"discount_amount" <= "subtotal"')
+@Check(
+  'CHK_quotations_total_amount',
+  '"total_amount" = "subtotal" - "discount_amount" + "travel_fee"',
+)
+@Check(
+  'quotations_status_check',
+  `"status" IN ('Draft', 'PendingApproval', 'Sent', 'Approved', 'Rejected')`,
+)
+export class Quotation {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => ServiceRequest,
+    (serviceRequest) => serviceRequest.quotations,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({
+    name: 'service_request_id',
+    foreignKeyConstraintName: 'FK_quotations_service_request',
+  })
+  service_request!: ServiceRequest;
+
+  @Column({ type: 'integer' })
+  service_request_id!: number;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  subtotal!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  travel_fee!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  total_amount!: string;
+
+  @Column({ type: 'date', nullable: true })
+  estimated_completion_date!: string | null;
+
+  @Column({ type: 'varchar', length: 30, default: 'Draft' })
+  status!: string;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'created_by' })
+  created_by_account!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  created_by!: number | null;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'head_sales_reviewed_by' })
+  head_sales_reviewer!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  head_sales_reviewed_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  head_sales_reviewed_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  head_sales_note!: string | null;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  head_sales_decision!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  customer_reject_reason!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  customer_responded_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  sales_submission_note!: string | null;
+
+  @Column({ type: 'integer', default: 0 })
+  submission_count!: number;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, nullable: true })
+  last_rejected_total!: string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, nullable: true })
+  last_rejected_discount!: string | null;
+
+  @OneToMany(
+    () => QuotationLineItem,
+    (lineItem) => lineItem.quotation,
+  )
+  line_items!: QuotationLineItem[];
+}
+
+// ==================== QUOTATION LINE ITEM ====================
+
+@Entity({ name: 'quotation_line_items' })
+@Unique(
+  'uq_quotation_line_items_quotation_request_item',
+  ['quotation_id', 'service_request_item_id'],
+)
+@Index('idx_quotation_line_items_quotation_id', ['quotation_id'])
+@Index(
+  'idx_quotation_line_items_service_request_item_id',
+  ['service_request_item_id'],
+)
+@Check(
+  'chk_quotation_line_items_unit_price',
+  '"unit_price" >= 0',
+)
+@Check(
+  'chk_quotation_line_items_discount',
+  '"discount_amount" >= 0 AND "discount_amount" <= "unit_price"',
+)
+export class QuotationLineItem {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => Quotation,
+    (quotation) => quotation.line_items,
+    { nullable: false, onDelete: 'CASCADE' },
+  )
+  @JoinColumn({ name: 'quotation_id', foreignKeyConstraintName: 'fk_quotation_line_items_quotation' })
+  quotation!: Quotation;
+
+  @Column({ type: 'integer' })
+  quotation_id!: number;
+
+  @ManyToOne(
+    () => ServiceRequestItem,
+    (item) => item.quotation_line_items,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({
+    name: 'service_request_item_id',
+    foreignKeyConstraintName: 'fk_quotation_line_items_service_request_item',
+  })
+  service_request_item!: ServiceRequestItem;
+
+  @Column({ type: 'integer' })
+  service_request_item_id!: number;
+
+  @Column({ type: 'text' })
+  description!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2 })
+  unit_price!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+}
+
+// ==================== ATTACHMENT ====================
+
+@Entity({ name: 'attachments' })
+@Index('idx_attachments_service_request_id', ['service_request_id'])
+export class Attachment {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(
+    () => ServiceRequest,
+    (serviceRequest) => serviceRequest.attachments,
+    { nullable: false, onDelete: 'RESTRICT' },
+  )
+  @JoinColumn({
+    name: 'service_request_id',
+    foreignKeyConstraintName: 'fk_attachments_service_request',
+  })
+  service_request!: ServiceRequest;
+
+  @Column({ type: 'integer' })
+  service_request_id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  file_name!: string;
+
+  @Column({ type: 'text' })
+  file_url!: string;
+
+  @CreateDateColumn({ type: 'timestamp' })
+  uploaded_at!: Date;
+}
+
+// ==================== COMPANY PROFILE (Bên B) ====================
+
+@Entity({ name: 'company_profiles' })
+export class CompanyProfile {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  bank_name!: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  is_default!: boolean;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+}
+
+// ==================== CONTRACT ====================
+
+@Entity({ name: 'contracts' })
+@Unique('UQ_contracts_contract_code', ['contract_code'])
+@Index('IDX_contracts_customer_id', ['customer_id'])
+@Index('IDX_contracts_status', ['status'])
+export class Contract {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  contract_code!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Service' })
+  contract_type!: string;
+
+  @ManyToOne(() => Quotation, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'quotation_id',
+    foreignKeyConstraintName: 'FK_contracts_quotation',
+  })
+  quotation!: Quotation | null;
+
+  @Column({ type: 'integer', nullable: true })
+  quotation_id!: number | null;
+
+  @ManyToOne(() => Customer, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'customer_id',
+    foreignKeyConstraintName: 'FK_contracts_customer',
+  })
+  customer!: Customer;
+
+  @Column({ type: 'integer' })
+  customer_id!: number;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  title!: string;
+
+  @Column({ type: 'date', nullable: true })
+  sign_date!: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  start_date!: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  end_date!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  duration_days!: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  location!: string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  subtotal!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  travel_fee!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  tax_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  total_amount!: string;
+
+  @Column({ type: 'text', nullable: true })
+  total_in_words!: string | null;
+
+  @Column({ type: 'integer', default: 30 })
+  payment_term_days!: number;
+
+  @Column({ type: 'text', nullable: true })
+  legal_basis!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Draft' })
+  status!: string;
+
+  @Column({ type: 'text', nullable: true })
+  rejection_reason!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  rejected_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  rejected_at!: Date | null;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  party_a_name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  party_a_representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_a_position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  party_a_address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_a_bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  party_a_bank_name!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_a_budget_code!: string | null;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  party_b_name!: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  party_b_representative!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_b_position!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  party_b_address!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_phone!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_fax!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  party_b_tax_code!: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  party_b_bank_account!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  party_b_bank_name!: string | null;
+
+  @Column({ type: 'integer' })
+  created_by!: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  submitted_at!: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  approved_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  approved_at!: Date | null;
+
+  @Column({ type: 'integer', nullable: true })
+  liquidated_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  liquidated_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  draft_file_url!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  signed_file_url!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  committed_years!: number | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, nullable: true })
+  credit_limit!: string | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  updated_at!: Date;
+
+  @OneToMany(() => ContractItem, (item) => item.contract)
+  items!: ContractItem[];
+}
+
+// ==================== CONTRACT ITEM ====================
+
+@Entity({ name: 'contract_items' })
+@Index('IDX_contract_items_contract_id', ['contract_id'])
+export class ContractItem {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Contract, (contract) => contract.items, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'contract_id',
+    foreignKeyConstraintName: 'FK_contract_items_contract',
+  })
+  contract!: Contract;
+
+  @Column({ type: 'integer' })
+  contract_id!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  service_request_item_id!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  quotation_line_item_id!: number | null;
+
+  @Column({ type: 'integer', default: 1 })
+  line_no!: number;
+
+  @Column({ type: 'varchar', length: 255 })
+  name!: string;
+
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  location!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  execution_time!: string | null;
+
+  @Column({ type: 'numeric', precision: 12, scale: 3, default: 1 })
+  quantity!: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  unit!: string | null;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  unit_price!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  discount_amount!: string;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 5 })
+  tax_rate!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  tax_amount!: string;
+
+  @Column({ type: 'numeric', precision: 15, scale: 2, default: 0 })
+  amount!: string;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+}
+
+// ==================== DIGITAL SIGNATURE ====================
+
+@Entity({ name: 'digital_signatures' })
+@Index('IDX_digital_signatures_contract_id', ['contract_id'])
+@Index('IDX_digital_signatures_calibration_record_id', ['calibration_record_id'])
+@Index('IDX_digital_signatures_certificate_id', ['certificate_id'])
+@Index('IDX_digital_signatures_seal_revocation_id', ['seal_revocation_id'])
+@Index('IDX_digital_signatures_signer_id', ['signer_id'])
+@Index('IDX_digital_signatures_status', ['status'])
+@Unique('UQ_digital_signatures_contract_purpose', ['contract_id', 'purpose'])
+export class DigitalSignature {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Contract, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({
+    name: 'contract_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_contract',
+  })
+  contract!: Contract | null;
+
+  @Column({ type: 'integer', nullable: true })
+  contract_id!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  calibration_record_id!: number | null;
+
+  @ManyToOne(() => Certificate, (certificate) => certificate.signatures, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'certificate_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_certificate',
+  })
+  certificate!: Certificate | null;
+
+  @Column({ type: 'integer', nullable: true })
+  certificate_id!: number | null;
+
+  @ManyToOne(() => SealRevocation, (revocation) => revocation.signatures, {
+    nullable: true,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'seal_revocation_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_seal_revocation',
+  })
+  seal_revocation!: SealRevocation | null;
+
+  @Column({ type: 'integer', nullable: true })
+  seal_revocation_id!: number | null;
+
+  @Column({ type: 'varchar', length: 30 })
+  purpose!: string;
+
+  @Column({ type: 'integer' })
+  signer_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'signer_id',
+    foreignKeyConstraintName: 'FK_digital_signatures_signer',
+  })
+  signer!: Account;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  signer_name!: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  provider!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  provider_transaction_id!: string | null;
+
+  @Column({ type: 'varchar', length: 255 })
+  document_hash!: string;
+
+  @Column({ type: 'text', nullable: true })
+  signature_value!: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  signature_metadata!: Record<string, unknown> | null;
+
+  @Column({ type: 'text', nullable: true })
+  signed_file_url!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  signed_at!: Date | null;
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  created_at!: Date;
+}
+
+// ==================== CERTIFICATE ====================
+
+@Entity({ name: 'certificates' })
+@Index('IDX_certificates_calibration_record_id', ['calibration_record_id'])
+@Index('IDX_certificates_status', ['status'])
+@Unique('UQ_certificates_certificate_no', ['certificate_no'])
+@Check(
+  'CHK_certificates_status',
+  `"status" IN ('Draft', 'PendingPayment', 'Released')`,
+)
+export class Certificate {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => CalibrationRecord, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'calibration_record_id',
+    foreignKeyConstraintName: 'FK_certificates_calibration_record',
+  })
+  calibration_record!: CalibrationRecord;
+
+  @Column({ type: 'integer' })
+  calibration_record_id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  certificate_no!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Draft' })
+  status!: 'Draft' | 'PendingPayment' | 'Released';
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  file_url!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  issued_at!: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToOne(() => Seal, (seal) => seal.certificate)
+  seal!: Seal | null;
+
+  @OneToMany(() => DigitalSignature, (signature) => signature.certificate)
+  signatures!: DigitalSignature[];
+}
+
+// ==================== SEAL ====================
+
+@Entity({ name: 'seals' })
+@Index('IDX_seals_device_id', ['device_id'])
+@Index('IDX_seals_status', ['status'])
+@Index('IDX_seals_due_date', ['due_date'])
+@Unique('UQ_seals_seal_code', ['seal_code'])
+@Unique('UQ_seals_certificate_id', ['certificate_id'])
+@Check(
+  'CHK_seals_status',
+  `"status" IN ('PendingPayment', 'Active', 'Expired', 'Revoked')`,
+)
+@Check('CHK_seals_dates', `"due_date" >= "cal_date"`)
+export class Seal {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Device, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'device_id',
+    foreignKeyConstraintName: 'FK_seals_device',
+  })
+  device!: Device;
+
+  @Column({ type: 'integer' })
+  device_id!: number;
+
+  @OneToOne(() => Certificate, (certificate) => certificate.seal, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'certificate_id',
+    foreignKeyConstraintName: 'FK_seals_certificate',
+  })
+  certificate!: Certificate;
+
+  @Column({ type: 'integer' })
+  certificate_id!: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  seal_code!: string;
+
+  @Column({ type: 'date' })
+  cal_date!: string;
+
+  @Column({ type: 'date' })
+  due_date!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Active' })
+  status!: 'PendingPayment' | 'Active' | 'Expired' | 'Revoked';
+
+  @Column({ type: 'timestamptz', default: () => 'NOW()' })
+  issued_at!: Date;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToMany(() => SealRevocation, (revocation) => revocation.seal)
+  revocations!: SealRevocation[];
+
+  @OneToMany(() => SealVerificationLog, (log) => log.seal)
+  verification_logs!: SealVerificationLog[];
+}
+
+// ==================== SEAL REVOCATION ====================
+
+@Entity({ name: 'seal_revocations' })
+@Index('IDX_seal_revocations_seal_id', ['seal_id'])
+@Index('IDX_seal_revocations_status', ['status'])
+@Index('IDX_seal_revocations_requested_by', ['requested_by'])
+@Check(
+  'CHK_seal_revocations_status',
+  `"status" IN ('Pending', 'Approved', 'Rejected')`,
+)
+@Check(
+  'CHK_seal_revocations_distinct_actors',
+  `"decided_by" IS NULL OR "decided_by" <> "requested_by"`,
+)
+export class SealRevocation {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Seal, (seal) => seal.revocations, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'seal_id',
+    foreignKeyConstraintName: 'FK_seal_revocations_seal',
+  })
+  seal!: Seal;
+
+  @Column({ type: 'integer' })
+  seal_id!: number;
+
+  @ManyToOne(() => Account, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({
+    name: 'requested_by',
+    foreignKeyConstraintName: 'FK_seal_revocations_requested_by',
+  })
+  requester!: Account;
+
+  @Column({ type: 'integer' })
+  requested_by!: number;
+
+  @Column({ type: 'text' })
+  reason!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'Pending' })
+  status!: 'Pending' | 'Approved' | 'Rejected';
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({
+    name: 'decided_by',
+    foreignKeyConstraintName: 'FK_seal_revocations_decided_by',
+  })
+  decider!: Account | null;
+
+  @Column({ type: 'integer', nullable: true })
+  decided_by!: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  decided_at!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  decision_note!: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_at!: Date;
+
+  @OneToMany(() => DigitalSignature, (signature) => signature.seal_revocation)
+  signatures!: DigitalSignature[];
+}
+
+// ==================== SEAL VERIFICATION LOG ====================
+
+@Entity({ name: 'seal_verification_logs' })
+@Index('IDX_seal_verification_logs_seal_id', ['seal_id'])
+@Index('IDX_seal_verification_logs_seal_code', ['seal_code'])
+@Index('IDX_seal_verification_logs_verified_at', ['verified_at'])
+@Check(
+  'CHK_seal_verification_logs_result',
+  `"verification_result" IN ('Valid', 'Invalid', 'Expired', 'Revoked')`,
+)
+export class SealVerificationLog {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @ManyToOne(() => Seal, (seal) => seal.verification_logs, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'seal_id',
+    foreignKeyConstraintName: 'FK_seal_verification_logs_seal',
+  })
+  seal!: Seal | null;
+
+  @Column({ type: 'integer', nullable: true })
+  seal_id!: number | null;
+
+  @Column({ type: 'varchar', length: 50 })
+  seal_code!: string;
+
+  @Column({ type: 'varchar', length: 20 })
+  verification_result!: 'Valid' | 'Invalid' | 'Expired' | 'Revoked';
+
+  @Column({ type: 'varchar', length: 45, nullable: true })
+  source_ip!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  user_agent!: string | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  verified_at!: Date;
+}
+
 // ==================== WORK ORDER ====================
 
 @Entity({ name: 'work_orders' })
@@ -430,6 +1754,9 @@ export class CalibrationRecord {
 
   @OneToMany(() => ReviewLog, (reviewLog) => reviewLog.calibration_record)
   review_logs!: ReviewLog[];
+
+  @OneToOne(() => Certificate, (certificate) => certificate.calibration_record)
+  certificate!: Certificate | null;
 }
 
 // ==================== REVIEW LOG ====================
@@ -610,4 +1937,8 @@ export const entities = [
   StepResult,
   MeasurementDetail,
   ReviewLog,
+  Certificate,
+  Seal,
+  SealRevocation,
+  SealVerificationLog,
 ];
