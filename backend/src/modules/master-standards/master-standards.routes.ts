@@ -16,13 +16,13 @@ masterStandardsRoutes.get('/:id', getSingleMasterStandard);
 
 masterStandardsRoutes.post(
   '/',
-  authorize('Reviewer', 'Admin', 'admin', 'reviewer', 'Head of Tech', 'headoftech'),
+  authorize('Reviewer', 'Admin', 'admin', 'reviewer', 'Head of Tech', 'headoftech', 'HeadTechnician', 'headtechnician'),
   postMasterStandard,
 );
 
 masterStandardsRoutes.put(
   '/:id',
-  authorize('Reviewer', 'Admin', 'admin', 'reviewer', 'Head of Tech', 'headoftech'),
+  authorize('Reviewer', 'Admin', 'admin', 'reviewer', 'Head of Tech', 'headoftech', 'HeadTechnician', 'headtechnician'),
   putMasterStandard,
 );
 
