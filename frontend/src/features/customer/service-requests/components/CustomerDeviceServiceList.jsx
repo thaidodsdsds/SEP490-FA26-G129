@@ -312,8 +312,12 @@ function CustomerDeviceServiceList({
                         ) : (
                           <div className="csr-service-grid">
                             {visibleServices.map((service) => {
-                              const isValid = service.is_valid !== false;
+                              const isGroup2Restricted = Boolean(device.is_group2) && service.kind !== 'Verification';
+                              const isValid = service.is_valid !== false && !isGroup2Restricted;
                               const checked = chosenServiceIds.includes(service.id);
+                              const blockedReason = isGroup2Restricted
+                                ? 'Thiết bị thuộc nhóm 2: Bắt buộc chọn dịch vụ Kiểm định (Verification).'
+                                : (service.blocked_reason || 'Dịch vụ chưa sẵn sàng đăng ký');
 
                               return (
                                 <button
@@ -321,7 +325,7 @@ function CustomerDeviceServiceList({
                                   disabled={!isValid}
                                   key={service.id}
                                   onClick={() => isValid && onToggleServiceForDevice(device.id, service.id)}
-                                  title={!isValid ? service.blocked_reason || 'Dịch vụ tạm ngưng hoặc chưa có quy trình' : ''}
+                                  title={!isValid ? blockedReason : ''}
                                   type="button"
                                 >
                                   <div className="csr-service-option-head">
@@ -344,7 +348,7 @@ function CustomerDeviceServiceList({
                                   </small>
                                   {!isValid && (
                                     <small className="csr-blocked-reason">
-                                      ⚠ {service.blocked_reason || 'Dịch vụ chưa sẵn sàng đăng ký'}
+                                      ⚠ {blockedReason}
                                     </small>
                                   )}
                                 </button>
