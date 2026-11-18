@@ -15,9 +15,14 @@ import {
 } from '../../services/calibration-record-service.js';
 import ReviewerWorkspaceContext from './ReviewerWorkspaceContext.js';
 import ReviewerWorkspaceOverlays from './shared/ReviewerWorkspaceOverlays.jsx';
+import { useAppContext } from '../../app/providers.jsx';
 import './reviewer.css';
 
 function ReviewerWorkspaceProvider() {
+  const { session } = useAppContext();
+  const role = String(session?.role ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  const canLoadReviewQueue = role !== 'admin';
+
   const [procedures, setProcedures] = useState(initialProcedures);
   const [records, setRecords] = useState(initialReviewRecords);
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -58,8 +63,9 @@ function ReviewerWorkspaceProvider() {
   };
 
   useEffect(() => {
+    if (!canLoadReviewQueue) return;
     loadReviewQueue();
-  }, []);
+  }, [canLoadReviewQueue]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase('vi-VN');
   const matches = (value) => !normalizedQuery || String(value).toLocaleLowerCase('vi-VN').includes(normalizedQuery);

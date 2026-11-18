@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   '/review-queue',
   authenticate,
-  authorize('reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'technician', 'ceo'),
+  authorize('Reviewer', 'HeadTechnician', 'LabManager', 'HeadOfTech', 'Technician'),
   controller.getReviewQueueHandler,
 );
 
@@ -16,7 +16,7 @@ router.get(
 router.get(
   '/:id',
   authenticate,
-  authorize('reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'technician'),
+  authorize('Reviewer', 'HeadTechnician', 'LabManager', 'HeadOfTech', 'Technician'),
   controller.getCalibrationRecordDetailHandler,
 );
 
@@ -24,7 +24,7 @@ router.get(
 router.post(
   '/:id/review',
   authenticate,
-  authorize('reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin'),
+  authorize('Reviewer', 'HeadTechnician', 'LabManager', 'HeadOfTech'),
   controller.reviewCalibrationRecordHandler,
 );
 

@@ -41,8 +41,6 @@ import ReviewQueuePage from '../features/reviewer/features/review-queue/ReviewQu
 import DriftPage from '../features/reviewer/features/drift/DriftPage.jsx';
 import CertificatesPage from '../features/reviewer/features/certificates/CertificatesPage.jsx';
 import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
-import VerificationLogsPage from '../features/reviewer/features/verification-logs/VerificationLogsPage.jsx';
-import SignaturesPage from '../features/reviewer/features/signatures/SignaturesPage.jsx';
 import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
 import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
 import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
@@ -163,6 +161,17 @@ const adminRoutes = [
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
+      {
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/admin">
+            <ReviewerWorkspaceProvider />
+          </RoleDashboardGate>
+        ),
+        children: [
+          { path: 'certificates', element: <CertificatesPage /> },
+          { path: 'seals', element: <SealsPage /> },
+        ],
+      },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -261,7 +270,7 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: (
-      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin', 'ceo']} portalType="staff">
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech']} portalType="staff">
         <HeadOfTechLayout />
       </ProtectedRoute>
     ),
@@ -269,7 +278,7 @@ const internalRoutes = [
       {
         element: (
           <RoleDashboardGate
-            allowedDashboardPaths={['/internal/head-of-tech', '/internal/admin', '/internal']}
+            allowedDashboardPaths={['/internal/head-of-tech', '/internal']}
             dashboardPath="/internal/head-of-tech"
           >
             <ReviewerWorkspaceProvider />
@@ -286,8 +295,6 @@ const internalRoutes = [
           { path: 'drift', element: <DriftPage /> },
           { path: 'certificates', element: <CertificatesPage /> },
           { path: 'seals', element: <SealsPage /> },
-          { path: 'verification-logs', element: <VerificationLogsPage /> },
-          { path: 'signatures', element: <SignaturesPage /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'warehouse', element: <WarehousePage /> },

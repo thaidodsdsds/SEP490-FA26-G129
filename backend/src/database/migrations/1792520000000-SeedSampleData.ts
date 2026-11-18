@@ -24,16 +24,17 @@ export default class SeedSampleData1792520000000 implements MigrationInterface {
     // Reset sequence after manual id insert
     await queryRunner.query(`SELECT setval(pg_get_serial_sequence('"customers"', 'id'), (SELECT MAX(id) FROM "customers"))`);
 
-    // Seed accounts
+    // Seed accounts (2FA is disabled on all seed accounts so they can be used for local testing)
     await queryRunner.query(`
       INSERT INTO "accounts" ("id", "role_id", "customer_id", "full_name", "email", "phone", "password_hash", "is_2fa_enabled", "failed_login_attempts")
       VALUES
-        (1,  1, NULL, 'System Administrator',  'admin@isocal.com',            '0901000001', $1, TRUE,  0),
+        (1,  1, NULL, 'System Administrator',  'admin@isocal.com',            '0901000001', $1, FALSE, 0),
         (2,  2, NULL, 'Nguyen Van An',          'sale@isocal.com',             '0901000002', $1, FALSE, 0),
         (3,  3, NULL, 'Tran Thi Binh',          'accountant@isocal.com',       '0901000003', $1, FALSE, 0),
         (4,  4, NULL, 'Le Van Cuong',            'technician@isocal.com',       '0901000004', $1, FALSE, 0),
-        (5,  5, NULL, 'Pham Minh Duc',           'head.technician@isocal.com',  '0901000005', $1, TRUE,  0),
-        (6,  6, NULL, 'Hoang Thi Lan',           'ceo@isocal.com',              '0901000006', $1, TRUE,  0),
+        (5,  5, NULL, 'Pham Minh Duc',           'head.technician@isocal.com',  '0901000005', $1, FALSE, 0),
+        // CEO is an alias of Admin: same role, different login email.
+        (6,  1, NULL, 'Hoang Thi Lan',           'ceo@isocal.com',              '0901000006', $1, FALSE, 0),
         (7,  7, 1,    'Nguyen Minh Long',         'long@abc-calibration.com',    '0911000001', $1, FALSE, 0),
         (8,  7, 2,    'Tran Quoc Huy',            'huy@vietnamprecision.com',    '0911000002', $1, FALSE, 0),
         (9,  7, 3,    'Vo Thanh Mai',             'mai@mekongfood.com',          '0911000003', $1, FALSE, 0),

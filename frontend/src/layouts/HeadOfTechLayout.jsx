@@ -31,8 +31,6 @@ const links = [
       { to: '/internal/head-of-tech/review-queue', label: 'Hàng chờ soát xét' },
       { to: '/internal/head-of-tech/certificates', label: 'Chứng chỉ' },
       { to: '/internal/head-of-tech/seals', label: 'Tem & thu hồi' },
-      { to: '/internal/head-of-tech/verification-logs', label: 'Lịch sử tra cứu tem' },
-      { to: '/internal/head-of-tech/signatures', label: 'Chữ ký số' },
     ],
   },
   {
