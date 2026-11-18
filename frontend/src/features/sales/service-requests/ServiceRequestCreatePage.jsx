@@ -156,6 +156,10 @@ function ServiceRequestCreatePage() {
     if (service && !service.is_valid) {
       return;
     }
+    const dev = devices.find((d) => d.id === deviceId);
+    if (dev?.is_group2 && service?.kind !== 'Verification') {
+      return;
+    }
 
     setSelectedServices((current) => {
       const currentServices = current[deviceId] || [];
