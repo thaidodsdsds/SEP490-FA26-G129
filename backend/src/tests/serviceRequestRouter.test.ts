@@ -165,6 +165,7 @@ describe('Service Requests Module API', () => {
               company_name: 'ABC Calibration Company',
               tax_code: '0312345678',
               address: '123 Nguyen Trai, District 1, Ho Chi Minh City',
+              assigned_sales_id: null,
             },
           },
           {
@@ -176,6 +177,7 @@ describe('Service Requests Module API', () => {
               company_name: 'Viet Tech Lab',
               tax_code: '0109876543',
               address: '456 Le Loi, District 3, Ho Chi Minh City',
+              assigned_sales_id: null,
             },
           },
         ],
@@ -267,7 +269,7 @@ describe('Service Requests Module API', () => {
     });
 
     it('returns 400 when a selected device does not belong to the customer', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 2, name: 'Đồng hồ vạn năng' },
       ]);
@@ -292,7 +294,7 @@ describe('Service Requests Module API', () => {
     });
 
     it('returns 400 when a selected service type has no Active procedure', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
       ]);
@@ -329,8 +331,91 @@ describe('Service Requests Module API', () => {
       });
     });
 
+    it('returns 400 when a Group 2 device selects a non-Verification service', async () => {
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
+      findDevices.mockResolvedValue([
+        { id: 3, customer_id: 1, name: 'Huyết áp kế cơ ALPK2 500', is_group2: true },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 4,
+          name: 'Hiệu chuẩn Áp suất – Lưu lượng',
+          kind: 'Calibration',
+          field: 'APSUAT',
+          standard_code: 'HC-APSUAT',
+          measuring_range: null,
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 401, version: 'V1.0', status: 'Active' }],
+        },
+      ]);
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken()}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          items: [{ device_id: 3, service_type_id: 4 }],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Thiết bị "Huyết áp kế cơ ALPK2 500" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).',
+        },
+      });
+    });
+
+    it('creates a service request when a Group 2 device selects a Verification service', async () => {
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
+      findDevices.mockResolvedValue([
+        { id: 3, customer_id: 1, name: 'Huyết áp kế cơ ALPK2 500', is_group2: true },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 10,
+          name: 'Kiểm định Huyết áp kế (Cơ, Thủy ngân & Điện tử)',
+          kind: 'Verification',
+          field: 'APSUAT',
+          standard_code: 'KD-HAK',
+          measuring_range: '0 – 300 mmHg',
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 402, version: 'ĐLVN 09:2011 / 343:2020', status: 'Active' }],
+        },
+      ]);
+      saveServiceRequestMock.mockImplementation(async (sr) => ({
+        id: 99,
+        created_at: new Date('2026-11-18T10:00:00.000Z'),
+        ...sr,
+      }));
+      saveServiceRequestItemMock.mockImplementation(async (items) =>
+        items.map((item: Record<string, unknown>, idx: number) => ({
+          id: 600 + idx,
+          ...item,
+        })),
+      );
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken('Sales', 8)}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          items: [{ device_id: 3, service_type_id: 10 }],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.id).toBe(99);
+      expect(response.body.data.items[0].service_type_id).toBe(10);
+    });
+
     it('creates a service request and its items when all validations pass', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
       ]);
@@ -505,7 +590,7 @@ describe('Service Requests Module API', () => {
     });
 
     it('saves preferred_date when a valid date is provided', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
       ]);

@@ -1,4 +1,3 @@
-
 import {
   Check,
   Column,
@@ -1365,20 +1364,22 @@ export class WorkOrder {
 
 // ==================== MASTER STANDARD ====================
 
-@Entity({ name: 'masterstandard' })
-@Index('IDX_masterstandard_assignment', ['status', 'calibration_expiry'])
+@Entity({ name: 'master_standards' })
+@Index('IDX_master_standards_status', ['status'])
+@Index('IDX_master_standards_calibration_expiry', ['calibration_expiry'])
+@Unique('UQ_master_standards_serial_number', ['serial_number'])
 export class MasterStandard {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: 255 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: 100, unique: true })
   serial_number!: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  accuracy_class!: string;
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  accuracy_class!: string | null;
 
   @Column({ type: 'date' })
   calibration_expiry!: string;
@@ -1563,19 +1564,20 @@ export class InitialInspection {
 // ==================== PROCEDURE STEP ====================
 
 @Entity({ name: 'procedure_steps' })
-@Unique('UQ_procedure_steps_procedure_step_no', ['procedure_id', 'step_no'])
+@Index('IDX_procedure_steps_procedure_id', ['procedure_id'])
+@Unique('UQ_procedure_steps_proc_step_no', ['procedure_id', 'step_no'])
 export class ProcedureStep {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => CalibrationProcedure, {
-    nullable: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
-  })
+  @ManyToOne(
+    () => CalibrationProcedure,
+    (proc) => proc.steps,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
   @JoinColumn({
     name: 'procedure_id',
-    foreignKeyConstraintName: 'FK_procedure_steps_procedure',
+    foreignKeyConstraintName: 'FK_procedure_steps_procedure_id',
   })
   procedure!: CalibrationProcedure;
 
@@ -1600,49 +1602,53 @@ export class ProcedureParameter {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => CalibrationProcedure, {
-    nullable: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
-  })
+  @ManyToOne(
+    () => CalibrationProcedure,
+    (proc) => proc.parameters,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
   @JoinColumn({
     name: 'procedure_id',
-    foreignKeyConstraintName: 'FK_procedure_parameters_procedure',
+    foreignKeyConstraintName: 'FK_procedure_parameters_procedure_id',
   })
   procedure!: CalibrationProcedure;
 
   @Column({ type: 'integer' })
   procedure_id!: number;
 
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: 255 })
   name!: string;
 
   @Column({ type: 'varchar', length: 50 })
   unit!: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', default: 1 })
   repeat_count!: number;
 
-  @Column({ type: 'varchar', length: 20 })
-  calculation_method!: 'mean' | 'stdev' | 'max' | 'min' | 'sum' | 'abs';
+  @Column({ type: 'varchar', length: 255, default: 'mean' })
+  calculation_method!: string;
+
+  @OneToMany(() => ProcedureTestPoint, (tp) => tp.parameter)
+  test_points!: ProcedureTestPoint[];
 }
 
 // ==================== PROCEDURE TEST POINT ====================
 
 @Entity({ name: 'procedure_test_points' })
-@Unique('UQ_procedure_test_points_parameter_point_no', ['parameter_id', 'point_no'])
+@Index('IDX_procedure_test_points_parameter_id', ['parameter_id'])
+@Unique('UQ_procedure_test_points_param_point_no', ['parameter_id', 'point_no'])
 export class ProcedureTestPoint {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => ProcedureParameter, {
-    nullable: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
-  })
+  @ManyToOne(
+    () => ProcedureParameter,
+    (param) => param.test_points,
+    { nullable: false, onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+  )
   @JoinColumn({
     name: 'parameter_id',
-    foreignKeyConstraintName: 'FK_procedure_test_points_parameter',
+    foreignKeyConstraintName: 'FK_procedure_test_points_parameter_id',
   })
   parameter!: ProcedureParameter;
 
@@ -1652,14 +1658,14 @@ export class ProcedureTestPoint {
   @Column({ type: 'integer' })
   point_no!: number;
 
-  @Column({ type: 'numeric' })
-  nominal_value!: string;
+  @Column({ type: 'numeric', precision: 15, scale: 4 })
+  nominal_value!: number | string;
 
-  @Column({ type: 'numeric', nullable: true })
-  tolerance!: string | null;
+  @Column({ type: 'numeric', precision: 15, scale: 4, nullable: true })
+  tolerance!: number | string | null;
 
-  @Column({ type: 'numeric' })
-  max_uncertainty!: string;
+  @Column({ type: 'numeric', precision: 15, scale: 4, nullable: true })
+  max_uncertainty!: number | string | null;
 }
 
 // ==================== CALIBRATION RECORD ====================
@@ -1910,7 +1916,6 @@ export const entities = [
   ServiceType,
   Device,
   DeviceOwnershipHistory,
-
   CalibrationProcedure,
   ServiceRequest,
   ServiceRequestItem,
