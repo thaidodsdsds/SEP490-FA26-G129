@@ -3,30 +3,43 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import {
+  Account,
+  Attachment,
   Customer,
   Device,
+  InitialInspection,
   ServiceRequest,
   ServiceRequestItem,
   ServiceType,
 } from '../database/entities.js';
 
 const {
+  findOneAccountMock,
   findOneCustomer,
   findDevices,
   findServiceTypes,
+  findServiceRequestsMock,
+  findOneServiceRequestMock,
   createServiceRequestMock,
   saveServiceRequestMock,
   createServiceRequestItemMock,
   saveServiceRequestItemMock,
+  createAttachmentMock,
+  saveAttachmentMock,
   getRepository,
 } = vi.hoisted(() => ({
+  findOneAccountMock: vi.fn(),
   findOneCustomer: vi.fn(),
   findDevices: vi.fn(),
   findServiceTypes: vi.fn(),
+  findServiceRequestsMock: vi.fn(),
+  findOneServiceRequestMock: vi.fn(),
   createServiceRequestMock: vi.fn(),
   saveServiceRequestMock: vi.fn(),
   createServiceRequestItemMock: vi.fn(),
   saveServiceRequestItemMock: vi.fn(),
+  createAttachmentMock: vi.fn(),
+  saveAttachmentMock: vi.fn(),
   getRepository: vi.fn(),
 }));
 
@@ -47,15 +60,23 @@ const createToken = (role = 'Sales', id = 8) => jwt.sign(
 
 describe('Service Requests Module API', () => {
   beforeEach(() => {
+    findOneAccountMock.mockReset();
     findOneCustomer.mockReset();
     findDevices.mockReset();
     findServiceTypes.mockReset();
+    findServiceRequestsMock.mockReset();
+    findOneServiceRequestMock.mockReset();
     createServiceRequestMock.mockReset().mockImplementation((payload) => ({ ...payload }));
     saveServiceRequestMock.mockReset();
     createServiceRequestItemMock.mockReset().mockImplementation((payload) => ({ ...payload }));
     saveServiceRequestItemMock.mockReset();
+    createAttachmentMock.mockReset().mockImplementation((payload) => ({ ...payload }));
+    saveAttachmentMock.mockReset();
 
     getRepository.mockReset().mockImplementation((entity) => {
+      if (entity === Account) {
+        return { findOne: findOneAccountMock };
+      }
       if (entity === Customer) {
         return { findOne: findOneCustomer };
       }
@@ -67,6 +88,8 @@ describe('Service Requests Module API', () => {
       }
       if (entity === ServiceRequest) {
         return {
+          find: findServiceRequestsMock,
+          findOne: findOneServiceRequestMock,
           create: createServiceRequestMock,
           save: saveServiceRequestMock,
         };
@@ -77,7 +100,98 @@ describe('Service Requests Module API', () => {
           save: saveServiceRequestItemMock,
         };
       }
+      if (entity === Attachment) {
+        return {
+          create: createAttachmentMock,
+          save: saveAttachmentMock,
+        };
+      }
+      if (entity === InitialInspection) {
+        return {
+          find: vi.fn().mockResolvedValue([]),
+        };
+      }
       return {};
+    });
+  });
+
+  describe('GET /api/v1/service-requests', () => {
+    it('requires an authenticated account', async () => {
+      const response = await request(app).get('/api/v1/service-requests');
+      expect(response.status).toBe(401);
+    });
+
+    it('returns the list of service requests with customer details', async () => {
+      findServiceRequestsMock.mockResolvedValue([
+        {
+          id: 88,
+          request_code: 'SR-2026-088',
+          created_at: new Date('2026-10-28T11:30:00.000Z'),
+          customer: {
+            id: 1,
+            company_name: 'ABC Calibration Company',
+            tax_code: '0312345678',
+            address: '123 Nguyen Trai, District 1, Ho Chi Minh City',
+          },
+        },
+        {
+          id: 12,
+          request_code: null,
+          created_at: new Date('2026-05-10T09:00:00.000Z'),
+          customer: {
+            id: 2,
+            company_name: 'Viet Tech Lab',
+            tax_code: '0109876543',
+            address: '456 Le Loi, District 3, Ho Chi Minh City',
+          },
+        },
+      ]);
+
+      const response = await request(app)
+        .get('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken()}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        meta: null,
+        data: [
+          {
+            id: 88,
+            request_code: 'SR-2026-088',
+            created_at: '2026-10-28T11:30:00.000Z',
+            customer: {
+              id: 1,
+              company_name: 'ABC Calibration Company',
+              tax_code: '0312345678',
+              address: '123 Nguyen Trai, District 1, Ho Chi Minh City',
+              assigned_sales_id: null,
+            },
+          },
+          {
+            id: 12,
+            request_code: 'SR-2026-012',
+            created_at: '2026-05-10T09:00:00.000Z',
+            customer: {
+              id: 2,
+              company_name: 'Viet Tech Lab',
+              tax_code: '0109876543',
+              address: '456 Le Loi, District 3, Ho Chi Minh City',
+              assigned_sales_id: null,
+            },
+          },
+        ],
+      });
+    });
+
+    it('forwards internal errors to the global error handler', async () => {
+      findServiceRequestsMock.mockRejectedValue(new Error('DB connection error'));
+
+      const response = await request(app)
+        .get('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken()}`);
+
+      expect(response.status).toBe(500);
     });
   });
 
@@ -155,7 +269,7 @@ describe('Service Requests Module API', () => {
     });
 
     it('returns 400 when a selected device does not belong to the customer', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 2, name: 'Đồng hồ vạn năng' },
       ]);
@@ -180,7 +294,7 @@ describe('Service Requests Module API', () => {
     });
 
     it('returns 400 when a selected service type has no Active procedure', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
       ]);
@@ -217,8 +331,91 @@ describe('Service Requests Module API', () => {
       });
     });
 
+    it('returns 400 when a Group 2 device selects a non-Verification service', async () => {
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
+      findDevices.mockResolvedValue([
+        { id: 3, customer_id: 1, name: 'Huyết áp kế cơ ALPK2 500', is_group2: true },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 4,
+          name: 'Hiệu chuẩn Áp suất – Lưu lượng',
+          kind: 'Calibration',
+          field: 'APSUAT',
+          standard_code: 'HC-APSUAT',
+          measuring_range: null,
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 401, version: 'V1.0', status: 'Active' }],
+        },
+      ]);
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken()}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          items: [{ device_id: 3, service_type_id: 4 }],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Thiết bị "Huyết áp kế cơ ALPK2 500" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).',
+        },
+      });
+    });
+
+    it('creates a service request when a Group 2 device selects a Verification service', async () => {
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
+      findDevices.mockResolvedValue([
+        { id: 3, customer_id: 1, name: 'Huyết áp kế cơ ALPK2 500', is_group2: true },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 10,
+          name: 'Kiểm định Huyết áp kế (Cơ, Thủy ngân & Điện tử)',
+          kind: 'Verification',
+          field: 'APSUAT',
+          standard_code: 'KD-HAK',
+          measuring_range: '0 – 300 mmHg',
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 402, version: 'ĐLVN 09:2011 / 343:2020', status: 'Active' }],
+        },
+      ]);
+      saveServiceRequestMock.mockImplementation(async (sr) => ({
+        id: 99,
+        created_at: new Date('2026-11-18T10:00:00.000Z'),
+        ...sr,
+      }));
+      saveServiceRequestItemMock.mockImplementation(async (items) =>
+        items.map((item: Record<string, unknown>, idx: number) => ({
+          id: 600 + idx,
+          ...item,
+        })),
+      );
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken('Sales', 8)}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          items: [{ device_id: 3, service_type_id: 10 }],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.id).toBe(99);
+      expect(response.body.data.items[0].service_type_id).toBe(10);
+    });
+
     it('creates a service request and its items when all validations pass', async () => {
-      findOneCustomer.mockResolvedValue({ id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
       findDevices.mockResolvedValue([
         { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
       ]);
@@ -299,6 +496,266 @@ describe('Service Requests Module API', () => {
         ],
       });
     });
+
+    it('resolves customer_id from Account and saves attachments when created by a Customer user', async () => {
+      findOneAccountMock.mockResolvedValue({ id: 20, customer_id: 1 });
+      findOneCustomer.mockResolvedValue({ id: 1 });
+      findDevices.mockResolvedValue([
+        { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Hiệu chuẩn đồng hồ vạn năng',
+          kind: 'Calibration',
+          field: 'DIEN',
+          standard_code: 'ĐLVN 142:2004',
+          measuring_range: '0 - 1000V',
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 101, version: 'V1.0', status: 'Active' }],
+        },
+      ]);
+      saveServiceRequestMock.mockImplementation(async (sr) => ({
+        id: 89,
+        created_at: new Date('2026-10-29T05:00:00.000Z'),
+        ...sr,
+      }));
+      saveServiceRequestItemMock.mockImplementation(async (items) =>
+        items.map((item: Record<string, unknown>, idx: number) => ({
+          id: 600 + idx,
+          ...item,
+        })),
+      );
+      saveAttachmentMock.mockImplementation(async (atts) =>
+        atts.map((att: Record<string, unknown>, idx: number) => ({
+          id: 700 + idx,
+          uploaded_at: new Date('2026-10-29T05:00:00.000Z'),
+          ...att,
+        })),
+      );
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken('Customer', 20)}`)
+        .send({
+          location_type: 'On-site',
+          items: [{ device_id: 10, service_type_id: 1 }],
+          attachments: [
+            {
+              file_name: 'danh-muc-thiet-bi.pdf',
+              file_url: 'client-upload://danh-muc-thiet-bi.pdf',
+            },
+          ],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data).toMatchObject({
+        id: 89,
+        request_code: 'SR-2026-089',
+        customer_id: 1,
+        created_by: 20,
+        location_type: 'On-site',
+        status: 'New',
+        attachments: [
+          {
+            id: 700,
+            service_request_id: 89,
+            file_name: 'danh-muc-thiet-bi.pdf',
+            file_url: 'client-upload://danh-muc-thiet-bi.pdf',
+          },
+        ],
+      });
+    });
+
+    it('returns 400 when preferred_date format is invalid', async () => {
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken()}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          preferred_date: 'invalid-date',
+          items: [{ device_id: 10, service_type_id: 1 }],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'Invalid preferred_date format. Expected format: YYYY-MM-DD.',
+        },
+      });
+    });
+
+    it('saves preferred_date when a valid date is provided', async () => {
+      findOneCustomer.mockResolvedValue({ id: 1, assigned_sales_id: 8 });
+      findDevices.mockResolvedValue([
+        { id: 10, customer_id: 1, name: 'Đồng hồ vạn năng' },
+      ]);
+      findServiceTypes.mockResolvedValue([
+        {
+          id: 1,
+          name: 'Hiệu chuẩn đồng hồ vạn năng',
+          kind: 'Calibration',
+          field: 'DIEN',
+          standard_code: 'ĐLVN 142:2004',
+          measuring_range: '0 - 1000V',
+          description: null,
+          status: 'Active',
+          calibration_procedures: [{ id: 101, version: 'V1.0', status: 'Active' }],
+        },
+      ]);
+      saveServiceRequestMock.mockImplementation(async (sr) => ({
+        id: 90,
+        created_at: new Date('2026-10-28T11:30:00.000Z'),
+        ...sr,
+      }));
+      saveServiceRequestItemMock.mockImplementation(async (items) =>
+        items.map((item: Record<string, unknown>, idx: number) => ({
+          id: 600 + idx,
+          ...item,
+        })),
+      );
+
+      const response = await request(app)
+        .post('/api/v1/service-requests')
+        .set('Authorization', `Bearer ${createToken('Sales', 8)}`)
+        .send({
+          customer_id: 1,
+          location_type: 'In-lab',
+          preferred_date: '2026-11-05',
+          special_notes: 'Hiệu chuẩn ở 20, 25, 30 độ C',
+          accessories_note: '01 que đo Fluke',
+          items: [{ device_id: 10, service_type_id: 1 }],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data).toMatchObject({
+        id: 90,
+        location_type: 'In-lab',
+        preferred_date: '2026-11-05',
+        special_notes: 'Hiệu chuẩn ở 20, 25, 30 độ C',
+        accessories_note: '01 que đo Fluke',
+      });
+    });
+  });
+
+  describe('GET /api/v1/service-requests/:id', () => {
+    it('returns 400 when id is not a positive integer', async () => {
+      const response = await request(app)
+        .get('/api/v1/service-requests/abc')
+        .set('Authorization', `Bearer ${createToken()}`);
+      expect(response.status).toBe(400);
+    });
+
+    it('returns 404 when request does not exist', async () => {
+      findOneServiceRequestMock.mockResolvedValue(null);
+      const response = await request(app)
+        .get('/api/v1/service-requests/999')
+        .set('Authorization', `Bearer ${createToken()}`);
+      expect(response.status).toBe(404);
+    });
+
+    it('returns service request detail with items, customer and attachments', async () => {
+      findOneServiceRequestMock.mockResolvedValue({
+        id: 88,
+        request_code: 'SR-2026-088',
+        customer_id: 1,
+        created_by: 8,
+        location_type: 'In-lab',
+        preferred_date: '2026-11-05',
+        special_notes: 'Yêu cầu tem tiếng Anh',
+        accessories_note: '01 que đo',
+        status: 'New',
+        created_at: new Date('2026-10-28T11:30:00.000Z'),
+        customer: {
+          id: 1,
+          company_name: 'ABC Calibration',
+          tax_code: '0312345678',
+          address: '123 Nguyen Trai',
+        },
+        items: [
+          {
+            id: 500,
+            device_id: 10,
+            service_type_id: 1,
+            status: 'Pending',
+            device: { name: 'Đồng hồ vạn năng' },
+            service_type: { name: 'Hiệu chuẩn đồng hồ', kind: 'Calibration' },
+          },
+        ],
+        attachments: [
+          {
+            id: 700,
+            service_request_id: 88,
+            file_name: 'tem.pdf',
+            file_url: 'client-upload://tem.pdf',
+            uploaded_at: new Date(),
+          },
+        ],
+        quotations: [],
+      });
+
+      const response = await request(app)
+        .get('/api/v1/service-requests/88')
+        .set('Authorization', `Bearer ${createToken()}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({
+        id: 88,
+        request_code: 'SR-2026-088',
+        can_edit: true,
+        can_cancel: true,
+        customer: { id: 1, company_name: 'ABC Calibration' },
+        items: [{ id: 500, device_name: 'Đồng hồ vạn năng' }],
+        attachments: [{ id: 700, file_name: 'tem.pdf' }],
+      });
+    });
+  });
+
+  describe('PATCH /api/v1/service-requests/:id/cancel', () => {
+    it('cancels a service request when in New status', async () => {
+      const mockReq = {
+        id: 88,
+        request_code: 'SR-2026-088',
+        customer_id: 1,
+        created_by: 8,
+        location_type: 'In-lab',
+        status: 'New',
+        created_at: new Date('2026-10-28T11:30:00.000Z'),
+        customer: { id: 1, company_name: 'ABC' },
+        items: [],
+        attachments: [],
+        quotations: [],
+      };
+      findOneServiceRequestMock
+        .mockResolvedValueOnce(mockReq)
+        .mockResolvedValueOnce({ ...mockReq, status: 'Cancelled' });
+      saveServiceRequestMock.mockImplementation(async (r) => r);
+
+      const response = await request(app)
+        .patch('/api/v1/service-requests/88/cancel')
+        .set('Authorization', `Bearer ${createToken()}`)
+        .send({ reason: 'Thay đổi kế hoạch sản xuất' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe('Cancelled');
+    });
+
+    it('rejects cancellation when status is InProgress', async () => {
+      findOneServiceRequestMock.mockResolvedValue({
+        id: 88,
+        status: 'InProgress',
+      });
+
+      const response = await request(app)
+        .patch('/api/v1/service-requests/88/cancel')
+        .set('Authorization', `Bearer ${createToken()}`)
+        .send({ reason: 'Hủy' });
+
+      expect(response.status).toBe(400);
+    });
   });
 });
-

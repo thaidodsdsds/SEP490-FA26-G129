@@ -156,6 +156,10 @@ function ServiceRequestCreatePage() {
     if (service && !service.is_valid) {
       return;
     }
+    const dev = devices.find((d) => d.id === deviceId);
+    if (dev?.is_group2 && service?.kind !== 'Verification') {
+      return;
+    }
 
     setSelectedServices((current) => {
       const currentServices = current[deviceId] || [];
@@ -264,7 +268,7 @@ function ServiceRequestCreatePage() {
 
       <div className="sr-stats-strip" aria-label="Thống kê danh mục hiện tại">
         <div className="sr-stat-pill">
-          <span>Khách hàng hệ thống</span>
+          <span>Khách hàng được gán cho bạn</span>
           <strong>{loadingInitial ? '...' : customers.length}</strong>
         </div>
         <div className="sr-stat-pill">
@@ -286,6 +290,14 @@ function ServiceRequestCreatePage() {
               Khách hàng: <b>{createdRequest.customer}</b> · Hình thức: <b>{createdRequest.locationType}</b> ·{' '}
               {createdRequest.devices} thiết bị · {createdRequest.items} hạng mục dịch vụ.
             </p>
+            <div style={{ marginTop: '0.5rem' }}>
+              <Link
+                className="button button-primary"
+                to={`/internal/sales/quotations/new?requestId=${encodeURIComponent(createdRequest.id)}`}
+              >
+                Lập báo giá cho phiếu {createdRequest.id} →
+              </Link>
+            </div>
           </div>
           <button
             aria-label="Đóng thông báo"

@@ -1089,3 +1089,196 @@
     max-width: none;
   }
 }
+
+/* UI/UX pass: readability, feedback and dashboard motion. */
+.dash-eyebrow,
+.dash-description,
+.dash-kpi-label,
+.dash-kpi-hint,
+.dash-section-head p,
+.dash-scroll-hint,
+.dash-table th,
+.dash-empty,
+.dash-bar-label,
+.dash-line-labels span,
+.dash-cell-sub,
+.dash-donut-center span,
+.dash-quote-top small,
+.dash-invoice-stat span,
+.dash-invoice-main small,
+.dash-notice-item small {
+  color: #5a7083;
+}
+
+.dash-eyebrow,
+.dash-kpi-hint,
+.dash-scroll-hint,
+.dash-table th,
+.dash-cell-sub,
+.dash-donut-center span,
+.dash-quote-top small,
+.dash-invoice-stat span,
+.dash-invoice-main small,
+.dash-notice-item small {
+  font-size: 0.72rem;
+}
+
+.dash-kpi-label {
+  font-size: 0.75rem;
+}
+
+.dash-table td {
+  font-size: 0.78rem;
+}
+
+.dash-page .button {
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.dash-page .button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.dash-page .button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+.dash-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.dash-table tbody tr:hover {
+  background: #f8fbfc;
+}
+
+@keyframes dash-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dash-bar-grow-y {
+  from {
+    opacity: 0.35;
+    transform: scaleY(0.05);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes dash-bar-grow-x {
+  from {
+    opacity: 0.35;
+    transform: scaleX(0.05);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes dash-donut-in {
+  from {
+    opacity: 0;
+    transform: rotate(-18deg) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+.dash-kpi-card,
+.dash-section-card {
+  animation: dash-rise-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dash-kpi-grid > .dash-kpi-card:nth-child(2) {
+  animation-delay: 35ms;
+}
+
+.dash-kpi-grid > .dash-kpi-card:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.dash-kpi-grid > .dash-kpi-card:nth-child(4) {
+  animation-delay: 105ms;
+}
+
+.dash-grid > .dash-section-card:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.dash-grid > .dash-section-card:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.dash-bar-fill {
+  transform-origin: bottom;
+  animation: dash-bar-grow-y 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dash-hbar-fill {
+  transform-origin: left;
+  animation: dash-bar-grow-x 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dash-bar-col:nth-child(2) .dash-bar-fill,
+.dash-hbar-row:nth-child(2) .dash-hbar-fill {
+  animation-delay: 35ms;
+}
+
+.dash-bar-col:nth-child(3) .dash-bar-fill,
+.dash-hbar-row:nth-child(3) .dash-hbar-fill {
+  animation-delay: 70ms;
+}
+
+.dash-bar-col:nth-child(4) .dash-bar-fill,
+.dash-hbar-row:nth-child(4) .dash-hbar-fill {
+  animation-delay: 105ms;
+}
+
+.dash-bar-col:nth-child(5) .dash-bar-fill,
+.dash-hbar-row:nth-child(5) .dash-hbar-fill {
+  animation-delay: 140ms;
+}
+
+.dash-donut {
+  animation: dash-donut-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dash-progress-fill {
+  transform-origin: left;
+  animation: dash-bar-grow-x 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (max-width: 480px) {
+  .dash-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash-header-actions .button {
+    width: 100%;
+    flex: none;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-kpi-card,
+  .dash-section-card,
+  .dash-bar-fill,
+  .dash-hbar-fill,
+  .dash-donut,
+  .dash-progress-fill {
+    animation: none;
+  }
+}

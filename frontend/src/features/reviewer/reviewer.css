@@ -1092,6 +1092,7 @@
 
   .reviewer-modal .modal-heading {
     top: -18px;
+
     margin: -18px -18px 0;
     padding: 16px 18px 13px;
   }
@@ -1099,5 +1100,108 @@
   .reject-form .modal-actions {
     align-items: stretch;
     flex-direction: column-reverse;
+  }
+}
+
+/* UI/UX pass: readability, feedback tone and reviewer motion. */
+.reviewer-page-heading > div > p:last-child,
+.reviewer-card-heading p,
+.reviewer-table th,
+.reviewer-empty,
+.attention-item small,
+.drift-heading span,
+.drift-current,
+.drift-point small {
+  color: #5a7083;
+}
+
+.reviewer-table th,
+.attention-item small,
+.drift-heading span,
+.drift-point small {
+  font-size: 0.72rem;
+}
+
+.drift-current {
+  font-size: 0.68rem !important;
+}
+
+.reviewer-table td {
+  font-size: 0.75rem;
+}
+
+.reviewer-table td code {
+  font-size: 0.7rem;
+}
+
+.reviewer-status {
+  color: #526a7d;
+  font-size: 0.68rem;
+}
+
+.reviewer-status.waiting {
+  color: #825a17;
+}
+
+.reviewer-status.quiet {
+  color: #5a7083;
+}
+
+.reviewer-feedback.error {
+  border-color: #eccaca;
+  background: #fdf1f1;
+  color: #9a3f3f;
+}
+
+.reviewer-feedback.error > span {
+  background: #f3dada;
+}
+
+.reviewer-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.reviewer-table tbody tr:hover {
+  background: #f8fbfc;
+}
+
+@keyframes reviewer-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reviewer-card {
+  animation: reviewer-rise-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.reviewer-page .reviewer-card:nth-of-type(2) {
+  animation-delay: 45ms;
+}
+
+.reviewer-page .reviewer-card:nth-of-type(3) {
+  animation-delay: 90ms;
+}
+
+.reviewer-page .button-compact,
+.reviewer-page .text-action,
+.reviewer-page .icon-button {
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.reviewer-page .button-compact:active,
+.reviewer-page .text-action:active,
+.reviewer-page .icon-button:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reviewer-card {
+    animation: none;
   }
 }

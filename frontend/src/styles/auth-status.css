@@ -1,0 +1,282 @@
+/* ─── Auth Status & Security States CSS ────────────────────────────── */
+
+.auth-state-container {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  background: #f4f7fa;
+}
+
+.auth-state-card {
+  max-width: 540px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e1e8f0;
+  box-shadow: 0 10px 25px -5px rgba(23, 43, 77, 0.08), 0 8px 10px -6px rgba(23, 43, 77, 0.04);
+  padding: 36px 32px;
+  text-align: center;
+  animation: authStateFadeIn 0.25s ease-out;
+}
+
+@keyframes authStateFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-state-icon-wrapper {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+
+.auth-state-icon-wrapper--lock {
+  background: #e6f7ff;
+  border: 2px solid #bae7ff;
+  color: #096dd9;
+}
+
+.auth-state-icon-wrapper--denied {
+  background: #fff1f0;
+  border: 2px solid #ffa39e;
+  color: #cf1322;
+}
+
+.auth-state-icon-wrapper--expired {
+  background: #fffbe6;
+  border: 2px solid #ffe58f;
+  color: #d46b08;
+}
+
+.auth-state-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.auth-state-badge--primary {
+  background: #e6f7ff;
+  color: #0050b3;
+}
+
+.auth-state-badge--danger {
+  background: #fff1f0;
+  color: #a8071a;
+}
+
+.auth-state-badge--warning {
+  background: #fffbe6;
+  color: #ad4e00;
+}
+
+.auth-state-title {
+  font-size: 1.45rem;
+  font-weight: 750;
+  color: #1a202c;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+
+.auth-state-desc {
+  font-size: 0.95rem;
+  color: #4a5568;
+  line-height: 1.55;
+  margin: 0 0 24px;
+}
+
+.auth-state-meta {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  font-size: 0.86rem;
+  color: #475569;
+  text-align: left;
+}
+
+.auth-state-meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.auth-state-meta-row:last-child {
+  margin-bottom: 0;
+}
+
+.auth-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-state-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease-in-out;
+}
+
+.auth-state-btn--primary {
+  background: #176f91;
+  color: #ffffff;
+  border-color: #176f91;
+}
+
+.auth-state-btn--primary:hover {
+  background: #125570;
+  border-color: #125570;
+  color: #ffffff;
+}
+
+.auth-state-btn--secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.auth-state-btn--secondary:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.auth-state-btn--outline {
+  background: transparent;
+  color: #64748b;
+  border-color: transparent;
+}
+
+.auth-state-btn--outline:hover {
+  color: #334155;
+  text-decoration: underline;
+}
+
+.auth-state-btn--danger {
+  background: #fff1f0;
+  color: #cf1322;
+  border-color: #ffa39e;
+}
+
+.auth-state-btn--danger:hover {
+  background: #ffccc7;
+  color: #a8071a;
+}
+
+/* ─── Modal Styles ────────────────────────────────────────────────── */
+
+.auth-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: authOverlayFadeIn 0.2s ease-out;
+}
+
+@keyframes authOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.auth-modal-dialog {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  padding: 32px 28px;
+  text-align: center;
+  position: relative;
+  animation: authDialogPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes authDialogPop {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Banner Styles for Login Pages ────────────────────────────────── */
+
+.auth-notice-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.auth-notice-banner--warning {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  color: #ad4e00;
+}
+
+.auth-notice-banner--danger {
+  background: #fff1f0;
+  border: 1px solid #ffa39e;
+  color: #a8071a;
+}
+
+.auth-notice-banner--info {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #0050b3;
+}
+
+.auth-notice-banner-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.auth-notice-banner-body strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+

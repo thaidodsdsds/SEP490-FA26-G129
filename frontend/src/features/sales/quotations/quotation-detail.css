@@ -1,0 +1,481 @@
+/* Quotation Detail Styles */
+
+.quotation-detail-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 50px;
+}
+
+/* Top Action Toolbar */
+.qd-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 14px 20px;
+  border: 1px solid #dce6ed;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.qd-action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.qd-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4a5568;
+  text-decoration: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  transition: all 0.15s ease;
+}
+
+.qd-back-link:hover {
+  background: #edf2f7;
+  color: #1a202c;
+  border-color: #cbd5e0;
+}
+
+.qd-action-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Formal Document Sheet */
+.qd-document {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  padding: 36px 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Document Top Ribbon */
+.qd-status-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.qd-status-ribbon--draft {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.qd-status-ribbon--sent {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.qd-status-ribbon--approved {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.qd-status-ribbon--rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Document Header */
+.qd-doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.qd-brand-block h2 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #1a365d;
+  letter-spacing: 0.5px;
+}
+
+.qd-brand-sub {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #2b6cb0;
+  text-transform: uppercase;
+}
+
+.qd-brand-meta {
+  font-size: 0.8rem;
+  color: #718096;
+  line-height: 1.5;
+}
+
+.qd-doc-title-block {
+  text-align: right;
+}
+
+.qd-doc-title-block h1 {
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #2d3748;
+  letter-spacing: 0.5px;
+}
+
+.qd-doc-code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1a56db;
+}
+
+.qd-doc-date {
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 4px;
+}
+
+/* Two-column Parties Info */
+.qd-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+}
+
+.qd-party-col h4 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.qd-party-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1a202c;
+  margin-bottom: 6px;
+}
+
+.qd-party-details {
+  font-size: 0.83rem;
+  color: #4a5568;
+  line-height: 1.55;
+}
+
+/* Linked Service Request Banner */
+.qd-sr-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+  color: #2b6cb0;
+  font-size: 0.84rem;
+}
+
+.qd-sr-banner strong {
+  color: #2c5282;
+}
+
+.qd-sr-banner a {
+  color: #2b6cb0;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Line Items Table */
+.qd-table-section {
+  margin-bottom: 24px;
+}
+
+.qd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.qd-table th {
+  padding: 12px 14px;
+  background: #edf2f7;
+  color: #2d3748;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid #cbd5e0;
+}
+
+.qd-table td {
+  padding: 14px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: top;
+  color: #2d3748;
+}
+
+.qd-table tbody tr:nth-child(even) {
+  background: #fafcff;
+}
+
+.qd-device-title {
+  font-weight: 800;
+  color: #1a202c;
+  font-size: 0.9rem;
+}
+
+.qd-device-sub {
+  font-size: 0.76rem;
+  color: #718096;
+  margin-top: 3px;
+}
+
+.qd-service-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #4a5568;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* Financial Total Breakdown */
+.qd-totals-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 28px;
+}
+
+.qd-totals-box {
+  width: 100%;
+  max-width: 440px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 16px 20px;
+}
+
+.qd-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 0.86rem;
+  color: #4a5568;
+}
+
+.qd-total-row--discount {
+  color: #c53030;
+}
+
+.qd-total-row--grand {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 2px solid #cbd5e0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #1a365d;
+}
+
+.qd-amount-in-words {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #cbd5e0;
+  font-size: 0.78rem;
+  color: #718096;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Technical Specs & Logistics note */
+.qd-notes-block {
+  margin-bottom: 28px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: #f7fafc;
+  border-left: 4px solid #3182ce;
+  font-size: 0.84rem;
+}
+
+.qd-notes-block h4 {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #2b6cb0;
+}
+
+.qd-notes-block p {
+  margin: 0 0 6px;
+  color: #4a5568;
+  line-height: 1.5;
+}
+
+/* Terms and Signatures */
+.qd-terms {
+  margin-bottom: 32px;
+  font-size: 0.8rem;
+  color: #718096;
+  line-height: 1.6;
+  padding-top: 16px;
+  border-top: 1px solid #edf2f7;
+}
+
+.qd-terms h4 {
+  margin: 0 0 6px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #4a5568;
+  text-transform: uppercase;
+}
+
+.qd-terms ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.qd-signatures-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.qd-sig-box {
+  padding: 10px;
+}
+
+.qd-sig-title {
+  font-weight: 800;
+  color: #2d3748;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.qd-sig-sub {
+  font-size: 0.75rem;
+  color: #a0aec0;
+}
+
+.qd-sig-placeholder {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: #cbd5e0;
+  font-style: italic;
+}
+
+.qd-sig-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #1a202c;
+}
+
+/* Modals */
+.button-success {
+  background: #38a169;
+  color: #ffffff;
+  border: 1px solid #2f855a;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.button-success:hover {
+  background: #2f855a;
+}
+
+/* Print Optimization */
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  .dash-nav,
+  .dash-sidebar,
+  .qd-action-bar,
+  .site-header,
+  .site-footer {
+    display: none !important;
+  }
+
+  .quotation-detail-page {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .qd-document {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .qd-doc-header {
+    flex-direction: column;
+  }
+
+  .qd-doc-title-block {
+    text-align: left;
+  }
+
+  .qd-parties-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .qd-totals-box {
+    max-width: 100%;
+  }
+
+  .qd-document {
+    padding: 20px;
+  }
+}
+
