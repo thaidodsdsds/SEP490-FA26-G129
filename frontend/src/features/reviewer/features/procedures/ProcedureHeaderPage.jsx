@@ -7,6 +7,7 @@ import {
   updateProcedureApi,
 } from '../../../../services/procedure-service.js';
 import ReviewerPageShell from '../../shared/ReviewerPageShell.jsx';
+import ProcedureStepTracker from './ProcedureStepTracker.jsx';
 
 function ProcedureHeaderPage() {
   const { id } = useParams();
@@ -106,136 +107,7 @@ function ProcedureHeaderPage() {
       title={isEditing ? `Chỉnh sửa quy trình: #${id}` : 'Tạo mới phiên bản Quy trình Kỹ thuật'}
     >
       <div style={{ maxWidth: 880, margin: '0 auto' }}>
-        {/* Step Progress Tracker */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#ffffff',
-            padding: '16px 24px',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: '#2563eb',
-                color: '#fff',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-              }}
-            >
-              1
-            </span>
-            <div>
-              <strong style={{ fontSize: '0.92rem', color: '#1e293b', display: 'block' }}>Thông tin chung</strong>
-              <small style={{ color: '#2563eb', fontSize: '0.78rem', fontWeight: 600 }}>Đang thực hiện</small>
-            </div>
-          </div>
-
-          <span style={{ color: '#cbd5e1', fontSize: '1.2rem' }}>→</span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: isEditing ? 1 : 0.45 }}>
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: '#f1f5f9',
-                color: '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-              }}
-            >
-              2
-            </span>
-            <div>
-              {isEditing ? (
-                <Link to={`/internal/head-of-tech/procedures/${id}/steps`} style={{ color: '#1e293b', fontWeight: 600, fontSize: '0.92rem', textDecoration: 'none' }}>
-                  Bước thao tác
-                </Link>
-              ) : (
-                <span style={{ fontSize: '0.92rem', color: '#64748b', fontWeight: 600 }}>Bước thao tác</span>
-              )}
-              <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.78rem' }}>Thao tác & bằng chứng</small>
-            </div>
-          </div>
-
-          <span style={{ color: '#cbd5e1', fontSize: '1.2rem' }}>→</span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: isEditing ? 1 : 0.45 }}>
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: '#f1f5f9',
-                color: '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-              }}
-            >
-              3
-            </span>
-            <div>
-              {isEditing ? (
-                <Link to={`/internal/head-of-tech/procedures/${id}/parameters`} style={{ color: '#1e293b', fontWeight: 600, fontSize: '0.92rem', textDecoration: 'none' }}>
-                  Thông số & Điểm đo
-                </Link>
-              ) : (
-                <span style={{ fontSize: '0.92rem', color: '#64748b', fontWeight: 600 }}>Thông số & Điểm đo</span>
-              )}
-              <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.78rem' }}>Dung sai & công thức</small>
-            </div>
-          </div>
-
-          <span style={{ color: '#cbd5e1', fontSize: '1.2rem' }}>→</span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, opacity: isEditing ? 1 : 0.45 }}>
-            <span
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: '#f1f5f9',
-                color: '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-              }}
-            >
-              4
-            </span>
-            <div>
-              {isEditing ? (
-                <Link to={`/internal/head-of-tech/procedures/${id}/preview`} style={{ color: '#1e293b', fontWeight: 600, fontSize: '0.92rem', textDecoration: 'none' }}>
-                  Xem trước & Ban hành
-                </Link>
-              ) : (
-                <span style={{ fontSize: '0.92rem', color: '#64748b', fontWeight: 600 }}>Xem trước & Ban hành</span>
-              )}
-              <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.78rem' }}>Preview form đo</small>
-            </div>
-          </div>
-        </div>
+        <ProcedureStepTracker currentStep={1} procedureId={id} />
 
         {error && (
           <div
