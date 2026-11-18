@@ -657,6 +657,21 @@ export const updateServiceRequest = async (
       }
     }
 
+    const deviceMap = new Map(devices.map((d) => [d.id, d]));
+    const serviceTypeMap = new Map(serviceTypes.map((st) => [st.id, st]));
+    for (const item of input.items) {
+      const dev = deviceMap.get(item.device_id);
+      const st = serviceTypeMap.get(item.service_type_id);
+      if (dev?.is_group2 && st?.kind !== 'Verification') {
+        throw new AppError(
+          `Thiết bị "${dev.name}" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).`,
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+          { device_id: dev.id, service_type_id: st?.id, service_kind: st?.kind },
+        );
+      }
+    }
+
     const itemRepo = dataSource.getRepository(ServiceRequestItem);
     await itemRepo.delete({ service_request_id: req.id });
 
@@ -832,6 +847,29 @@ export const createServiceRequest = async (
         })),
       },
     );
+  }
+
+  // 3.1. Ràng buộc thiết bị nhóm 2 (is_group2) chỉ được chọn dịch vụ Kiểm định (Verification)
+  const deviceMap = new Map(devices.map((d) => [d.id, d]));
+  const serviceTypeMap = new Map(serviceTypes.map((st) => [st.id, st]));
+  for (const item of items) {
+    const dev = deviceMap.get(item.device_id);
+    const st = serviceTypeMap.get(item.service_type_id);
+    if (dev?.is_group2 && st?.kind !== 'Verification') {
+      throw new AppError(
+        `Thiết bị "${dev.name}" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).`,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        {
+          device_id: dev.id,
+          device_name: dev.name,
+          is_group2: true,
+          service_type_id: st?.id,
+          service_name: st?.name,
+          service_kind: st?.kind,
+        },
+      );
+    }
   }
 
   // 4. Lưu phiếu yêu cầu và các hạng mục dịch vụ

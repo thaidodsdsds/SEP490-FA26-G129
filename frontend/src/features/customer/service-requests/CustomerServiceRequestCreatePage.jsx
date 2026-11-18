@@ -188,6 +188,15 @@ function CustomerServiceRequestCreatePage() {
 
   const handleToggleServiceForDevice = (deviceId, serviceTypeId) => {
     setFormError('');
+    const service = serviceTypes.find((s) => s.id === serviceTypeId);
+    if (service && service.is_valid === false) {
+      return;
+    }
+    const dev = devices.find((d) => d.id === deviceId);
+    if (dev?.is_group2 && service?.kind !== 'Verification') {
+      return;
+    }
+
     setSelectedServicesByDevice((current) => {
       const existing = current[deviceId] || [];
       const next = existing.includes(serviceTypeId)
