@@ -33,7 +33,7 @@ export interface MasterStandardItem {
   id: number;
   name: string;
   serial_number: string;
-  accuracy_class: string;
+  accuracy_class: string | null;
   calibration_expiry: string;
   status: string;
   is_valid: boolean;
@@ -90,7 +90,7 @@ export interface DeviceAssignmentDetail {
     id: number;
     name: string;
     serial_number: string;
-    accuracy_class: string;
+    accuracy_class: string | null;
     calibration_expiry: string;
     is_valid: boolean;
     days_remaining: number;
