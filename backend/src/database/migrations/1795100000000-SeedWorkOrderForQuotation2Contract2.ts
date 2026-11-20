@@ -6,26 +6,31 @@ export default class SeedWorkOrderForQuotation2Contract2179510000000
   name = 'SeedWorkOrderForQuotation2Contract2179510000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Seed dữ liệu cứng bảng work_orders với quotation_id = 2 và contract_id = 2
+    // Seed dữ liệu cứng bảng work_orders với quotation_id = 2 và contract_id = 2 nếu tồn tại
     await queryRunner.query(`
-      INSERT INTO "work_orders" (
-        "id",
-        "contract_id",
-        "quotation_id",
-        "status",
-        "created_at"
-      ) VALUES (
-        2,
-        2,
-        2,
-        'Open',
-        NOW()
-      ) ON CONFLICT ("id") DO UPDATE SET
-        "contract_id" = EXCLUDED."contract_id",
-        "quotation_id" = EXCLUDED."quotation_id",
-        "status" = EXCLUDED."status";
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM "contracts" WHERE "id" = 2) AND EXISTS (SELECT 1 FROM "quotations" WHERE "id" = 2) THEN
+          INSERT INTO "work_orders" (
+            "id",
+            "contract_id",
+            "quotation_id",
+            "status",
+            "created_at"
+          ) VALUES (
+            2,
+            2,
+            2,
+            'Open',
+            NOW()
+          ) ON CONFLICT ("id") DO UPDATE SET
+            "contract_id" = EXCLUDED."contract_id",
+            "quotation_id" = EXCLUDED."quotation_id",
+            "status" = EXCLUDED."status";
 
-      SELECT setval(pg_get_serial_sequence('"work_orders"', 'id'), (SELECT MAX(id) FROM "work_orders"));
+          PERFORM setval(pg_get_serial_sequence('"work_orders"', 'id'), (SELECT MAX(id) FROM "work_orders"));
+        END IF;
+      END $$;
     `);
   }
 

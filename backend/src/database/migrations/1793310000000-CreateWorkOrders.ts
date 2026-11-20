@@ -39,11 +39,6 @@ export class CreateWorkOrders1793310000000 implements MigrationInterface {
       CREATE INDEX "IDX_work_orders_status"
       ON "work_orders" ("status");
     `);
-
-    await queryRunner.query(`
-      INSERT INTO "work_orders" ("contract_id", "quotation_id", "status")
-      VALUES (2, 9, 'Open');
-    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
