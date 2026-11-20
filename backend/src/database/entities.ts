@@ -367,6 +367,11 @@ export class CalibrationProcedure {
   @Column({ type: 'varchar', length: 20, default: 'Draft' })
   status!: string;
 
+  @OneToMany(() => ProcedureStep, (step) => step.procedure)
+  steps!: ProcedureStep[];
+
+  @OneToMany(() => ProcedureParameter, (param) => param.procedure)
+  parameters!: ProcedureParameter[];
 }
 
 // ==================== SERVICE REQUEST ====================
