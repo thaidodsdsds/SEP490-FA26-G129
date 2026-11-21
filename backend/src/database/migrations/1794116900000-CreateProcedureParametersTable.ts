@@ -7,7 +7,7 @@ export default class CreateProcedureParametersTable1794116900000
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "procedure_parameters" (
+      CREATE TABLE IF NOT EXISTS "procedure_parameters" (
         "id" SERIAL PRIMARY KEY,
         "procedure_id" INTEGER NOT NULL,
         "name" VARCHAR(150) NOT NULL,
@@ -30,7 +30,7 @@ export default class CreateProcedureParametersTable1794116900000
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_procedure_parameters_procedure_id"
+      CREATE INDEX IF NOT EXISTS "IDX_procedure_parameters_procedure_id"
       ON "procedure_parameters" ("procedure_id");
     `);
   }

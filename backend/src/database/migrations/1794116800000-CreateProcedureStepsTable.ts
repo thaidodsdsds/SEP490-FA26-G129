@@ -7,7 +7,7 @@ export default class CreateProcedureStepsTable1794116800000
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "procedure_steps" (
+      CREATE TABLE IF NOT EXISTS "procedure_steps" (
         "id" SERIAL PRIMARY KEY,
         "procedure_id" INTEGER NOT NULL,
         "step_no" INTEGER NOT NULL,

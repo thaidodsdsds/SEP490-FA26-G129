@@ -7,7 +7,7 @@ export default class CreateProcedureTestPointsTable1794117000000
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "procedure_test_points" (
+      CREATE TABLE IF NOT EXISTS "procedure_test_points" (
         "id" SERIAL PRIMARY KEY,
         "parameter_id" INTEGER NOT NULL,
         "point_no" INTEGER NOT NULL,
