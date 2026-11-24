@@ -249,6 +249,31 @@ const applyCustomerScope = (
   }
 };
 
+// Admin/CEO chỉ làm việc với chứng thư mà HeadTech đã soát xét (Approved).
+const applyAdminReviewScope = (
+  where: string[],
+  actor?: CertificateActor,
+  pendingOnly = false,
+) => {
+  const role = String(actor?.role || '').toLowerCase();
+  if (role !== 'admin' && role !== 'ceo') return;
+
+  where.push(`cr.review_status = 'Approved'`);
+  where.push(
+    `EXISTS (
+       SELECT 1 FROM accounts review_acc
+       JOIN roles review_role ON review_role.id = review_acc.role_id
+       WHERE review_acc.id = cr.reviewer_id
+         AND LOWER(review_role.name) = 'headtechnician'
+     )`,
+  );
+
+  // Danh sách Admin chỉ chứa bản HeadTech vừa duyệt chờ ký; bản Released không còn trong queue.
+  if (pendingOnly) {
+    where.push(`cert.status IN ('Draft', 'PendingPayment')`);
+  }
+};
+
 export const listCertificates = async (
   filters: CertificateListFilter = {},
   actor?: CertificateActor,
@@ -278,6 +303,7 @@ export const listCertificates = async (
   }
 
   applyCustomerScope(where, params, actor);
+  applyAdminReviewScope(where, actor, true);
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -352,6 +378,7 @@ const loadCertificateRow = async (
   const where: string[] = ['cert.id = $1'];
   const params: unknown[] = [certificateId];
   applyCustomerScope(where, params, actor);
+  applyAdminReviewScope(where, actor);
 
   const rows = await dataSource.query(
     `${CERTIFICATE_SELECT} WHERE ${where.join(' AND ')} LIMIT 1`,
@@ -568,19 +595,21 @@ const nextCertificateNo = async (queryRunner: {
   const rows = (await queryRunner.query(
     `SELECT certificate_no
      FROM certificates
-     WHERE certificate_no LIKE $1
-     ORDER BY certificate_no DESC
-     LIMIT 1`,
+     WHERE certificate_no LIKE $1`,
     [`${prefix}%`],
   )) as Array<{ certificate_no: string }>;
 
-  let sequence = 1;
-  if (Array.isArray(rows) && rows.length > 0) {
-    const parsed = Number(String(rows[0].certificate_no).slice(prefix.length));
-    if (!Number.isNaN(parsed)) sequence = parsed + 1;
+  // Chỉ xét các mã có đuôi là số (CN-<year>-0001). Bỏ qua mã test như CN-2026-TEST-02
+  // để không trả về CN-2026-0001 bị trùng khi sort chuỗi.
+  let maxSequence = 0;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const suffix = String(row.certificate_no).slice(prefix.length);
+    if (/^\d+$/.test(suffix)) {
+      maxSequence = Math.max(maxSequence, Number(suffix));
+    }
   }
 
-  return `${prefix}${String(sequence).padStart(4, '0')}`;
+  return `${prefix}${String(maxSequence + 1).padStart(4, '0')}`;
 };
 
 export const issueCertificate = async (
@@ -702,7 +731,7 @@ export const signCertificate = async (
   certificateId: number,
   actor: CertificateActor,
 ) => {
-  const detail = await getCertificateDetail(certificateId);
+  const detail = await getCertificateDetail(certificateId, actor);
 
   if (!detail.can_sign) {
     throw new AppError(
