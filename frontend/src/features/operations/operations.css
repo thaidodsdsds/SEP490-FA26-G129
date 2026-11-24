@@ -813,6 +813,13 @@
   color: #367a56;
 }
 
+.status-rejected {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  font-weight: 600;
+}
+
 .task-detail {
   min-width: 0;
   padding: 22px;

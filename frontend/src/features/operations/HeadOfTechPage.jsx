@@ -317,7 +317,7 @@ function HeadOfTechPage() {
       schedules.find((s) => {
         // Nếu là chính assignment đang được sửa thì không coi là trùng
         if (assignment.assignmentId && s.assignment_id === assignment.assignmentId) return false;
-        if (s.status === 'Cancelled' || s.status === 'Completed') return false;
+        if (s.status === 'Cancelled' || s.status === 'Completed' || s.status === 'Done') return false;
         const sStart = new Date(s.scheduled_start).getTime();
         const sEnd = new Date(s.scheduled_end).getTime();
         return newStart < sEnd && newEnd > sStart;

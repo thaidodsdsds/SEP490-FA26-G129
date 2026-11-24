@@ -713,6 +713,25 @@ export const updateWorkOrderStatus = async (
   wo.status = newStatus;
   await workOrderRepo.save(wo);
 
+  if (newStatus === 'Done') {
+    await assignmentRepo
+      .createQueryBuilder()
+      .update(WorkOrderAssignment)
+      .set({ status: 'Done' })
+      .where('work_order_id = :woId AND status != :cancelled', {
+        woId: workOrderId,
+        cancelled: 'Cancelled',
+      })
+      .execute();
+  } else if (newStatus === 'Cancelled') {
+    await assignmentRepo
+      .createQueryBuilder()
+      .update(WorkOrderAssignment)
+      .set({ status: 'Cancelled' })
+      .where('work_order_id = :woId', { woId: workOrderId })
+      .execute();
+  }
+
   return getWorkOrderDetail(workOrderId);
 };
 
@@ -839,7 +858,7 @@ export const getAssignmentResources = async (): Promise<AssignmentResourcesResul
     for (const a of assignmentsForTech) {
       if (a.status === 'Assigned') assignedCount++;
       else if (a.status === 'InProgress') inProgressCount++;
-      else if (a.status === 'Completed') completedCount++;
+      else if (a.status === 'Completed' || a.status === 'Done') completedCount++;
 
       const woCode = formatWorkOrderCode(
         a.work_order_id,
@@ -1795,6 +1814,7 @@ export interface TechnicianTaskItem {
   environment_humidity?: string;
   result_status?: 'Pass' | 'Fail' | null;
   review_status?: 'Pending' | 'Approved' | 'Rejected';
+  reject_reason?: string | null;
   submitted_at?: string | null;
   workOrder: string;
   work_order_id?: number;
@@ -2041,6 +2061,7 @@ export const getTechnicianTasks = async (
       let envHumStr = '';
       let resultStatus: 'Pass' | 'Fail' | null = null;
       let reviewStatus: 'Pending' | 'Approved' | 'Rejected' = 'Pending';
+      let rejectReason: string | null = null;
       let submittedAtStr: string | null = null;
       let digitalSignatureRow: any = null;
 
@@ -2062,7 +2083,7 @@ export const getTechnicianTasks = async (
 
             // Load existing calibration_record if any
             const calRows = await dataSource.query(
-              `SELECT id, environment_temp, environment_humidity, result_status, review_status, submitted_at
+              `SELECT id, environment_temp, environment_humidity, result_status, review_status, reject_reason, submitted_at
                FROM calibration_records
                WHERE service_request_item_id = $1
                ORDER BY id DESC
@@ -2076,6 +2097,7 @@ export const getTechnicianTasks = async (
               envHumStr = calRec.environment_humidity !== null && calRec.environment_humidity !== undefined ? String(Number(calRec.environment_humidity)) : '';
               resultStatus = calRec.result_status || null;
               reviewStatus = calRec.review_status || 'Pending';
+              rejectReason = calRec.reject_reason || null;
               submittedAtStr = calRec.submitted_at ? new Date(calRec.submitted_at).toISOString() : null;
 
               try {
@@ -2262,6 +2284,7 @@ export const getTechnicianTasks = async (
         environment_humidity: envHumStr,
         result_status: resultStatus,
         review_status: reviewStatus,
+        reject_reason: rejectReason,
         submitted_at: submittedAtStr,
         workOrder: formatWorkOrderCode(wo.id, new Date(wo.created_at)),
         work_order_id: wo.id,
@@ -2288,8 +2311,8 @@ export const getTechnicianTasks = async (
         consentSignerName: insp?.customer_consent_signer_name || '',
         consentMethod: insp?.customer_consent_method || '',
         consentedAt: insp?.customer_consented_at ? new Date(insp.customer_consented_at).toISOString() : null,
-        signed: Boolean(digitalSignatureRow || submittedAtStr) || asg.status === 'Done',
-        submitted: Boolean(submittedAtStr) || asg.status === 'Done',
+        signed: reviewStatus !== 'Rejected' && (Boolean(digitalSignatureRow || submittedAtStr) || asg.status === 'Done'),
+        submitted: reviewStatus !== 'Rejected' && (asg.status === 'Done' || Boolean(submittedAtStr)),
         signedAt: digitalSignatureRow?.signed_at
           ? new Date(digitalSignatureRow.signed_at).toISOString()
           : submittedAtStr,
@@ -2517,7 +2540,7 @@ export const getProcedureExecution = async (serviceRequestItemId: number) => {
   );
 
   const calRows = await dataSource.query(
-    `SELECT id, service_request_item_id, procedure_id, technician_id, environment_temp, environment_humidity, result_status, review_status, submitted_at
+    `SELECT id, service_request_item_id, procedure_id, technician_id, environment_temp, environment_humidity, result_status, review_status, reject_reason, submitted_at
      FROM calibration_records
      WHERE service_request_item_id = $1
      ORDER BY id DESC
@@ -2671,6 +2694,7 @@ export const getProcedureExecution = async (serviceRequestItemId: number) => {
           environment_humidity: calRec.environment_humidity !== null ? String(Number(calRec.environment_humidity)) : '',
           result_status: calRec.result_status,
           review_status: calRec.review_status,
+          reject_reason: calRec.reject_reason || null,
           submitted_at: calRec.submitted_at ? new Date(calRec.submitted_at).toISOString() : null,
         }
       : null,
@@ -2876,7 +2900,9 @@ export const saveCalibrationRecord = async (
          environment_temp = COALESCE($3, environment_temp),
          environment_humidity = COALESCE($4, environment_humidity),
          result_status = COALESCE($5, result_status),
-         submitted_at = COALESCE(submitted_at, $6)
+         submitted_at = CASE WHEN $6::boolean = true THEN NOW() ELSE submitted_at END,
+         review_status = CASE WHEN $6::boolean = true THEN 'Pending' ELSE review_status END,
+         reject_reason = CASE WHEN $6::boolean = true THEN NULL ELSE reject_reason END
        WHERE id = $7`,
       [
         procedureId,
@@ -2884,10 +2910,19 @@ export const saveCalibrationRecord = async (
         envTemp !== null && !Number.isNaN(envTemp) ? envTemp : null,
         envHum !== null && !Number.isNaN(envHum) ? envHum : null,
         overallResultStatus,
-        submittedAtVal,
+        Boolean(input.submit),
         calRecordId,
       ],
     );
+
+    if (input.submit) {
+      await dataSource.query(
+        `UPDATE service_request_items
+         SET status = 'Inspected'
+         WHERE id = $1 AND status = 'Rejected'`,
+        [sriId],
+      );
+    }
   } else {
     const insertRows = await dataSource.query(
       `INSERT INTO calibration_records (
