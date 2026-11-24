@@ -647,6 +647,7 @@ function TechnicianPage() {
               environment_humidity: saved.calibration_record?.environment_humidity ?? t.environment_humidity,
               result_status: saved.calibration_record?.result_status || t.result_status,
               review_status: saved.calibration_record?.review_status || t.review_status,
+              reject_reason: saved.calibration_record?.reject_reason ?? (saved.calibration_record?.review_status === 'Pending' ? null : t.reject_reason),
               submitted_at: saved.calibration_record?.submitted_at || t.submitted_at,
               signed: Boolean(sig || saved.calibration_record?.submitted_at || t.signed),
               submitted: Boolean(saved.calibration_record?.submitted_at || t.submitted),
@@ -746,6 +747,8 @@ function TechnicianPage() {
       ...selectedTask,
       signed: true,
       submitted: true,
+      review_status: 'Pending',
+      reject_reason: null,
       signedAt: nowIso,
       signedBy: signData.signerName || currentUserName,
       signatureHash: signData.previewHash || `SHA256:${Math.random().toString(36).slice(2, 14).toUpperCase()}`,
@@ -773,11 +776,13 @@ function TechnicianPage() {
           .toLowerCase()
           .includes(q);
 
+      const isRejected = task.review_status === 'Rejected';
+      const isSubmitted = task.submitted && !isRejected;
       const matchFilter =
         filter === 'all' ||
-        (filter === 'in-progress' && !task.submitted && task.inspection) ||
-        (filter === 'new' && !task.submitted && !task.inspection) ||
-        (filter === 'submitted' && task.submitted) ||
+        (filter === 'in-progress' && ((!isSubmitted && task.inspection) || isRejected)) ||
+        (filter === 'new' && !isSubmitted && !task.inspection && !isRejected) ||
+        (filter === 'submitted' && isSubmitted) ||
         (filter === 'pending-sync' && task.pendingSync);
 
       return matchSearch && matchFilter;
@@ -785,8 +790,9 @@ function TechnicianPage() {
   }, [filter, search, tasks]);
 
   const selectedTask = tasks.find((t) => t.id === selectedId) || visibleTasks[0] || tasks[0];
-  const completedCount = tasks.filter((t) => t.submitted).length;
-  const activeCount = tasks.filter((t) => !t.submitted && t.inspection).length;
+  const isSubmittedLocked = Boolean(selectedTask?.submitted && selectedTask?.review_status !== 'Rejected');
+  const completedCount = tasks.filter((t) => t.submitted && t.review_status !== 'Rejected').length;
+  const activeCount = tasks.filter((t) => (!t.submitted && t.inspection) || t.review_status === 'Rejected').length;
   const pendingSyncCount = tasks.filter((t) => t.pendingSync).length;
 
   return (
@@ -1034,18 +1040,22 @@ function TechnicianPage() {
                     <small>{task.scheduled} · {task.location}</small>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '3px', alignItems: 'center' }}>
                       <span
-                        className={`status-badge ${task.submitted
-                            ? 'status-submitted'
-                            : task.inspection
-                              ? 'status-progress'
-                              : 'status-new'
+                        className={`status-badge ${task.review_status === 'Rejected'
+                            ? 'status-rejected'
+                            : task.submitted
+                              ? 'status-submitted'
+                              : task.inspection
+                                ? 'status-progress'
+                                : 'status-new'
                           }`}
                       >
-                        {task.submitted
-                          ? 'Đã trình Review'
-                          : task.inspection
-                            ? 'Đang đo kiểm'
-                            : 'Chưa bắt đầu'}
+                        {task.review_status === 'Rejected'
+                          ? '⚠️ Yêu cầu đo lại'
+                          : task.submitted
+                            ? 'Đã trình Review'
+                            : task.inspection
+                              ? 'Đang đo kiểm'
+                              : 'Chưa bắt đầu'}
                       </span>
                       {isMobile && <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: '#94a3b8' }}>→</span>}
                     </div>
@@ -1101,18 +1111,22 @@ function TechnicianPage() {
                   <p>{selectedTask.customer}</p>
                 </div>
                 <span
-                  className={`status-badge detail-status ${selectedTask.submitted
-                      ? 'status-submitted'
-                      : selectedTask.inspection
-                        ? 'status-progress'
-                        : 'status-new'
+                  className={`status-badge detail-status ${selectedTask.review_status === 'Rejected'
+                      ? 'status-rejected'
+                      : isSubmittedLocked
+                        ? 'status-submitted'
+                        : selectedTask.inspection
+                          ? 'status-progress'
+                          : 'status-new'
                     }`}
                 >
-                  {selectedTask.submitted
-                    ? 'Đã trình duyệt'
-                    : selectedTask.inspection
-                      ? 'Đang thực hiện'
-                      : 'Chưa bắt đầu'}
+                  {selectedTask.review_status === 'Rejected'
+                    ? '⚠️ Yêu cầu đo lại'
+                    : isSubmittedLocked
+                      ? 'Đã trình duyệt'
+                      : selectedTask.inspection
+                        ? 'Đang thực hiện'
+                        : 'Chưa bắt đầu'}
                 </span>
               </div>
 
@@ -1138,11 +1152,33 @@ function TechnicianPage() {
               {/* Feedback Alert Notice */}
               {notice && (
                 <div
-                  className={`task-notice${selectedTask.submitted ? ' success' : ''}`}
-                  role={selectedTask.submitted ? 'status' : 'alert'}
+                  className={`task-notice${isSubmittedLocked ? ' success' : ''}`}
+                  role={isSubmittedLocked ? 'status' : 'alert'}
                 >
-                  <span aria-hidden="true">{selectedTask.submitted ? '✓' : 'ℹ'}</span>
+                  <span aria-hidden="true">{isSubmittedLocked ? '✓' : 'ℹ'}</span>
                   {notice}
+                </div>
+              )}
+
+              {/* Rejection Alert Notice */}
+              {selectedTask.review_status === 'Rejected' && (
+                <div
+                  style={{
+                    background: '#fff1f2',
+                    border: '1px solid #fecdd3',
+                    borderLeft: '4px solid #e11d48',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                  }}
+                  role="alert"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9f1239', fontWeight: 700, fontSize: '0.9rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>⚠️</span> Trưởng phòng yêu cầu đo lại / Từ chối hồ sơ
+                  </div>
+                  <p style={{ margin: '6px 0 0 26px', color: '#881337', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                    <strong>Lý do từ chối:</strong> {selectedTask.reject_reason || 'Hồ sơ chưa đạt chuẩn, vui lòng kiểm tra và đo lại các điểm đo.'}
+                  </p>
                 </div>
               )}
 
@@ -1180,7 +1216,7 @@ function TechnicianPage() {
                   <button
                     aria-pressed={selectedTask.inspection === 'Pass'}
                     className={`inspection-option${selectedTask.inspection === 'Pass' ? ' chosen pass' : ''}`}
-                    disabled={selectedTask.submitted}
+                    disabled={isSubmittedLocked}
                     onClick={() => {
                       const updated = {
                         ...selectedTask,
@@ -1203,7 +1239,7 @@ function TechnicianPage() {
                   <button
                     aria-pressed={selectedTask.inspection === 'Fail'}
                     className={`inspection-option${selectedTask.inspection === 'Fail' ? ' chosen fail' : ''}`}
-                    disabled={selectedTask.submitted}
+                    disabled={isSubmittedLocked}
                     onClick={() => {
                       const updated = {
                         ...selectedTask,
@@ -1260,7 +1296,7 @@ function TechnicianPage() {
                       Mô tả chi tiết lỗi ngoại quan <span>*</span>
                     </label>
                     <textarea
-                      disabled={selectedTask.submitted}
+                      disabled={isSubmittedLocked}
                       id={`defect-note-${selectedTask.id}`}
                       onChange={(event) =>
                         updateTask(selectedTask.id, (task) => ({
@@ -1279,7 +1315,7 @@ function TechnicianPage() {
                         <input
                           accept="image/*"
                           capture="environment"
-                          disabled={selectedTask.submitted || uploadingPhotoKey === 'inspection'}
+                          disabled={isSubmittedLocked || uploadingPhotoKey === 'inspection'}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleInspectionPhotoUpload(file);
@@ -1327,7 +1363,7 @@ function TechnicianPage() {
                             </div>
                           </div>
 
-                          {!selectedTask.submitted && (
+                          {!isSubmittedLocked && (
                             <button
                               onClick={handleRemoveInspectionPhoto}
                               style={{
@@ -1352,7 +1388,7 @@ function TechnicianPage() {
 
                     {/* Customer Consent Details & Technician On-site Consent Box */}
                     <TechnicianInspectionConsentBox
-                      disabled={selectedTask.submitted}
+                      disabled={isSubmittedLocked}
                       onSubmitConsent={handleTechnicianConsentSubmit}
                       task={selectedTask}
                     />
@@ -1385,7 +1421,7 @@ function TechnicianPage() {
 
                     <button
                       className="button button-primary"
-                      disabled={selectedTask.submitted || !selectedTask.defectNote?.trim() || isSavingInspection}
+                      disabled={isSubmittedLocked || !selectedTask.defectNote?.trim() || isSavingInspection}
                       onClick={() => handleSaveInspection(selectedTask)}
                       style={{
                         marginTop: '12px',
@@ -1441,7 +1477,7 @@ function TechnicianPage() {
                   </div>
                   <button
                     className="button button-secondary"
-                    disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask) || isSavingRecord}
+                    disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask) || isSavingRecord}
                     onClick={() => handleSaveProcedureProgress(false)}
                     style={{ fontSize: '0.76rem', padding: '6px 12px', fontWeight: 700 }}
                     type="button"
@@ -1500,7 +1536,7 @@ function TechnicianPage() {
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.74rem', color: '#334155', fontWeight: 600 }}>
                       <span>🌡️ Nhiệt độ phòng thực tế (°C):</span>
                       <input
-                        disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                        disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                         inputMode="decimal"
                         onChange={(e) => setEnvironmentField('environment_temp', e.target.value)}
                         placeholder="VD: 23.5"
@@ -1519,7 +1555,7 @@ function TechnicianPage() {
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.74rem', color: '#334155', fontWeight: 600 }}>
                       <span>💧 Độ ẩm phòng thực tế (%RH):</span>
                       <input
-                        disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                        disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                         inputMode="decimal"
                         onChange={(e) => setEnvironmentField('environment_humidity', e.target.value)}
                         placeholder="VD: 48.0"
@@ -1595,7 +1631,7 @@ function TechnicianPage() {
 
                         <div style={{ marginTop: '6px' }}>
                           <input
-                            disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                            disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                             onChange={(e) => setStepNote(step.id, e.target.value)}
                             placeholder="Ghi chú thực hiện bước kỹ thuật này (tùy chọn)..."
                             style={{
@@ -1617,7 +1653,7 @@ function TechnicianPage() {
                               <input
                                 accept="image/*,.pdf"
                                 capture="environment"
-                                disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask) || uploadingPhotoKey === `step-${step.id}`}
+                                disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask) || uploadingPhotoKey === `step-${step.id}`}
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) handleEvidencePhotoUpload(step.id, file);
@@ -1655,7 +1691,7 @@ function TechnicianPage() {
                                 <span className="file-name">
                                   ✓ {step.fileName || (step.file?.startsWith('http') ? 'Ảnh minh chứng Cloudinary' : step.file)}
                                 </span>
-                                {!selectedTask.submitted && (
+                                {!isSubmittedLocked && (
                                   <button
                                     onClick={() => handleRemoveEvidencePhoto(step.id)}
                                     style={{
@@ -1684,7 +1720,7 @@ function TechnicianPage() {
                         <input
                           checked={step.done}
                           disabled={
-                            selectedTask.submitted ||
+                            isSubmittedLocked ||
                             !inspectionCanProceed(selectedTask) ||
                             (step.evidence && !step.file)
                           }
@@ -1721,7 +1757,7 @@ function TechnicianPage() {
                     </span>
                     <button
                       className="button button-secondary"
-                      disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask) || isSavingRecord}
+                      disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask) || isSavingRecord}
                       onClick={() => handleSaveProcedureProgress(false)}
                       style={{ fontSize: '0.76rem', padding: '6px 12px', fontWeight: 700 }}
                       type="button"
@@ -1762,7 +1798,7 @@ function TechnicianPage() {
                                 <label className="measurement-input">
                                   <input
                                     aria-label={`Giá trị đo ${measurement.point}`}
-                                    disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                                    disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                                     inputMode="decimal"
                                     onChange={(event) => setMeasurement(measurement.id, event.target.value)}
                                     placeholder="Nhập số đo"
@@ -1777,7 +1813,7 @@ function TechnicianPage() {
                                 <label className="measurement-input" style={{ maxWidth: '110px' }}>
                                   <input
                                     aria-label={`Độ không đảm bảo đo ${measurement.point}`}
-                                    disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                                    disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                                     inputMode="decimal"
                                     onChange={(event) => setMeasurementUncertainty(measurement.id, event.target.value)}
                                     placeholder="U"
@@ -1841,7 +1877,7 @@ function TechnicianPage() {
                               <span>Số đo thực tế:</span>
                               <div className="mobile-input-wrapper">
                                 <input
-                                  disabled={selectedTask.submitted || !inspectionCanProceed(selectedTask)}
+                                  disabled={isSubmittedLocked || !inspectionCanProceed(selectedTask)}
                                   inputMode="decimal"
                                   onChange={(e) => setMeasurement(m.id, e.target.value)}
                                   placeholder="0.000"
@@ -1854,7 +1890,7 @@ function TechnicianPage() {
                             </label>
 
                             {/* Quick adjustments */}
-                            {!selectedTask.submitted && inspectionCanProceed(selectedTask) && (
+                            {!isSubmittedLocked && inspectionCanProceed(selectedTask) && (
                               <div className="mobile-stepper-btns">
                                 <button
                                   className="stepper-btn"
@@ -1888,30 +1924,36 @@ function TechnicianPage() {
               <div className="submit-review-bar">
                 <div>
                   <strong>
-                    {selectedTask.submitted
-                      ? '✓ Hồ sơ đã ký số và trình phê duyệt'
-                      : 'Hoàn tất đo kiểm & Ký số nội bộ'}
+                    {selectedTask.review_status === 'Rejected'
+                      ? '⚠️ Yêu cầu đo lại - Vui lòng kiểm tra và ký nộp lại'
+                      : isSubmittedLocked
+                        ? '✓ Hồ sơ đã ký số và trình phê duyệt'
+                        : 'Hoàn tất đo kiểm & Ký số nội bộ'}
                   </strong>
                   <span>
-                    {selectedTask.submitted
-                      ? `Đã ký bởi ${selectedTask.signedBy || currentUserName} (${new Date(selectedTask.signedAt || Date.now()).toLocaleTimeString('vi-VN')})`
-                      : effectiveOnline
-                        ? 'Ký số điện tử (SHA-256) và gửi trực tiếp tới tài khoản Reviewer.'
-                        : 'Lưu trữ chữ ký số ngoại tuyến trên máy. Sẽ gửi tự động khi có mạng.'}
+                    {selectedTask.review_status === 'Rejected'
+                      ? `Lý do: "${selectedTask.reject_reason || 'Chưa đạt chuẩn'}" — Hãy hiệu chỉnh và ký nộp lại.`
+                      : isSubmittedLocked
+                        ? `Đã ký bởi ${selectedTask.signedBy || currentUserName} (${new Date(selectedTask.signedAt || Date.now()).toLocaleTimeString('vi-VN')})`
+                        : effectiveOnline
+                          ? 'Ký số điện tử (SHA-256) và gửi trực tiếp tới tài khoản Reviewer.'
+                          : 'Lưu trữ chữ ký số ngoại tuyến trên máy. Sẽ gửi tự động khi có mạng.'}
                   </span>
                 </div>
 
                 <button
                   className="button button-primary"
-                  disabled={selectedTask.submitted || !isTaskReady(selectedTask)}
+                  disabled={isSubmittedLocked || !isTaskReady(selectedTask)}
                   onClick={handleSignAndSubmit}
                   type="button"
                 >
-                  {selectedTask.submitted
-                    ? '✓ Đã trình soát xét'
-                    : effectiveOnline
-                      ? '✍ Ký số & Trình duyệt'
-                      : '✍ Ký số & Lưu ngoại tuyến'}
+                  {selectedTask.review_status === 'Rejected'
+                    ? '✍ Ký số & Nộp lại'
+                    : isSubmittedLocked
+                      ? '✓ Đã trình soát xét'
+                      : effectiveOnline
+                        ? '✍ Ký số & Trình duyệt'
+                        : '✍ Ký số & Lưu ngoại tuyến'}
                 </button>
               </div>
 
@@ -1936,11 +1978,15 @@ function TechnicianPage() {
                   </div>
                   <button
                     className="button button-primary mobile-sign-btn"
-                    disabled={selectedTask.submitted || !isTaskReady(selectedTask)}
+                    disabled={isSubmittedLocked || !isTaskReady(selectedTask)}
                     onClick={handleSignAndSubmit}
                     type="button"
                   >
-                    {selectedTask.submitted ? '✓ Đã trình' : 'Ký số & Trình'}
+                    {selectedTask.review_status === 'Rejected'
+                      ? 'Ký & Nộp lại'
+                      : isSubmittedLocked
+                        ? '✓ Đã trình'
+                        : 'Ký số & Trình'}
                   </button>
                 </div>
               )}

@@ -742,6 +742,7 @@ function MobileTechnicianApp() {
               environment_humidity: saved.calibration_record?.environment_humidity ?? t.environment_humidity,
               result_status: saved.calibration_record?.result_status || t.result_status,
               review_status: saved.calibration_record?.review_status || t.review_status,
+              reject_reason: saved.calibration_record?.reject_reason ?? (saved.calibration_record?.review_status === 'Pending' ? null : t.reject_reason),
               submitted_at: saved.calibration_record?.submitted_at || t.submitted_at,
               signed: Boolean(sig || saved.calibration_record?.submitted_at || t.signed),
               submitted: Boolean(saved.calibration_record?.submitted_at || t.submitted),
@@ -799,6 +800,8 @@ function MobileTechnicianApp() {
       ...selectedTask,
       signed: true,
       submitted: true,
+      review_status: 'Pending',
+      reject_reason: null,
       signedAt: nowIso,
       signedBy: signData.signerName || technicianName,
       signatureHash: signData.previewHash || `SHA256:${Math.random().toString(36).slice(2, 14).toUpperCase()}`,
@@ -826,11 +829,13 @@ function MobileTechnicianApp() {
           .toLowerCase()
           .includes(q);
 
+      const isRejected = task.review_status === 'Rejected';
+      const isSubmitted = task.submitted && !isRejected;
       const matchFilter =
         filter === 'all' ||
-        (filter === 'new' && !task.submitted && !task.inspection) ||
-        (filter === 'in-progress' && !task.submitted && task.inspection) ||
-        (filter === 'done' && task.submitted) ||
+        (filter === 'new' && !isSubmitted && !task.inspection && !isRejected) ||
+        (filter === 'in-progress' && ((!isSubmitted && task.inspection) || isRejected)) ||
+        (filter === 'done' && isSubmitted) ||
         (filter === 'pending' && task.pendingSync);
 
       return matchSearch && matchFilter;
@@ -838,9 +843,10 @@ function MobileTechnicianApp() {
   }, [filter, search, tasks]);
 
   const selectedTask = tasks.find((t) => t.id === selectedId) || visibleTasks[0] || tasks[0];
+  const isMobileTaskLocked = Boolean(selectedTask?.submitted && selectedTask?.review_status !== 'Rejected');
   const pendingCount = tasks.filter((t) => t.pendingSync).length;
-  const completedCount = tasks.filter((t) => t.submitted).length;
-  const inProgressCount = tasks.filter((t) => !t.submitted && t.inspection).length;
+  const completedCount = tasks.filter((t) => t.submitted && t.review_status !== 'Rejected').length;
+  const inProgressCount = tasks.filter((t) => (!t.submitted && t.inspection) || t.review_status === 'Rejected').length;
 
   return (
     <div className="mobile-app-root">
@@ -1239,10 +1245,14 @@ function MobileTechnicianApp() {
                       <div className="mobile-card-footer">
                         <span
                           className={`mobile-badge ${
-                            task.submitted ? 'done' : task.inspection ? 'in-progress' : 'new'
+                            task.review_status === 'Rejected'
+                              ? 'error'
+                              : task.submitted ? 'done' : task.inspection ? 'in-progress' : 'new'
                           }`}
                         >
-                          {task.submitted ? '✓ Đã trình duyệt' : task.inspection ? '● Đang đo kiểm' : 'Chưa bắt đầu'}
+                          {task.review_status === 'Rejected'
+                            ? '⚠️ Yêu cầu đo lại'
+                            : task.submitted ? '✓ Đã trình duyệt' : task.inspection ? '● Đang đo kiểm' : 'Chưa bắt đầu'}
                         </span>
 
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -1345,10 +1355,14 @@ function MobileTechnicianApp() {
                     </h2>
                     <span
                       className={`mobile-badge ${
-                        selectedTask.submitted ? 'done' : selectedTask.inspection ? 'in-progress' : 'new'
+                        selectedTask.review_status === 'Rejected'
+                          ? 'error'
+                          : selectedTask.submitted ? 'done' : selectedTask.inspection ? 'in-progress' : 'new'
                       }`}
                     >
-                      {selectedTask.submitted ? 'Đã duyệt' : selectedTask.inspection ? 'Đang đo' : 'Mới'}
+                      {selectedTask.review_status === 'Rejected'
+                        ? '⚠️ Yêu cầu đo lại'
+                        : selectedTask.submitted ? 'Đã duyệt' : selectedTask.inspection ? 'Đang đo' : 'Mới'}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 700, marginTop: '2px' }}>
@@ -1357,6 +1371,26 @@ function MobileTechnicianApp() {
                   <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '4px' }}>
                     Model: {selectedTask.model} · Serial: {selectedTask.serial} · Chuẩn: {selectedTask.master_standard || 'Lab'}
                   </div>
+
+                  {selectedTask.review_status === 'Rejected' && (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        background: '#fef2f2',
+                        border: '1px solid #fecdd3',
+                        borderLeft: '4px solid #ef4444',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.74rem',
+                        color: '#991b1b',
+                      }}
+                    >
+                      <strong>⚠️ Trưởng phòng yêu cầu đo lại:</strong>
+                      <div style={{ marginTop: '2px' }}>
+                        {selectedTask.reject_reason || 'Vui lòng kiểm tra lại thiết bị và các điểm đo.'}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Step Navigation Tabs */}
@@ -1387,7 +1421,7 @@ function MobileTechnicianApp() {
                     <div className="mobile-touch-btn-row">
                       <button
                         className={`mobile-touch-btn pass ${selectedTask.inspection === 'Pass' ? 'chosen' : ''}`}
-                        disabled={selectedTask.submitted}
+                        disabled={isMobileTaskLocked}
                         onClick={() => {
                           const updated = {
                             ...selectedTask,
@@ -1406,7 +1440,7 @@ function MobileTechnicianApp() {
 
                       <button
                         className={`mobile-touch-btn fail ${selectedTask.inspection === 'Fail' ? 'chosen' : ''}`}
-                        disabled={selectedTask.submitted}
+                        disabled={isMobileTaskLocked}
                         onClick={() => {
                           const updated = {
                             ...selectedTask,
@@ -1457,7 +1491,7 @@ function MobileTechnicianApp() {
                           Mô tả lỗi ngoại quan <span>*</span>:
                         </label>
                         <textarea
-                          disabled={selectedTask.submitted}
+                          disabled={isMobileTaskLocked}
                           onChange={(e) => updateTask(selectedTask.id, (t) => ({ ...t, defectNote: e.target.value }))}
                           placeholder="Mô tả vết nứt, cong vênh, trầy xước..."
                           rows={2}
@@ -1486,7 +1520,7 @@ function MobileTechnicianApp() {
                             <input
                               accept="image/*"
                               capture="environment"
-                              disabled={selectedTask.submitted || uploadingPhotoKey === 'inspectionPhoto'}
+                              disabled={isMobileTaskLocked || uploadingPhotoKey === 'inspectionPhoto'}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleCameraCapture(file, 'inspectionPhoto');
@@ -1522,7 +1556,7 @@ function MobileTechnicianApp() {
                                 <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 700 }}>
                                   ✓ Đã lưu ảnh ngoại quan
                                 </span>
-                                {!selectedTask.submitted && (
+                                {!isMobileTaskLocked && (
                                   <button
                                     onClick={handleRemoveInspectionPhoto}
                                     style={{
@@ -1547,7 +1581,7 @@ function MobileTechnicianApp() {
 
                         {/* Customer Consent Details & Technician On-site Consent Box */}
                         <TechnicianInspectionConsentBox
-                          disabled={selectedTask.submitted}
+                          disabled={isMobileTaskLocked}
                           isMobile={true}
                           onSubmitConsent={handleTechnicianConsentSubmit}
                           task={selectedTask}
@@ -1573,7 +1607,7 @@ function MobileTechnicianApp() {
 
                         <button
                           className="button button-primary"
-                          disabled={selectedTask.submitted || !selectedTask.defectNote?.trim() || isSavingInspection}
+                          disabled={isMobileTaskLocked || !selectedTask.defectNote?.trim() || isSavingInspection}
                           onClick={() => handleSaveInspection(selectedTask)}
                           style={{
                             marginTop: '12px',
@@ -1658,7 +1692,7 @@ function MobileTechnicianApp() {
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.68rem', fontWeight: 600, color: '#334155' }}>
                         <span>🌡️ Nhiệt độ (°C)</span>
                         <input
-                          disabled={selectedTask.submitted}
+                          disabled={isMobileTaskLocked}
                           inputMode="decimal"
                           onChange={(e) => setEnvironmentField('environment_temp', e.target.value)}
                           placeholder="VD: 23.5"
@@ -1677,7 +1711,7 @@ function MobileTechnicianApp() {
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.68rem', fontWeight: 600, color: '#334155' }}>
                         <span>💧 Độ ẩm (%RH)</span>
                         <input
-                          disabled={selectedTask.submitted}
+                          disabled={isMobileTaskLocked}
                           inputMode="decimal"
                           onChange={(e) => setEnvironmentField('environment_humidity', e.target.value)}
                           placeholder="VD: 48.0"
@@ -1741,7 +1775,7 @@ function MobileTechnicianApp() {
                             </div>
 
                             <input
-                              disabled={selectedTask.submitted}
+                              disabled={isMobileTaskLocked}
                               onChange={(e) => setStepNote(step.id, e.target.value)}
                               placeholder="Ghi chú bước thực hiện..."
                               style={{
@@ -1763,7 +1797,7 @@ function MobileTechnicianApp() {
                                   <input
                                     accept="image/*"
                                     capture="environment"
-                                    disabled={selectedTask.submitted || uploadingPhotoKey === `step-${step.id}`}
+                                    disabled={isMobileTaskLocked || uploadingPhotoKey === `step-${step.id}`}
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) handleStepEvidenceCapture(step.id, file);
@@ -1797,7 +1831,7 @@ function MobileTechnicianApp() {
                                     <span style={{ fontSize: '0.66rem', color: '#166534', fontWeight: 600 }}>
                                       ✓ Đã đính kèm ảnh
                                     </span>
-                                    {!selectedTask.submitted && (
+                                    {!isMobileTaskLocked && (
                                       <button
                                         onClick={() => handleRemoveStepEvidence(step.id)}
                                         style={{
@@ -1824,7 +1858,7 @@ function MobileTechnicianApp() {
                           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginTop: '2px' }}>
                             <input
                               checked={step.done}
-                              disabled={selectedTask.submitted}
+                              disabled={isMobileTaskLocked}
                               onChange={() => toggleStep(step.id)}
                               style={{ width: '20px', height: '20px' }}
                               type="checkbox"
@@ -1837,7 +1871,7 @@ function MobileTechnicianApp() {
                     <div style={{ marginTop: '12px' }}>
                       <button
                         className="button button-secondary"
-                        disabled={selectedTask.submitted || isSavingRecord}
+                        disabled={isMobileTaskLocked || isSavingRecord}
                         onClick={() => handleSaveProcedureProgress(false)}
                         style={{ width: '100%', padding: '8px 12px', fontSize: '0.75rem', fontWeight: 700 }}
                         type="button"
@@ -1872,7 +1906,7 @@ function MobileTechnicianApp() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <h3 style={{ margin: 0 }}>Bước 3: Nhập số đọc đo kiểm</h3>
                       <button
-                        disabled={selectedTask.submitted || isSavingRecord}
+                        disabled={isMobileTaskLocked || isSavingRecord}
                         onClick={() => handleSaveProcedureProgress(false)}
                         style={{
                           background: '#0284c7',
@@ -1933,7 +1967,7 @@ function MobileTechnicianApp() {
                             <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                               <div style={{ flex: 1, display: 'flex', border: '1.5px solid #cbd5e1', borderRadius: '8px', background: '#fff' }}>
                                 <input
-                                  disabled={selectedTask.submitted}
+                                  disabled={isMobileTaskLocked}
                                   inputMode="decimal"
                                   onChange={(e) => handleMeasurementChange(m.id, e.target.value)}
                                   placeholder="0.000"
@@ -1955,7 +1989,7 @@ function MobileTechnicianApp() {
                                 </span>
                               </div>
 
-                              {!selectedTask.submitted && (
+                              {!isMobileTaskLocked && (
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button
                                     onClick={() => adjustMeasurement(m.id, -0.01)}
@@ -2030,11 +2064,15 @@ function MobileTechnicianApp() {
 
                     <button
                       className="button button-primary mobile-sync-cta"
-                      disabled={selectedTask.submitted || !isTaskReady(selectedTask)}
+                      disabled={isMobileTaskLocked || !isTaskReady(selectedTask)}
                       onClick={handleDigitalSign}
                       type="button"
                     >
-                      {selectedTask.submitted ? '✓ ĐÃ KÝ SỐ VÀ TRÌNH PHÊ DUYỆT' : '✍ MỞ KHUNG KÝ SỐ ĐIỆN TỬ & HOÀN TẤT'}
+                      {selectedTask.review_status === 'Rejected'
+                        ? '✍ KÝ SỐ & NỘP LẠI (ĐO LẠI)'
+                        : isMobileTaskLocked
+                          ? '✓ ĐÃ KÝ SỐ VÀ TRÌNH PHÊ DUYỆT'
+                          : '✍ MỞ KHUNG KÝ SỐ ĐIỆN TỬ & HOÀN TẤT'}
                     </button>
 
                     <TechnicianSignedDetailsCard
