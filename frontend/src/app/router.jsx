@@ -9,6 +9,8 @@ import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashb
 import CustomerServiceRequestCreatePage from '../features/customer/service-requests/CustomerServiceRequestCreatePage.jsx';
 import CustomerServiceRequestListPage from '../features/customer/service-requests/CustomerServiceRequestListPage.jsx';
 import CustomerServiceRequestDetailPage from '../features/customer/service-requests/CustomerServiceRequestDetailPage.jsx';
+import CustomerCertificatesPage from '../features/customer/records/CustomerCertificatesPage.jsx';
+import CustomerSealsPage from '../features/customer/records/CustomerSealsPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
@@ -113,6 +115,8 @@ const customerRoutes = [
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
       { path: 'contracts', element: <ContractListPage basePath="/internal/customer/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/customer/contracts" /> },
+      { path: 'certificates', element: <CustomerCertificatesPage /> },
+      { path: 'seals', element: <CustomerSealsPage /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],

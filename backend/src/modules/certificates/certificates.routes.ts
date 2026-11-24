@@ -22,8 +22,10 @@ const ISSUE_ROLES = [
   'HeadTechnician',
   'LabManager',
   'HeadOfTech',
-  'Admin',
 ];
+
+// HeadTech chỉ tạo chứng nhận ở trạng thái Draft; ký phát hành thuộc Admin/CEO.
+const SIGN_ROLES = ['Reviewer', 'LabManager', 'HeadOfTech', 'Admin', 'CEO'];
 
 certificatesRoutes.get(
   '/eligible-records',
@@ -57,7 +59,7 @@ certificatesRoutes.get(
 
 certificatesRoutes.post(
   '/:id/sign',
-  authorize(...ISSUE_ROLES, 'CEO'),
+  authorize(...SIGN_ROLES),
   controller.signCertificateHandler,
 );
 

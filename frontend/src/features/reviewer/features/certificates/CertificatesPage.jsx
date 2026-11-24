@@ -17,8 +17,10 @@ import IssueCertificateModal from './IssueCertificateModal.jsx';
 
 const normalizeRole = (value) => String(value || '').toLowerCase().replace(/[^a-z]/g, '');
 
-const CAN_ISSUE_ROLES = ['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin'];
-const CAN_SIGN_ROLES = [...CAN_ISSUE_ROLES, 'ceo'];
+// Chỉ HeadTech (và các role soát xét) được cấp chứng nhận; Admin không cấp.
+const CAN_ISSUE_ROLES = ['reviewer', 'headtechnician', 'labmanager', 'headoftech'];
+// Admin/CEO chỉ xem bản HeadTech đã duyệt và ký phát hành.
+const CAN_SIGN_ROLES = ['reviewer', 'labmanager', 'headoftech', 'admin', 'ceo'];
 
 const errorMessage = (error) =>
   error?.response?.data?.error?.message || error?.message || 'Đã xảy ra lỗi khi gọi máy chủ.';
@@ -36,6 +38,8 @@ function CertificatesPage() {
   const role = normalizeRole(session?.role);
   const canIssue = CAN_ISSUE_ROLES.includes(role);
   const canSign = CAN_SIGN_ROLES.includes(role);
+  // Admin/CEO chỉ xem hàng HeadTech đã duyệt và ký; không có thao tác cấp chứng nhận.
+  const isApprovalQueue = canSign && !canIssue;
 
   const [data, setData] = useState({
     items: [],
@@ -238,11 +242,13 @@ function CertificatesPage() {
           <div>
             <h2>Danh sách Certificate</h2>
             <p>
-              Chứng nhận liên kết hồ sơ hiệu chuẩn đã duyệt, quy trình áp dụng và chữ ký phát hành (DigitalSignature).
+              {isApprovalQueue
+                ? 'Chứng nhận đã được HeadTech soát xét, chờ Admin xem và ký phát hành (DigitalSignature).'
+                : 'Chứng nhận liên kết hồ sơ hiệu chuẩn đã duyệt, quy trình áp dụng và chữ ký phát hành (DigitalSignature).'}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {eligibleCount !== null ? (
+            {!isApprovalQueue && eligibleCount !== null ? (
               <span className="queue-counter" style={{ background: '#eff6ff', color: '#1d4ed8' }}>
                 {eligibleCount} hồ sơ đủ điều kiện
               </span>
@@ -423,13 +429,22 @@ function CertificatesPage() {
         )}
 
         <p className="mock-note">
-          <strong>Quy trình:</strong> Hồ sơ hiệu chuẩn phải được soát xét ở trạng thái Approved và đạt yêu cầu trước khi
-          cấp chứng nhận. Chứng nhận được tạo ở dạng Draft, sau đó ký phát hành để chuyển sang Released và cập nhật file
-          PDF có chữ ký số.
+          {isApprovalQueue ? (
+            <>
+              <strong>Quy trình:</strong> HeadTech soát xét hồ sơ và chuyển sang bản nháp chờ ký. Admin chỉ xem các bản
+              này và ký phát hành để chuyển sang Released, cập nhật file PDF có chữ ký số.
+            </>
+          ) : (
+            <>
+              <strong>Quy trình:</strong> Hồ sơ hiệu chuẩn phải được soát xét ở trạng thái Approved và đạt yêu cầu trước
+              khi cấp chứng nhận. Chứng nhận được tạo ở dạng Draft, sau đó ký phát hành để chuyển sang Released và cập
+              nhật file PDF có chữ ký số.
+            </>
+          )}
         </p>
       </section>
 
-      {issueOpen ? (
+      {issueOpen && canIssue ? (
         <IssueCertificateModal onClose={() => setIssueOpen(false)} onIssue={handleIssue} />
       ) : null}
 

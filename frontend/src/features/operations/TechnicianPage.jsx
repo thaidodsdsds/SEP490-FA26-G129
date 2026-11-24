@@ -101,6 +101,17 @@ function TechnicianPage() {
       .catch(() => {});
   }, []);
 
+  // Luôn dùng IP do backend chọn (ưu tiên IP hotspot 192.168.137.x) khi chạy local,
+  // kể cả người dùng mở trang ở 192.168.1.x trên máy tính.
+  const mobileAppUrl = (() => {
+    if (typeof window === 'undefined') return `http://${lanIp}:5173/mobile/technician`;
+    const hostname = window.location.hostname;
+    const isLocalDev = /^(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
+    const host = isLocalDev ? lanIp : hostname;
+    const port = isLocalDev ? window.location.port || '5173' : window.location.port;
+    return `${window.location.protocol}//${host}${port ? `:${port}` : ''}/mobile/technician`;
+  })();
+
   // ─── Mobile View State ────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768,
@@ -2210,11 +2221,7 @@ function TechnicianPage() {
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
                 <img
                   alt="QR Code"
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
-                    typeof window !== 'undefined'
-                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
-                      : `http://${lanIp}:5173/mobile/technician`,
-                  )}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(mobileAppUrl)}`}
                   style={{ width: '130px', height: '130px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
                 />
                 <div style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, marginTop: '4px' }}>
@@ -2240,17 +2247,12 @@ function TechnicianPage() {
                     marginBottom: '8px',
                   }}
                 >
-                  {typeof window !== 'undefined'
-                    ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
-                    : `http://${lanIp}:5173/mobile/technician`}
+                  {mobileAppUrl}
                 </div>
                 <button
                   onClick={() => {
-                    const url = typeof window !== 'undefined'
-                      ? `${window.location.protocol}//${window.location.hostname === 'localhost' ? lanIp : window.location.hostname}:${window.location.port}/mobile/technician`
-                      : `http://${lanIp}:5173/mobile/technician`;
-                    navigator.clipboard?.writeText(url);
-                    alert('Đã sao chép liên kết vào bộ nhớ tạm!');
+                    navigator.clipboard?.writeText(mobileAppUrl);
+                    alert(`Đã sao chép: ${mobileAppUrl}`);
                   }}
                   style={{
                     background: '#e2e8f0',

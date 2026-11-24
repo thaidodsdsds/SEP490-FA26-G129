@@ -6,7 +6,8 @@ const links = [
   { to: '/internal/customer/devices', label: 'Hồ sơ thiết bị', icon: '▤' },
   { to: '/internal/customer/service-requests', label: 'Đơn dịch vụ', icon: '⌁' },
   { to: '/internal/customer/contracts', label: 'Hợp đồng', icon: '✎' },
-  { to: '/internal/customer/certificates', label: 'Chứng nhận & tem', icon: '✓', soon: true },
+  { to: '/internal/customer/certificates', label: 'Chứng nhận', icon: '✓' },
+  { to: '/internal/customer/seals', label: 'Tem hiệu chuẩn', icon: '◉' },
   { to: '/internal/customer/invoices', label: 'Công nợ', icon: '₫', soon: true },
 ];
 

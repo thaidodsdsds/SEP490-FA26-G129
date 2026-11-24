@@ -3,6 +3,7 @@ import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import env from '../../config/env.js';
+import { getPreferredLanIp } from '../../utils/network.js';
 
 const PAGE_WIDTH = 298.11; // A6 width (pt)
 const PAGE_HEIGHT = 419.53; // A6 height (pt)
@@ -50,7 +51,20 @@ const resolveFontPath = (): string | null => {
 };
 
 export const buildSealVerifyUrl = (sealCode: string): string => {
-  const baseUrl = env.frontendUrl.replace(/\/+$/, '');
+  let baseUrl = env.frontendUrl.replace(/\/+$/, '');
+
+  // FRONTEND_URL mặc định là localhost — điện thoại sẽ hiểu nhầm là chính nó.
+  // Khi chạy local, thay bằng IP LAN/hotspot mà điện thoại truy cập được.
+  try {
+    const parsed = new URL(baseUrl);
+    if (['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
+      parsed.hostname = getPreferredLanIp();
+      baseUrl = parsed.toString().replace(/\/+$/, '');
+    }
+  } catch {
+    // Giữ nguyên FRONTEND_URL nếu không parse được.
+  }
+
   return `${baseUrl}/verify/${encodeURIComponent(sealCode)}`;
 };
 
