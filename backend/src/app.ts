@@ -97,28 +97,32 @@ app.get(`${API_PREFIX}/health`, async (req, res, next) => {
 });
 
 app.get(`${API_PREFIX}/system/lan-ip`, (req, res) => {
-  const ifaces = os.networkInterfaces();
-  let lanIp = '192.168.1.7';
-  for (const dev in ifaces) {
-    const list = ifaces[dev];
-    if (list) {
-      for (const details of list) {
-        if (
-          details.family === 'IPv4' &&
-          !details.internal &&
-          (details.address.startsWith('192.168.') ||
-            details.address.startsWith('10.') ||
-            details.address.startsWith('172.'))
-        ) {
-          lanIp = details.address;
-          break;
-        }
+  const isPrivateIpv4 = (address: string): boolean =>
+    address.startsWith('192.168.') ||
+    address.startsWith('10.') ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(address);
+
+  // Bỏ qua card ảo (VMware, WSL/Hyper-V, Docker, VPN...) — thường chạy trước Wi-Fi thật.
+  const isVirtualInterface = (name: string): boolean =>
+    /vmware|virtual|vethernet|wsl|hyper-v|docker|loopback|tap|vpn/i.test(name);
+
+  const candidates: Array<{ name: string; address: string }> = [];
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    if (!list || isVirtualInterface(name)) continue;
+    for (const details of list) {
+      if (details.family === 'IPv4' && !details.internal && isPrivateIpv4(details.address)) {
+        candidates.push({ name, address: details.address });
+        break;
       }
     }
   }
+
+  const preferred =
+    candidates.find(({ name }) => /wi-?fi|wireless|ethernet/i.test(name)) ?? candidates[0];
+
   res.status(200).json(
     buildSuccessResponse({
-      lanIp,
+      lanIp: preferred?.address ?? '192.168.1.7',
     }),
   );
 });
