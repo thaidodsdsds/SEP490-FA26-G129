@@ -43,3 +43,21 @@ export const resetPasswordApi = async ({ token, password }) => {
   const response = await apiClient.post('/auth/reset-password', { token, password });
   return response.data.data;
 };
+
+/**
+ * Verify 2FA OTP code.
+ * Returns { token, account } on success.
+ */
+export const verify2FAApi = async ({ two_factor_token, otp }) => {
+  const response = await apiClient.post('/auth/verify-2fa', { two_factor_token, otp });
+  return response.data.data;
+};
+
+/**
+ * Resend 2FA OTP code.
+ * Returns { two_factor_token, email_masked, message }
+ */
+export const resend2FAApi = async ({ two_factor_token }) => {
+  const response = await apiClient.post('/auth/resend-2fa', { two_factor_token });
+  return response.data.data;
+};

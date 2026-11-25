@@ -9,6 +9,7 @@ function ReviewerPageShell({
   query,
   onSearchChange,
   hideSearch = false,
+  badge = 'Dữ liệu minh họa',
 }) {
   const message = typeof feedback === 'string' ? feedback : feedback?.message;
   const tone = typeof feedback === 'string' ? 'success' : feedback?.tone || 'success';
@@ -22,7 +23,7 @@ function ReviewerPageShell({
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
-        <span className="demo-pill"><span /> Dữ liệu minh họa</span>
+        {badge ? <span className="demo-pill"><span /> {badge}</span> : null}
       </header>
       <AnimatePresence initial={false}>
         {message && (

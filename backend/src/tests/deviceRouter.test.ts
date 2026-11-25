@@ -8,7 +8,7 @@ import {
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
-import { Customer, Device, ServiceRequestItem } from '../database/entities.js';
+import { Customer, Device, DeviceOwnershipHistory, ServiceRequestItem } from '../database/entities.js';
 
 const {
   getRepository,
@@ -103,6 +103,11 @@ describe('Devices Module API', () => {
       if (entity === ServiceRequestItem) {
         return {
           find: sriFind,
+        };
+      }
+      if (entity === DeviceOwnershipHistory) {
+        return {
+          find: vi.fn().mockResolvedValue([]),
         };
       }
       return {};

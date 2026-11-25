@@ -62,3 +62,22 @@ export const updateDeviceApi = async (deviceId, payload) => {
   return response.data?.data;
 };
 
+/**
+ * 1. Lấy lịch sử sở hữu của thiết bị (View Device Ownership History):
+ * Cho phép xem thiết bị trước đây thuộc về Customer nào và đã chuyển qua những chủ sở hữu nào.
+ */
+export const fetchDeviceOwnershipHistoryApi = async (deviceId) => {
+  const response = await apiClient.get(`/devices/${deviceId}/ownership-history`);
+  return response.data?.data;
+};
+
+/**
+ * 2. Chuyển quyền sở hữu thiết bị (Transfer Device Ownership):
+ * Chuyển quyền sở hữu từ Customer hiện tại sang Customer mới.
+ */
+export const transferDeviceOwnershipApi = async (deviceId, payload) => {
+  const response = await apiClient.post(`/devices/${deviceId}/transfer-ownership`, payload);
+  return response.data?.data;
+};
+
+

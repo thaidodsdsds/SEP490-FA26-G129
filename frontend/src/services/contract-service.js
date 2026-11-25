@@ -51,6 +51,23 @@ export const approveContractApi = async (contractId) => {
   return response.data?.data;
 };
 
+export const rejectContractApi = async (contractId, reason) => {
+  const response = await apiClient.post(`/contracts/${contractId}/reject`, { reason });
+  return response.data?.data;
+};
+
+export const customerSignContractApi = async (contractId) => {
+  const response = await apiClient.post(`/contracts/${contractId}/customer-sign`);
+  return response.data?.data;
+};
+
+export const downloadSignedContractApi = async (contractId) => {
+  const response = await apiClient.get(`/contracts/${contractId}/signed-file`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
 export const cancelContractApi = async (contractId) => {
   const response = await apiClient.post(`/contracts/${contractId}/cancel`);
   return response.data?.data;

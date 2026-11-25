@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAppContext } from '../../../app/providers.jsx';
 import { extractApiErrorMessage, getServiceRequestDetailApi } from '../../../services/service-request-service.js';
+import CustomerInspectionConsentModal from './components/CustomerInspectionConsentModal.jsx';
 import ServiceRequestCancelModal from './components/ServiceRequestCancelModal.jsx';
 import ServiceRequestEditModal from './components/ServiceRequestEditModal.jsx';
 import ServiceRequestStatusBadge from './components/ServiceRequestStatusBadge.jsx';
@@ -26,6 +28,17 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
+const extractRejectionReason = (specialNotes, quotationCode) => {
+  if (!specialNotes || typeof specialNotes !== 'string') return '';
+  if (quotationCode) {
+    const regex = new RegExp(`\\[Khách từ chối báo giá ${quotationCode}:\\s*([^\\]]+)\\]`, 'i');
+    const match = specialNotes.match(regex);
+    if (match) return match[1].trim();
+  }
+  const genericMatch = specialNotes.match(/\[Khách từ chối báo giá[^:]*:\s*([^\]]+)\]/i);
+  return genericMatch ? genericMatch[1].trim() : '';
+};
+
 const WORKFLOW_STEPS = [
   { key: 'New', label: '1. Tiếp nhận' },
   { key: 'Quoted', label: '2. Báo giá' },
@@ -35,6 +48,7 @@ const WORKFLOW_STEPS = [
 ];
 
 function CustomerServiceRequestDetailPage({ role = 'customer' }) {
+  const { user } = useAppContext() || {};
   const { id } = useParams();
   const navigate = useNavigate();
   const isSales = role === 'sales';
@@ -46,6 +60,7 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedConsentItem, setSelectedConsentItem] = useState(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -110,6 +125,9 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
   const isCancelled = detail.status === 'Cancelled';
   const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === detail.status);
   const items = Array.isArray(detail.items) ? detail.items : [];
+  const failedInspectionItems = items.filter(
+    (item) => item.initial_inspection?.result === 'Fail',
+  );
   const attachments = Array.isArray(detail.attachments) ? detail.attachments : [];
   const quotation = detail.latest_quotation;
   const allQuotations = Array.isArray(detail.quotations)
@@ -149,7 +167,7 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
               >
                 ₫ Lập báo giá cho đơn này
               </Link>
-            ) : (quotation?.status === 'Rejected' && !allQuotations.some((q) => q.status === 'Draft' || q.status === 'Sent' || q.status === 'Approved')) ? (
+            ) : (quotation?.status === 'Rejected' && !allQuotations.some((q) => q.status === 'Draft' || q.status === 'PendingApproval' || q.status === 'Sent' || q.status === 'Approved')) ? (
               <Link
                 className="button button-primary"
                 to={`/internal/sales/quotations?requestId=${detail.id}`}
@@ -231,6 +249,67 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
       <div className="sr-detail-grid">
         {/* Left Column */}
         <div className="sr-detail-main">
+          {/* Banner Cảnh báo Kiểm tra Ngoại quan không đạt */}
+          {failedInspectionItems.length > 0 && (
+            <div
+              style={{
+                marginBottom: '20px',
+                padding: '16px 20px',
+                borderRadius: '12px',
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                <span style={{ fontSize: '1.8rem', lineHeight: 1 }}>⚠️</span>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#92400e', fontWeight: 700 }}>
+                    Yêu cầu Xác nhận: Có {failedInspectionItems.length} thiết bị không đạt kiểm tra ngoại quan ban đầu
+                  </h3>
+                  <p style={{ margin: '6px 0 12px', fontSize: '0.82rem', color: '#78350f', lineHeight: 1.5 }}>
+                    Kỹ thuật viên phòng đo ISOCAL đã phát hiện khuyết tật ngoại quan (móp méo, nứt vỡ hoặc trầy xước bề mặt) trên thiết bị.
+                    Để đảm bảo độ tin cậy và quyền lợi của Quý khách, vui lòng xem ảnh chụp thực tế và đưa ra quyết định xác nhận tiếp tục hiệu chuẩn hoặc yêu cầu gửi trả thiết bị.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {failedInspectionItems.map((fi) => {
+                      const isApproved =
+                        fi.initial_inspection?.customer_consent_status === 'Approved';
+                      const isRejected =
+                        fi.initial_inspection?.customer_consent_status === 'Rejected';
+                      const isPending = !isApproved && !isRejected;
+
+                      return (
+                        <button
+                          key={fi.id}
+                          className="button"
+                          onClick={() => setSelectedConsentItem(fi)}
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            borderRadius: '20px',
+                            background: isPending ? '#f59e0b' : isApproved ? '#16a34a' : '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                          type="button"
+                        >
+                          <span>{isPending ? '⚠️ Cần duyệt: ' : isApproved ? '✓ Đã đồng ý: ' : '✕ Đã từ chối: '}</span>
+                          <span>{fi.device_name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section: Danh mục thiết bị & dịch vụ */}
           <section className="sr-card" aria-labelledby="heading-items">
             <h2 className="sr-card-title" id="heading-items">
@@ -250,46 +329,124 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
                       <th>Hãng & Model</th>
                       <th>Số Serial / Mã nội bộ</th>
                       <th>Dịch vụ yêu cầu</th>
-                      <th>Tiêu chuẩn</th>
+                      <th>Kiểm tra ngoại quan</th>
                       <th>Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item, idx) => (
-                      <tr key={item.id || idx}>
-                        <td style={{ color: '#8c9ba5', fontWeight: 600 }}>{idx + 1}</td>
-                        <td className="sr-device-row">
-                          <strong>{item.device_name}</strong>
-                        </td>
-                        <td>
-                          <span>{item.manufacturer || '—'}</span>
-                          {item.model && <small style={{ display: 'block', color: '#687f92' }}>Mod: {item.model}</small>}
-                        </td>
-                        <td>
-                          <div className="sr-device-tags">
-                            {item.serial_number && <span className="sr-meta-tag">SN: {item.serial_number}</span>}
-                            {item.internal_code && <span className="sr-meta-tag">Mã: {item.internal_code}</span>}
-                            {!item.serial_number && !item.internal_code && <span style={{ color: '#a0aec0' }}>—</span>}
-                          </div>
-                        </td>
-                        <td>
-                          <strong>{item.service_type_name}</strong>
-                          <span style={{ display: 'block', fontSize: '0.74rem', color: '#2b6cb0' }}>
-                            {item.service_kind === 'Calibration' ? 'Hiệu chuẩn' : item.service_kind}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.78rem', color: '#4a5568' }}>
-                            {item.standard_code || 'Tiêu chuẩn ISO/IEC 17025'}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="sr-meta-tag" style={{ background: '#edf2f7', color: '#2d3748' }}>
-                            {item.status === 'Pending' ? 'Chờ nhận mẫu' : item.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {items.map((item, idx) => {
+                      const insp = item.initial_inspection;
+                      const isApproved = insp?.customer_consent_status === 'Approved';
+                      const isRejected = insp?.customer_consent_status === 'Rejected';
+
+                      return (
+                        <tr key={item.id || idx}>
+                          <td style={{ color: '#8c9ba5', fontWeight: 600 }}>{idx + 1}</td>
+                          <td className="sr-device-row">
+                            <strong>{item.device_name}</strong>
+                          </td>
+                          <td>
+                            <span>{item.manufacturer || '—'}</span>
+                            {item.model && <small style={{ display: 'block', color: '#687f92' }}>Mod: {item.model}</small>}
+                          </td>
+                          <td>
+                            <div className="sr-device-tags">
+                              {item.serial_number && <span className="sr-meta-tag">SN: {item.serial_number}</span>}
+                              {item.internal_code && <span className="sr-meta-tag">Mã: {item.internal_code}</span>}
+                              {!item.serial_number && !item.internal_code && <span style={{ color: '#a0aec0' }}>—</span>}
+                            </div>
+                          </td>
+                          <td>
+                            <strong>{item.service_type_name}</strong>
+                            <span style={{ display: 'block', fontSize: '0.74rem', color: '#2b6cb0' }}>
+                              {item.service_kind === 'Calibration' ? 'Hiệu chuẩn' : item.service_kind}
+                            </span>
+                          </td>
+                          <td>
+                            {insp ? (
+                              insp.result === 'Pass' ? (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '3px 8px',
+                                    borderRadius: '12px',
+                                    background: '#f0fdf4',
+                                    color: '#166534',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    border: '1px solid #bbf7d0',
+                                  }}
+                                >
+                                  ✓ Ngoại quan: Đạt
+                                </span>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '2px 8px',
+                                      borderRadius: '10px',
+                                      background: isApproved
+                                        ? '#f0fdf4'
+                                        : isRejected
+                                        ? '#fef2f2'
+                                        : '#fffbeb',
+                                      color: isApproved
+                                        ? '#166534'
+                                        : isRejected
+                                        ? '#991b1b'
+                                        : '#b45309',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      border: `1px solid ${
+                                        isApproved
+                                          ? '#bbf7d0'
+                                          : isRejected
+                                          ? '#fecaca'
+                                          : '#fde68a'
+                                      }`,
+                                    }}
+                                  >
+                                    {isApproved
+                                      ? '✓ Đã duyệt tiếp tục'
+                                      : isRejected
+                                      ? '✕ Từ chối hiệu chuẩn'
+                                      : '⚠️ Không đạt (Cần xác nhận)'}
+                                  </span>
+                                  <button
+                                    onClick={() => setSelectedConsentItem(item)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: 0,
+                                      color: '#1a56db',
+                                      fontSize: '0.72rem',
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline',
+                                      fontWeight: 500,
+                                    }}
+                                    type="button"
+                                  >
+                                    Xem chi tiết lỗi & Quyết định
+                                  </button>
+                                </div>
+                              )
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>Chưa kiểm tra</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="sr-meta-tag" style={{ background: '#edf2f7', color: '#2d3748' }}>
+                              {item.status === 'Pending' ? 'Chờ nhận mẫu' : item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -334,26 +491,55 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
               <div className="csr-empty-box">Không có tệp đính kèm nào được tải lên cho phiếu này.</div>
             ) : (
               <div className="sr-attachments-grid">
-                {attachments.map((file) => (
-                  <div className="sr-attachment-card" key={file.id}>
-                    <span className="sr-attachment-icon" aria-hidden="true">📄</span>
-                    <div className="sr-attachment-info">
-                      <strong title={file.file_name}>{file.file_name}</strong>
-                      <small>Đã tải lên: {formatDate(file.uploaded_at)}</small>
+                {attachments.map((file) => {
+                  const isViewableUrl =
+                    file.file_url &&
+                    (/^https?:\/\//i.test(file.file_url) ||
+                      file.file_url.startsWith('/uploads/') ||
+                      file.file_url.startsWith('data:'));
+                  const isImageFile =
+                    isViewableUrl &&
+                    (/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.file_name || '') ||
+                      /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.file_url || '') ||
+                      file.file_url.startsWith('data:image/'));
+                  return (
+                    <div className="sr-attachment-card" key={file.id}>
+                      {isImageFile ? (
+                        <a href={file.file_url} rel="noreferrer" target="_blank" title="Bấm để xem ảnh lớn">
+                          <img
+                            alt={file.file_name}
+                            src={file.file_url}
+                            style={{
+                              width: '48px',
+                              height: '48px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              flexShrink: 0,
+                            }}
+                          />
+                        </a>
+                      ) : (
+                        <span className="sr-attachment-icon" aria-hidden="true">📄</span>
+                      )}
+                      <div className="sr-attachment-info">
+                        <strong title={file.file_name}>{file.file_name}</strong>
+                        <small>Đã tải lên: {formatDate(file.uploaded_at)}</small>
+                      </div>
+                      {isViewableUrl && (
+                        <a
+                          className="sr-btn-action"
+                          href={file.file_url}
+                          rel="noreferrer"
+                          target="_blank"
+                          title="Tải xuống / Xem tệp"
+                        >
+                          Xem
+                        </a>
+                      )}
                     </div>
-                    {file.file_url && (
-                      <a
-                        className="sr-btn-action"
-                        href={file.file_url}
-                        rel="noreferrer"
-                        target="_blank"
-                        title="Tải xuống / Xem tệp"
-                      >
-                        Mở
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -361,162 +547,432 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
           {/* Section: Báo giá */}
           <section className="sr-card" aria-labelledby="heading-quotation">
             <h2 className="sr-card-title" id="heading-quotation">
-              Thông tin Báo giá (Quotation)
+              {isSales ? 'Quản lý Báo giá (Sales Quotation)' : 'Thông tin Báo giá (Quotation)'}
             </h2>
 
             {quotation ? (
               <div>
-                {quotation.status === 'Rejected' && (
-                  <div style={{ background: '#fff1f0', border: '1px solid #ffa39e', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-                    <div style={{ fontWeight: 600, color: '#cf1322', marginBottom: '4px' }}>
-                      ✕ Báo giá {quotation.quotation_code} đã bị Khách hàng từ chối
-                    </div>
-                    <div style={{ fontSize: '0.86rem', color: '#595959' }}>
-                      {isSales
-                        ? 'Khách hàng chưa đồng ý với phương án báo giá này. Bạn có thể tạo bản ghi báo giá mới (cho đợt báo giá lại) với ID yêu cầu này.'
-                        : 'Bạn đã từ chối báo giá này. Nhân viên kinh doanh ISOCAL sẽ xây dựng phương án báo giá mới phù hợp hơn và gửi lại cho bạn.'}
-                    </div>
-                    {isSales && !allQuotations.some((q) => q.status === 'Draft') && (
-                      <div style={{ marginTop: '10px' }}>
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* GIAO DIỆN PHÍA KHÁCH HÀNG (CUSTOMER)                       */}
+                {/* ────────────────────────────────────────────────────────── */}
+                {!isSales && (
+                  <div className={`sr-quote-card sr-quote-card--${quotation.status?.toLowerCase() || 'sent'}`}>
+                    <div className="sr-quote-card-header">
+                      <div className="sr-quote-title-group">
+                        <span className="sr-quote-code">{quotation.quotation_code || `QT-${quotation.id}`}</span>
+                        {quotation.status === 'Sent' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--sent">
+                            ● Chờ Quý khách phản hồi
+                          </span>
+                        )}
+                        {quotation.status === 'Approved' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--approved">
+                            ✓ Quý khách đã chấp thuận
+                          </span>
+                        )}
+                        {quotation.status === 'Rejected' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--rejected">
+                            ✕ Quý khách đã từ chối
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="sr-quote-header-actions">
                         <Link
                           className="button button-primary"
-                          style={{ fontSize: '0.82rem', padding: '6px 14px' }}
-                          to={`/internal/sales/quotations?requestId=${detail.id}`}
+                          style={{ fontSize: '0.84rem', padding: '6px 14px' }}
+                          to={`/internal/customer/quotations/${quotation.id}`}
                         >
-                          + Lập báo giá mới cho yêu cầu này
+                          📄 Xem chi tiết bảng báo giá →
                         </Link>
                       </div>
+                    </div>
+
+                    {/* Customer Status Alerts */}
+                    {quotation.status === 'Sent' && (
+                      <div className="sr-quote-alert sr-quote-alert--info">
+                        <div>
+                          <strong>Báo giá chính thức đã sẵn sàng:</strong> Quý khách vui lòng bấm vào <strong>"Xem chi tiết bảng báo giá"</strong> để kiểm tra từng hạng mục thiết bị và tiến hành chấp thuận hoặc gửi yêu cầu điều chỉnh.
+                        </div>
+                      </div>
                     )}
+                    {quotation.status === 'Approved' && (
+                      <div className="sr-quote-alert sr-quote-alert--success">
+                        <div>
+                          <strong>✓ Quý khách đã chấp thuận báo giá này:</strong> Phòng kỹ thuật ISOCAL đang chuẩn bị các công tác tiếp nhận thiết bị để tiến hành đo lường hiệu chuẩn.
+                        </div>
+                      </div>
+                    )}
+                    {quotation.status === 'Rejected' && (
+                      <div className="sr-quote-alert sr-quote-alert--danger">
+                        <div>
+                          <strong>✕ Quý khách đã từ chối báo giá này</strong>
+                          {extractRejectionReason(detail.special_notes, quotation.quotation_code) && (
+                            <p style={{ margin: '4px 0 0', fontStyle: 'italic' }}>
+                              Lý do phản hồi: "{extractRejectionReason(detail.special_notes, quotation.quotation_code)}"
+                            </p>
+                          )}
+                          <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                            Đội ngũ kinh doanh ISOCAL đang chuẩn bị phương án điều chỉnh phù hợp hơn và sẽ gửi lại sớm nhất.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Customer Final Payment Box */}
+                    <div className="sr-quote-customer-hero">
+                      <div className="sr-quote-customer-amount-group">
+                        <span>Tổng chi phí thanh toán (Bao gồm VAT &amp; Chiết khấu)</span>
+                        <strong>{formatCurrency(quotation.total_amount)}</strong>
+                        {quotation.discount_amount > 0 && (
+                          <span className="sr-quote-customer-discount-tag">
+                            ✓ Đã áp dụng ưu đãi giảm giá: -{formatCurrency(quotation.discount_amount)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Customer Commercial Specs Grid */}
+                    <div className="sr-quote-customer-specs">
+                      <div className="sr-quote-spec-box">
+                        <span>Thời gian hoàn thành dự kiến</span>
+                        <strong>{formatDate(quotation.estimated_completion_date)}</strong>
+                      </div>
+                      <div className="sr-quote-spec-box">
+                        <span>Hình thức thực hiện</span>
+                        <strong>{detail.location_type === 'On-site' ? '⌖ Tận nơi tại nhà máy (On-site)' : '⚲ Tại phòng Lab ISOCAL (In-lab)'}</strong>
+                      </div>
+                      <div className="sr-quote-spec-box">
+                        <span>Quy mô báo giá</span>
+                        <strong>{quotation.line_items?.length || detail.items?.length || 0} thiết bị / dịch vụ</strong>
+                      </div>
+                      <div className="sr-quote-spec-box">
+                        <span>Cam kết chất lượng</span>
+                        <strong>Chuẩn ISO/IEC 17025 &amp; Tem kiểm định</strong>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="sr-quotation-summary">
-                  <div className="sr-quotation-top">
-                    <div>
-                      <strong>{quotation.quotation_code || `Báo giá #${quotation.id}`}</strong>
-                      <span
-                        style={{
-                          display: 'block',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: quotation.status === 'Approved' ? '#389e0d' : quotation.status === 'Rejected' ? '#cf1322' : quotation.status === 'Sent' ? '#096dd9' : '#8c8c8c',
-                        }}
-                      >
-                        Trạng thái: <b>{quotation.status === 'Sent' ? 'Đã gửi khách hàng' : quotation.status === 'Approved' ? 'Đã chấp thuận' : quotation.status === 'Rejected' ? 'Đã từ chối' : 'Bản nháp'}</b>
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <Link
-                        className="button button-primary"
-                        style={{ fontSize: '0.8rem', padding: '5px 12px' }}
-                        to={isSales ? `/internal/sales/quotations/${quotation.id}` : `/internal/customer/quotations/${quotation.id}`}
-                      >
-                        Xem chi tiết báo giá →
-                      </Link>
-                      {isSales && quotation.status === 'Draft' && (
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* GIAO DIỆN PHÍA SALES (KINH DOANH)                          */}
+                {/* ────────────────────────────────────────────────────────── */}
+                {isSales && (
+                  <div className={`sr-quote-card sr-quote-card--${quotation.status?.toLowerCase() || 'sent'}`}>
+                    <div className="sr-quote-card-header">
+                      <div className="sr-quote-title-group">
+                        <span className="sr-quote-code">{quotation.quotation_code || `QT-${quotation.id}`}</span>
+                        {quotation.status === 'Draft' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--draft">
+                            ✏ Bản nháp nội bộ (Draft)
+                          </span>
+                        )}
+                        {quotation.status === 'PendingApproval' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--draft" style={{ background: '#fff7ed', color: '#c2410c', borderColor: '#fdba74' }}>
+                            ⏳ Chờ HeadSales phê duyệt
+                          </span>
+                        )}
+                        {quotation.status === 'Sent' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--sent">
+                            ✉ Đã gửi khách (Chờ phản hồi)
+                          </span>
+                        )}
+                        {quotation.status === 'Approved' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--approved">
+                            ★ Khách đã chốt duyệt (Won)
+                          </span>
+                        )}
+                        {quotation.status === 'Rejected' && (
+                          <span className="sr-quote-status-badge sr-quote-status-badge--rejected">
+                            ✕ Khách từ chối (Lost)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="sr-quote-header-actions">
                         <Link
                           className="button button-secondary"
-                          style={{ fontSize: '0.8rem', padding: '5px 12px' }}
-                          to={`/internal/sales/quotations?requestId=${detail.id}`}
+                          style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                          to={`/internal/sales/quotations/${quotation.id}`}
                         >
-                          Sửa bản nháp
+                          📄 Chi tiết &amp; In PDF
                         </Link>
-                      )}
+                        {quotation.status === 'Draft' && (
+                          <Link
+                            className="button button-primary"
+                            style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                            to={`/internal/sales/quotations?requestId=${detail.id}`}
+                          >
+                            {quotation.head_sales_decision === 'Rejected'
+                              ? '✎ Chỉnh sửa theo ý kiến HeadSales & Trình duyệt lại'
+                              : '✎ Chỉnh sửa bản nháp'}
+                          </Link>
+                        )}
+                        {quotation.status === 'Rejected' && !allQuotations.some((q) => q.status === 'Draft') && (
+                          <Link
+                            className="button button-primary"
+                            style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                            to={`/internal/sales/quotations?requestId=${detail.id}`}
+                          >
+                            ₫ Lập báo giá mới cho đơn này
+                          </Link>
+                        )}
+                        {quotation.status === 'Approved' && (
+                          <Link
+                            className="button button-primary"
+                            style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                            to={`/internal/sales/contracts/new?quotationId=${quotation.id}`}
+                          >
+                            ▤ Tạo hợp đồng
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sales Alerts */}
+                    {quotation.status === 'Draft' && (
+                      <div className="sr-quote-alert sr-quote-alert--warning">
+                        <div>
+                          <strong>Bản ghi đang ở trạng thái Nháp (Draft):</strong> Khách hàng chưa thể thấy báo giá này. Hãy kiểm tra định mức tài chính và trình Trưởng phòng Kinh doanh (HeadSales) phê duyệt trước khi gửi khách hàng.
+                          {quotation.head_sales_decision === 'Rejected' && quotation.head_sales_note && (
+                            <p style={{ margin: '6px 0 0', color: '#991b1b', fontWeight: 600 }}>
+                              Ghi chú trả về từ HeadSales: &ldquo;{quotation.head_sales_note}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {quotation.status === 'PendingApproval' && (
+                      <div className="sr-quote-alert sr-quote-alert--warning">
+                        <div>
+                          <strong>⏳ Đang chờ Trưởng phòng Kinh doanh (HeadSales) phê duyệt:</strong> Báo giá đã được trình duyệt. Sau khi HeadSales đồng ý, báo giá sẽ tự động chuyển sang trạng thái Đã gửi (Sent) để khách hàng xem và phản hồi.
+                        </div>
+                      </div>
+                    )}
+                    {quotation.status === 'Rejected' && (
+                      <div className="sr-quote-alert sr-quote-alert--danger">
+                        <div>
+                          <strong>✕ Khách hàng đã từ chối báo giá này</strong>
+                          {(quotation.customer_reject_reason || extractRejectionReason(detail.special_notes, quotation.quotation_code)) && (
+                            <p style={{ margin: '4px 0 6px', fontWeight: 600 }}>
+                              Lý do từ chối: "{quotation.customer_reject_reason || extractRejectionReason(detail.special_notes, quotation.quotation_code)}"
+                            </p>
+                          )}
+                          <div style={{ marginTop: '8px' }}>
+                            <Link
+                              className="button button-primary"
+                              style={{ fontSize: '0.8rem', padding: '5px 12px' }}
+                              to={`/internal/sales/quotations?requestId=${detail.id}`}
+                            >
+                              + Lập bản ghi báo giá mới (báo giá lại)
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {quotation.status === 'Approved' && (
+                      <div className="sr-quote-alert sr-quote-alert--success">
+                        <div>
+                          <strong>★ Deal thành công (Approved):</strong> Khách hàng đã đồng ý phương án giá. Bạn có thể tiến hành tạo Hợp đồng dịch vụ và bàn giao lệnh cho phòng kỹ thuật.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sales Financial KPIs Grid */}
+                    <div className="sr-quote-sales-kpis">
+                      <div className="sr-quote-sales-kpi-card sr-quote-sales-kpi-card--highlight">
+                        <span>Doanh thu thực thu (Total)</span>
+                        <strong>{formatCurrency(quotation.total_amount)}</strong>
+                      </div>
+                      <div className="sr-quote-sales-kpi-card">
+                        <span>Giá niêm yết (Subtotal)</span>
+                        <strong>{formatCurrency(quotation.subtotal)}</strong>
+                      </div>
+                      <div className="sr-quote-sales-kpi-card">
+                        <span>Chiết khấu (Discount)</span>
+                        <strong style={{ color: quotation.discount_amount > 0 ? '#b91c1c' : '#475569' }}>
+                          {quotation.discount_amount > 0 ? `-${formatCurrency(quotation.discount_amount)}` : '0 ₫'}
+                          {quotation.subtotal > 0 && quotation.discount_amount > 0 && (
+                            <small style={{ fontSize: '0.72rem', marginLeft: '4px', color: '#64748b' }}>
+                              ({Math.round((quotation.discount_amount / quotation.subtotal) * 100)}%)
+                            </small>
+                          )}
+                        </strong>
+                      </div>
+                      <div className="sr-quote-sales-kpi-card">
+                        <span>Phí di chuyển On-site</span>
+                        <strong>{formatCurrency(quotation.travel_fee)}</strong>
+                      </div>
+                    </div>
+
+                    {/* Sales Operational Metadata */}
+                    <div className="sr-quote-sales-meta">
+                      <div><span>Hạn hoàn thành:</span> <strong>{formatDate(quotation.estimated_completion_date)}</strong></div>
+                      <div><span>Quy mô:</span> <strong>{quotation.line_items?.length || detail.items?.length || 0} thiết bị</strong></div>
+                      <div><span>Địa điểm:</span> <strong>{detail.location_type === 'On-site' ? 'Tận nơi (On-site)' : 'Tại Lab (In-lab)'}</strong></div>
+                      <div><span>Tiến độ khách:</span> <strong>{quotation.status === 'Sent' ? 'Chờ khách duyệt' : quotation.status === 'Approved' ? 'Đã duyệt' : quotation.status === 'Rejected' ? 'Bị từ chối' : quotation.status === 'PendingApproval' ? 'Chờ HeadSales duyệt' : 'Chưa gửi'}</strong></div>
                     </div>
                   </div>
+                )}
 
-                  <div className="sr-quotation-breakdown">
-                    <div>
-                      <span>Tiền dịch vụ (Subtotal):</span>
-                      <strong>{formatCurrency(quotation.subtotal)}</strong>
-                    </div>
-                    <div>
-                      <span>Chiết khấu (Discount):</span>
-                      <strong>{formatCurrency(quotation.discount_amount)}</strong>
-                    </div>
-                    <div>
-                      <span>Phí đi lại (Travel fee):</span>
-                      <strong>{formatCurrency(quotation.travel_fee)}</strong>
-                    </div>
-                    <div>
-                      <span>Ngày dự kiến hoàn thành:</span>
-                      <strong>{formatDate(quotation.estimated_completion_date)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="sr-quotation-total">
-                    <span>Tổng thanh toán:</span>
-                    <span>{formatCurrency(quotation.total_amount)}</span>
-                  </div>
-                </div>
-
-                {/* Bảng Lịch sử các lần báo giá (nếu có nhiều hơn 1 báo giá) */}
+                {/* ────────────────────────────────────────────────────────── */}
+                {/* PHẦN LỊCH SỬ BÁO GIÁ (ROLE-SPECIFIC QUOTATION HISTORY)    */}
+                {/* ────────────────────────────────────────────────────────── */}
                 {allQuotations.length > 1 && (
-                  <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#2d3748', margin: 0 }}>
-                        Lịch sử các lần báo giá ({allQuotations.length} phiên bản)
-                      </h4>
-                      <small style={{ color: '#718096' }}>Sắp xếp từ mới nhất đến cũ nhất</small>
+                  <div className="sr-quote-history-card">
+                    <div className="sr-quote-history-header">
+                      <div>
+                        <h4>
+                          {isSales
+                            ? `📊 Lịch sử & Các phiên bản báo giá (${allQuotations.length} phiên bản)`
+                            : `📋 Lịch sử các lần gửi báo giá từ ISOCAL (${allQuotations.length} đợt)`}
+                        </h4>
+                        <p>
+                          {isSales
+                            ? 'Theo dõi quá trình thương thảo giá và các phiên bản đã lập cho khách hàng (sắp xếp mới nhất trước)'
+                            : 'Danh sách các đợt phát hành báo giá chính thức mà ISOCAL đã gửi tới Quý khách'}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="sr-table-responsive">
-                      <table className="sr-table" style={{ fontSize: '0.84rem' }}>
-                        <thead>
-                          <tr>
-                            <th>Phiên bản</th>
-                            <th>Mã báo giá</th>
-                            <th>Ngày dự kiến</th>
-                            <th style={{ textAlign: 'right' }}>Tổng tiền</th>
-                            <th>Trạng thái</th>
-                            <th style={{ textAlign: 'center' }}>Thao tác</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {allQuotations.map((q, idx) => {
-                            const versionNum = allQuotations.length - idx;
-                            const isCurrent = q.id === quotation.id;
-                            return (
-                              <tr key={q.id || idx} style={isCurrent ? { background: '#f8fafc', fontWeight: 600 } : {}}>
-                                <td>
-                                  Lần {versionNum}
-                                  {isCurrent && (
-                                    <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#3182ce' }}>
-                                      (Hiện tại)
+                    <div className="sr-quote-history-table-wrapper">
+                      {isSales ? (
+                        /* ── BẢNG LỊCH SỬ DÀNH CHO SALES ── */
+                        <table className="sr-quote-history-table">
+                          <thead>
+                            <tr>
+                              <th>Phiên bản</th>
+                              <th>Mã báo giá</th>
+                              <th style={{ textAlign: 'right' }}>Giá niêm yết</th>
+                              <th style={{ textAlign: 'right' }}>Chiết khấu</th>
+                              <th style={{ textAlign: 'right' }}>Doanh thu thực</th>
+                              <th>Hạn hoàn thành</th>
+                              <th>Trạng thái khách</th>
+                              <th>Phản hồi / Ghi chú</th>
+                              <th style={{ textAlign: 'center' }}>Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allQuotations.map((q, idx) => {
+                              const versionNum = allQuotations.length - idx;
+                              const isCurrent = q.id === quotation.id;
+                              const reason = extractRejectionReason(detail.special_notes, q.quotation_code);
+                              return (
+                                <tr key={q.id || idx} className={isCurrent ? 'is-current' : ''}>
+                                  <td>
+                                    Revision #{versionNum}
+                                    {isCurrent && (
+                                      <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#1677ff', fontWeight: 700 }}>
+                                        (Đang áp dụng)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td><strong>{q.quotation_code || `QT-${q.id}`}</strong></td>
+                                  <td style={{ textAlign: 'right' }}>{formatCurrency(q.subtotal)}</td>
+                                  <td style={{ textAlign: 'right', color: q.discount_amount > 0 ? '#cf1322' : 'inherit' }}>
+                                    {q.discount_amount > 0 ? `-${formatCurrency(q.discount_amount)}` : '0 ₫'}
+                                  </td>
+                                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(q.total_amount)}</td>
+                                  <td>{formatDate(q.estimated_completion_date)}</td>
+                                  <td>
+                                    <span className={`sr-quote-history-badge sr-quote-history-badge--${q.status?.toLowerCase() || 'sent'}`}>
+                                      {q.status === 'Approved' ? 'Khách đã duyệt' : q.status === 'Rejected' ? 'Khách từ chối' : q.status === 'Sent' ? 'Đã gửi khách' : 'Bản nháp'}
                                     </span>
-                                  )}
-                                </td>
-                                <td><strong>{q.quotation_code || `QT-${q.id}`}</strong></td>
-                                <td>{formatDate(q.estimated_completion_date)}</td>
-                                <td style={{ textAlign: 'right' }}>{formatCurrency(q.total_amount)}</td>
-                                <td>
-                                  <span
-                                    style={{
-                                      display: 'inline-block',
-                                      padding: '2px 8px',
-                                      borderRadius: '12px',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 600,
-                                      background: q.status === 'Approved' ? '#f6ffed' : q.status === 'Rejected' ? '#fff1f0' : q.status === 'Sent' ? '#e6f7ff' : '#f5f5f5',
-                                      color: q.status === 'Approved' ? '#389e0d' : q.status === 'Rejected' ? '#cf1322' : q.status === 'Sent' ? '#096dd9' : '#595959',
-                                    }}
-                                  >
-                                    {q.status === 'Approved' ? 'Đã duyệt' : q.status === 'Rejected' ? 'Đã từ chối' : q.status === 'Sent' ? 'Đã gửi khách' : 'Bản nháp'}
-                                  </span>
-                                </td>
-                                <td style={{ textAlign: 'center' }}>
-                                  <Link
-                                    style={{ color: '#3182ce', textDecoration: 'none', fontWeight: 600 }}
-                                    to={isSales ? `/internal/sales/quotations/${q.id}` : `/internal/customer/quotations/${q.id}`}
-                                  >
-                                    Xem chi tiết →
-                                  </Link>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  </td>
+                                  <td>
+                                    {q.status === 'Rejected' && reason ? (
+                                      <span className="sr-quote-reason-subtext">↳ {reason}</span>
+                                    ) : (
+                                      <span style={{ color: '#94a3b8' }}>—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                      <Link
+                                        className="sr-code-link"
+                                        style={{ fontSize: '0.8rem' }}
+                                        to={`/internal/sales/quotations/${q.id}`}
+                                      >
+                                        Chi tiết
+                                      </Link>
+                                      {q.status === 'Draft' && (
+                                        <Link
+                                          style={{ fontSize: '0.8rem', color: '#096dd9' }}
+                                          to={`/internal/sales/quotations?requestId=${detail.id}`}
+                                        >
+                                          Sửa
+                                        </Link>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      ) : (
+                        /* ── BẢNG LỊCH SỬ DÀNH CHO KHÁCH HÀNG ── */
+                        <table className="sr-quote-history-table">
+                          <thead>
+                            <tr>
+                              <th>Đợt gửi</th>
+                              <th>Mã báo giá</th>
+                              <th>Thời gian hoàn thành</th>
+                              <th style={{ textAlign: 'right' }}>Ưu đãi giảm giá</th>
+                              <th style={{ textAlign: 'right' }}>Tổng thanh toán</th>
+                              <th>Phản hồi của bạn</th>
+                              <th>Ghi chú phản hồi</th>
+                              <th style={{ textAlign: 'center' }}>Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allQuotations.map((q, idx) => {
+                              const versionNum = allQuotations.length - idx;
+                              const isCurrent = q.id === quotation.id;
+                              const reason = extractRejectionReason(detail.special_notes, q.quotation_code);
+                              return (
+                                <tr key={q.id || idx} className={isCurrent ? 'is-current' : ''}>
+                                  <td>
+                                    Lần {versionNum}
+                                    {isCurrent && (
+                                      <span style={{ marginLeft: '6px', fontSize: '0.72rem', color: '#1677ff', fontWeight: 700 }}>
+                                        (Mới nhất)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td><strong>{q.quotation_code || `QT-${q.id}`}</strong></td>
+                                  <td>{formatDate(q.estimated_completion_date)}</td>
+                                  <td style={{ textAlign: 'right', color: q.discount_amount > 0 ? '#389e0d' : 'inherit' }}>
+                                    {q.discount_amount > 0 ? `-${formatCurrency(q.discount_amount)}` : '—'}
+                                  </td>
+                                  <td style={{ textAlign: 'right', fontWeight: 800 }}>{formatCurrency(q.total_amount)}</td>
+                                  <td>
+                                    <span className={`sr-quote-history-badge sr-quote-history-badge--${q.status?.toLowerCase() || 'sent'}`}>
+                                      {q.status === 'Approved' ? 'Đã chấp thuận' : q.status === 'Rejected' ? 'Đã từ chối' : 'Chờ bạn phản hồi'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {q.status === 'Rejected' && reason ? (
+                                      <span className="sr-quote-reason-subtext">↳ {reason}</span>
+                                    ) : (
+                                      <span style={{ color: '#94a3b8' }}>—</span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <Link
+                                      className="sr-code-link"
+                                      style={{ fontSize: '0.8rem' }}
+                                      to={`/internal/customer/quotations/${q.id}`}
+                                    >
+                                      Xem báo giá →
+                                    </Link>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </div>
                 )}
@@ -524,7 +980,9 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
             ) : (
               <div className="csr-empty-box">
                 <p style={{ margin: '0 0 10px' }}>
-                  Đơn dịch vụ hiện chưa có báo giá chính thức.
+                  {isSales
+                    ? 'Phiếu yêu cầu này hiện chưa có báo giá nào được lập.'
+                    : 'Đơn dịch vụ hiện chưa có báo giá chính thức từ ISOCAL.'}
                 </p>
                 {isSales ? (
                   <Link
@@ -535,7 +993,7 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
                   </Link>
                 ) : (
                   <small style={{ color: '#718096' }}>
-                    Nhân viên kinh doanh ISOCAL đang tính toán định mức và sẽ gửi báo giá sớm nhất tới bạn.
+                    Nhân viên kinh doanh ISOCAL đang tính toán định mức và sẽ gửi báo giá sớm nhất tới Quý khách.
                   </small>
                 )}
               </div>
@@ -584,7 +1042,7 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
                 <div className="sr-side-item">
                   <span>Địa chỉ nhận mẫu:</span>
                   <p style={{ margin: 0, color: '#4a5568', fontSize: '0.8rem' }}>
-                    Trung tâm Hiệu chuẩn ISOCAL — Quầy nhận mẫu, Tầng 1, Khu Công nghệ cao, TP. Thủ Đức, TP.HCM
+                    Trung tâm Hiệu chuẩn ISOCAL — Quầy nhận mẫu, Tầng 1, Tòa nhà Hoa Sơn, Thôn Đoài, Xã Hoàn Sơn, Huyện Tiên Du, Tỉnh Bắc Ninh
                   </p>
                 </div>
               ) : (
@@ -626,6 +1084,18 @@ function CustomerServiceRequestDetailPage({ role = 'customer' }) {
         onClose={() => setEditModalOpen(false)}
         onSuccess={handleEditSuccess}
         serviceRequest={detail}
+      />
+
+      {/* Customer Inspection Consent Modal */}
+      <CustomerInspectionConsentModal
+        defaultSignerName={user?.full_name || detail.customer?.company_name || ''}
+        isOpen={Boolean(selectedConsentItem)}
+        item={selectedConsentItem}
+        onClose={() => setSelectedConsentItem(null)}
+        onSuccess={() => {
+          fetchDetail();
+          showToast('Đã lưu quyết định xác nhận ngoại quan thành công.');
+        }}
       />
     </div>
   );

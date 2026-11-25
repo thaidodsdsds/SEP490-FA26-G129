@@ -16,6 +16,7 @@ const FILTERS = [
   { value: 'Signed', label: 'Đã ký' },
   { value: 'Liquidated', label: 'Đã thanh lý' },
   { value: 'Cancelled', label: 'Đã huỷ' },
+  { value: 'Rejected', label: 'Bị từ chối' },
 ];
 
 function ContractListPage({ basePath, canCreate = false }) {

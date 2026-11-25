@@ -5,6 +5,7 @@ export const CONTRACT_STATUS_LABELS = {
   Signed: 'Đã ký',
   Liquidated: 'Đã thanh lý',
   Cancelled: 'Đã huỷ',
+  Rejected: 'Bị từ chối',
 };
 
 export const CONTRACT_STATUS_TONES = {
@@ -14,6 +15,7 @@ export const CONTRACT_STATUS_TONES = {
   Signed: 'info',
   Liquidated: 'neutral',
   Cancelled: 'danger',
+  Rejected: 'danger',
 };
 
 export const CONTRACT_STATUS_CLASSES = {
@@ -23,6 +25,7 @@ export const CONTRACT_STATUS_CLASSES = {
   Signed: 'ct-status--signed',
   Liquidated: 'ct-status--liquidated',
   Cancelled: 'ct-status--cancelled',
+  Rejected: 'ct-status--cancelled',
 };
 
 export const getStatusLabel = (status) => CONTRACT_STATUS_LABELS[status] ?? status ?? '—';

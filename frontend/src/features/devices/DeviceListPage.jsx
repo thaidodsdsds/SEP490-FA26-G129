@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchDevicesApi } from '../../services/device-service.js';
 import { listCustomersDetailedApi } from '../../services/customer-service.js';
 import DeviceModalForm from './DeviceModalForm.jsx';
+import TransferOwnershipModal from './TransferOwnershipModal.jsx';
 import Toast from '../../components/ui/Toast.jsx';
 import './devices.css';
 
@@ -10,6 +11,7 @@ export default function DeviceListPage({ role = 'customer', basePath = '' }) {
   const navigate = useNavigate();
   const isCustomerRole = role?.toLowerCase() === 'customer';
   const isSalesRole = role?.toLowerCase() === 'sales';
+  const canTransfer = ['sales', 'admin'].includes(role?.toLowerCase());
 
   // Filters state
   const [search, setSearch] = useState('');
@@ -30,6 +32,8 @@ export default function DeviceListPage({ role = 'customer', basePath = '' }) {
   // Modal & Toast state
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferDevice, setTransferDevice] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   // Load customer list for internal roles filter
@@ -445,6 +449,22 @@ export default function DeviceListPage({ role = 'customer', basePath = '' }) {
                           👁 Chi tiết
                         </button>
 
+                        {canTransfer && (
+                          <button
+                            type="button"
+                            className="devices-btn-secondary"
+                            style={{ padding: '5px 10px', fontSize: '0.8rem', color: '#b45309' }}
+                            title="Chuyển quyền sở hữu thiết bị"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTransferDevice(device);
+                              setTransferModalOpen(true);
+                            }}
+                          >
+                            🔄 Chuyển quyền
+                          </button>
+                        )}
+
                         {!isSalesRole && (
                           <button
                             type="button"
@@ -502,6 +522,17 @@ export default function DeviceListPage({ role = 'customer', basePath = '' }) {
         role={role}
         onClose={() => setModalOpen(false)}
         onSuccess={(saved, msg) => {
+          setToast({ show: true, message: msg, type: 'success' });
+          loadDevices();
+        }}
+      />
+
+      {/* Transfer Ownership Modal */}
+      <TransferOwnershipModal
+        isOpen={transferModalOpen}
+        device={transferDevice}
+        onClose={() => setTransferModalOpen(false)}
+        onSuccess={(result, msg) => {
           setToast({ show: true, message: msg, type: 'success' });
           loadDevices();
         }}

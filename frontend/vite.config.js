@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // Cho phép điện thoại cùng mạng Wifi truy cập qua IP máy tính
     proxy: {
       // Forward mọi request /api sang backend Express (port 3000)
       '/api': {

@@ -1,4 +1,4 @@
-import { In, Like, Not } from 'typeorm';
+import { EntityManager, In, Like, Not } from 'typeorm';
 import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import { numberToVietnameseWords } from '../../common/number-to-words.js';
@@ -8,8 +8,17 @@ import {
   Contract,
   ContractItem,
   Quotation,
+  WorkOrder,
 } from '../../database/entities.js';
 import { formatQuotationCode } from '../quotations/quotations.service.js';
+import {
+  COMPANY_SIGNATURE_PURPOSE,
+  CUSTOMER_SIGNATURE_PURPOSE,
+  createSignatureRecord,
+  finalizeSignedContract,
+  listContractSignatures,
+  type ContractSignatureInfo,
+} from './contract-signature.service.js';
 
 export const CONTRACT_STATUSES = [
   'Draft',
@@ -18,9 +27,33 @@ export const CONTRACT_STATUSES = [
   'Signed',
   'Liquidated',
   'Cancelled',
+  'Rejected',
 ] as const;
 
 export const EDITABLE_STATUSES = ['Draft', 'PendingApproval'] as const;
+
+/**
+ * Bảo đảm mỗi hợp đồng đã ký có đúng 1 Work Order (schema work_orders hiện tại:
+ * contract_id, quotation_id, status). Việc phân công KTV được thực hiện sau
+ * ở màn hình Head of Tech.
+ */
+const ensureWorkOrderForContract = async (
+  manager: EntityManager,
+  contract: Contract,
+): Promise<void> => {
+  const repository = manager.getRepository(WorkOrder);
+
+  const existing = await repository.findOne({ where: { contract_id: contract.id } });
+  if (existing) return;
+
+  await repository.save(
+    repository.create({
+      contract_id: contract.id,
+      quotation_id: contract.quotation_id,
+      status: 'Open',
+    }),
+  );
+};
 
 export interface ContractActor {
   id: number;
@@ -130,13 +163,20 @@ export interface ContractDetail extends ContractSummary {
   approved_at: Date | null;
   liquidated_by: number | null;
   liquidated_at: Date | null;
+  rejection_reason: string | null;
+  rejected_by: number | null;
+  rejected_at: Date | null;
   draft_file_url: string | null;
   signed_file_url: string | null;
   items: ContractItemResult[];
+  signatures: ContractSignatureInfo[];
   can_edit: boolean;
   can_submit: boolean;
   can_approve: boolean;
+  can_reject: boolean;
+  can_sign_customer: boolean;
   can_cancel: boolean;
+  show_cancel: boolean;
   can_liquidate: boolean;
 }
 
@@ -302,7 +342,11 @@ const mapItem = (item: ContractItem): ContractItemResult => ({
   quotation_line_item_id: item.quotation_line_item_id ?? null,
 });
 
-const mapContract = (contract: Contract, actor?: ContractActor): ContractDetail => {
+const mapContract = (
+  contract: Contract,
+  actor?: ContractActor,
+  signatures: ContractSignatureInfo[] = [],
+): ContractDetail => {
   const status = contract.status;
   const isAdmin = actor?.role === 'Admin';
   const isSales = actor?.role === 'Sales';
@@ -360,21 +404,33 @@ const mapContract = (contract: Contract, actor?: ContractActor): ContractDetail 
     approved_at: contract.approved_at ?? null,
     liquidated_by: contract.liquidated_by ?? null,
     liquidated_at: contract.liquidated_at ?? null,
+    rejection_reason: contract.rejection_reason ?? null,
+    rejected_by: contract.rejected_by ?? null,
+    rejected_at: contract.rejected_at ?? null,
     draft_file_url: contract.draft_file_url ?? null,
     signed_file_url: contract.signed_file_url ?? null,
     created_at: contract.created_at,
     items: [...(contract.items ?? [])]
       .sort((left, right) => left.line_no - right.line_no)
       .map(mapItem),
+    signatures,
     can_edit:
-      status !== 'Cancelled' &&
+      !['Cancelled', 'Rejected'].includes(status) &&
       (isAdmin ? ['Draft', 'PendingApproval'].includes(status) : isSales && isOwner && status === 'Draft'),
     can_submit:
       status === 'Draft' && ((isSales && isOwner) || isAdmin),
     can_approve: status === 'PendingApproval' && (isAdmin || actor?.role === 'CEO'),
+    can_reject: status === 'PendingApproval' && (isAdmin || actor?.role === 'CEO'),
+    can_sign_customer:
+      status === 'Approved' &&
+      actor?.role === 'Customer' &&
+      !signatures.some((signature) => signature.purpose === CUSTOMER_SIGNATURE_PURPOSE),
     can_cancel:
-      !['Cancelled', 'Liquidated'].includes(status) &&
+      ['Draft', 'PendingApproval', 'Approved'].includes(status) &&
       (isAdmin || (isSales && isOwner && ['Draft', 'PendingApproval'].includes(status))),
+    // Vẫn hiện nút Huỷ (ở dạng xám, không bấm được) để người dùng biết hành động này bị chặn
+    show_cancel:
+      !['Cancelled', 'Liquidated', 'Rejected'].includes(status) && (isAdmin || (isSales && isOwner)),
     can_liquidate:
       ['Approved', 'Signed'].includes(status) && (isAdmin || actor?.role === 'Accountant'),
   };
@@ -708,7 +764,8 @@ export const getContractDetail = async (
   customerIdFilter?: number,
 ): Promise<ContractDetail> => {
   const contract = await findContractOrFail(id, customerIdFilter);
-  return mapContract(contract, actor);
+  const signatures = await listContractSignatures(id);
+  return mapContract(contract, actor, signatures);
 };
 
 const assertCodeAvailable = async (code: string, excludeId?: number): Promise<void> => {
@@ -1042,16 +1099,129 @@ export const submitContract = async (
 export const approveContract = async (
   id: number,
   actor: ContractActor,
-): Promise<ContractDetail> =>
-  transition(
+): Promise<ContractDetail> => {
+  if (!['Admin', 'CEO'].includes(actor.role)) {
+    throw new AppError('Bạn không có quyền thực hiện thao tác này.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const contract = await findContractOrFail(id);
+
+  if (contract.status !== 'PendingApproval') {
+    throw new AppError(
+      `Không thể duyệt hợp đồng ở trạng thái "${contract.status}".`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  const now = new Date();
+
+  await dataSource.transaction(async (manager) => {
+    await createSignatureRecord(manager, contract, COMPANY_SIGNATURE_PURPOSE, actor.id);
+
+    contract.status = 'Approved';
+    contract.approved_by = actor.id;
+    contract.approved_at = now;
+    contract.updated_at = now;
+
+    await manager.getRepository(Contract).save(contract);
+  });
+
+  return getContractDetail(id, actor);
+};
+
+/**
+ * SRS v1.5 màn 14: Admin/CEO từ chối hợp đồng đang chờ duyệt, bắt buộc có lý do.
+ * Khác với cancelContract (Sales huỷ hợp đồng của mình).
+ */
+export const rejectContract = async (
+  id: number,
+  actor: ContractActor,
+  reason: unknown,
+): Promise<ContractDetail> => {
+  if (!['Admin', 'CEO'].includes(actor.role)) {
+    throw new AppError('Bạn không có quyền từ chối hợp đồng.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const text = typeof reason === 'string' ? reason.trim() : '';
+  if (!text) {
+    throw new AppError('Vui lòng nhập lý do từ chối hợp đồng.', 400, ERROR_CODES.VALIDATION_ERROR);
+  }
+  if (text.length > 1000) {
+    throw new AppError('Lý do từ chối không được vượt quá 1000 ký tự.', 400, ERROR_CODES.VALIDATION_ERROR);
+  }
+
+  return transition(
     id,
     actor,
     ['Admin', 'CEO'],
     ['PendingApproval'],
-    'Approved',
+    'Rejected',
     false,
-    { approved_by: actor.id, approved_at: new Date() },
+    {
+      rejection_reason: text,
+      rejected_by: actor.id,
+      rejected_at: new Date(),
+    },
   );
+};
+
+export const signContractAsCustomer = async (
+  id: number,
+  actor: ContractActor,
+  customerIdFilter?: number,
+): Promise<ContractDetail> => {
+  if (actor.role !== 'Customer') {
+    throw new AppError('Chỉ khách hàng của hợp đồng mới được ký.', 403, ERROR_CODES.FORBIDDEN);
+  }
+
+  const contract = await findContractOrFail(id, customerIdFilter);
+
+  if (contract.status !== 'Approved') {
+    throw new AppError(
+      `Chỉ có thể ký hợp đồng đã được Bên B duyệt. Trạng thái hiện tại: "${contract.status}".`,
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  const signatures = await listContractSignatures(id);
+  if (!signatures.some((signature) => signature.purpose === COMPANY_SIGNATURE_PURPOSE)) {
+    throw new AppError(
+      'Hợp đồng chưa có chữ ký của Bên B.',
+      400,
+      ERROR_CODES.VALIDATION_ERROR,
+    );
+  }
+
+  if (signatures.some((signature) => signature.purpose === CUSTOMER_SIGNATURE_PURPOSE)) {
+    throw new AppError(
+      'Hợp đồng đã có chữ ký của Bên A.',
+      409,
+      ERROR_CODES.CONFLICT,
+    );
+  }
+
+  const now = new Date();
+
+  await dataSource.transaction(async (manager) => {
+    await createSignatureRecord(manager, contract, CUSTOMER_SIGNATURE_PURPOSE, actor.id);
+
+    contract.status = 'Signed';
+    contract.updated_at = now;
+
+    await manager.getRepository(Contract).save(contract);
+    await ensureWorkOrderForContract(manager, contract);
+  });
+
+  try {
+    await finalizeSignedContract(id);
+  } catch (error) {
+    console.error('[Contract] Không thể tạo file PDF đã ký:', error);
+  }
+
+  return getContractDetail(id, actor, customerIdFilter);
+};
 
 export const cancelContract = async (
   id: number,
