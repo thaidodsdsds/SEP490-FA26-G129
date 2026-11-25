@@ -9,6 +9,8 @@ import CustomerDashboardPage from '../features/dashboards/customer/CustomerDashb
 import CustomerServiceRequestCreatePage from '../features/customer/service-requests/CustomerServiceRequestCreatePage.jsx';
 import CustomerServiceRequestListPage from '../features/customer/service-requests/CustomerServiceRequestListPage.jsx';
 import CustomerServiceRequestDetailPage from '../features/customer/service-requests/CustomerServiceRequestDetailPage.jsx';
+import CustomerCertificatesPage from '../features/customer/records/CustomerCertificatesPage.jsx';
+import CustomerSealsPage from '../features/customer/records/CustomerSealsPage.jsx';
 import AccountantDashboardPage from '../features/dashboards/accountant/AccountantDashboardPage.jsx';
 import AdminDashboardPage from '../features/dashboards/admin/AdminDashboardPage.jsx';
 import AccountsPage from '../features/dashboards/admin/AccountsPage.jsx';
@@ -16,16 +18,16 @@ import RolesPage from '../features/dashboards/admin/RolesPage.jsx';
 import SalesDashboardPage from '../features/dashboards/sales/SalesDashboardPage.jsx';
 import SalesCustomerListPage from '../features/sales/customers/SalesCustomerListPage.jsx';
 import SalesCustomerDetailPage from '../features/sales/customers/SalesCustomerDetailPage.jsx';
+import HeadSalesCustomerAssignmentPage from '../features/sales/customers/HeadSalesCustomerAssignmentPage.jsx';
 import ServiceRequestCreatePage from '../features/sales/service-requests/ServiceRequestCreatePage.jsx';
 import QuotationCreatePage from '../features/sales/quotations/QuotationCreatePage.jsx';
 import QuotationDetailPage from '../features/sales/quotations/QuotationDetailPage.jsx';
+import HeadSalesQuotationApprovalPage from '../features/sales/quotations/HeadSalesQuotationApprovalPage.jsx';
 import ContractListPage from '../features/contracts/ContractListPage.jsx';
 import ContractFormPage from '../features/contracts/ContractFormPage.jsx';
 import ContractDetailPage from '../features/contracts/ContractDetailPage.jsx';
+import SalesWorkOrderListPage from '../features/sales/work-orders/SalesWorkOrderListPage.jsx';
 import WarehouseDashboardPage from '../features/dashboards/warehouse/WarehouseDashboardPage.jsx';
-import WarehouseInboundPage from '../features/warehouse/WarehouseInboundPage.jsx';
-import WarehouseOutboundPage from '../features/warehouse/WarehouseOutboundPage.jsx';
-import WarehouseHistoryPage from '../features/warehouse/WarehouseHistoryPage.jsx';
 import SalesLayout from '../layouts/SalesLayout.jsx';
 import WarehouseLayout from '../layouts/WarehouseLayout.jsx';
 import HeadOfTechPage from '../features/operations/HeadOfTechPage.jsx';
@@ -36,16 +38,22 @@ import WorkOrdersPage from '../features/reviewer/features/work-orders/WorkOrders
 import AssignmentsPage from '../features/reviewer/features/assignments/AssignmentsPage.jsx';
 import ServiceTypesPage from '../features/reviewer/features/service-types/ServiceTypesPage.jsx';
 import ProceduresPage from '../features/reviewer/features/procedures/ProceduresPage.jsx';
+import ProcedureHeaderPage from '../features/reviewer/features/procedures/ProcedureHeaderPage.jsx';
+import ProcedureStepsPage from '../features/reviewer/features/procedures/ProcedureStepsPage.jsx';
+import ProcedureParametersPage from '../features/reviewer/features/procedures/ProcedureParametersPage.jsx';
+import ProcedurePreviewPage from '../features/reviewer/features/procedures/ProcedurePreviewPage.jsx';
+import ProcedureDetailPage from '../features/reviewer/features/procedures/ProcedureDetailPage.jsx';
 import StandardsPage from '../features/reviewer/features/standards/StandardsPage.jsx';
 import ReviewQueuePage from '../features/reviewer/features/review-queue/ReviewQueuePage.jsx';
 import DriftPage from '../features/reviewer/features/drift/DriftPage.jsx';
 import CertificatesPage from '../features/reviewer/features/certificates/CertificatesPage.jsx';
 import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
-import VerificationLogsPage from '../features/reviewer/features/verification-logs/VerificationLogsPage.jsx';
-import SignaturesPage from '../features/reviewer/features/signatures/SignaturesPage.jsx';
 import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
 import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
 import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
+import WarehouseInboundPage from '../features/warehouse/WarehouseInboundPage.jsx';
+import WarehouseOutboundPage from '../features/warehouse/WarehouseOutboundPage.jsx';
+import WarehouseHistoryPage from '../features/warehouse/WarehouseHistoryPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
@@ -58,9 +66,11 @@ import { StaffLoginPage } from '../features/auth/StaffLoginPage.jsx';
 import { RegisterPage } from '../features/auth/RegisterPage.jsx';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage.jsx';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage.jsx';
+import SealVerificationPage from '../features/public/SealVerificationPage.jsx';
 import ProfilePage from '../features/profile/ProfilePage.jsx';
 import DeviceListPage from '../features/devices/DeviceListPage.jsx';
 import DeviceDetailPage from '../features/devices/DeviceDetailPage.jsx';
+import MobileTechnicianApp from '../features/mobile-technician/MobileTechnicianApp.jsx';
 
 const publicRoutes = [
   // Standalone auth pages — no wrapping layout, each manages its own shell
@@ -69,6 +79,12 @@ const publicRoutes = [
   { path: '/register', element: <RegisterPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Standalone Mobile PWA routes for Technician Offline App
+  { path: '/mobile/technician', element: <MobileTechnicianApp /> },
+  { path: '/mobile', element: <Navigate to="/mobile/technician" replace /> },
+  // Public Seal Verification — khớp URL QR được sinh trên tem/sticker
+  { path: '/verify', element: <SealVerificationPage /> },
+  { path: '/verify/:sealCode', element: <SealVerificationPage /> },
   {
     path: '/',
     element: <PublicLayout />,
@@ -100,6 +116,10 @@ const customerRoutes = [
       { path: 'devices', element: <DeviceListPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'devices/:id', element: <DeviceDetailPage role="customer" basePath="/internal/customer/devices" /> },
       { path: 'quotations/:id', element: <QuotationDetailPage role="customer" /> },
+      { path: 'contracts', element: <ContractListPage basePath="/internal/customer/contracts" /> },
+      { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/customer/contracts" /> },
+      { path: 'certificates', element: <CustomerCertificatesPage /> },
+      { path: 'seals', element: <CustomerSealsPage /> },
       { path: 'service-requests/new', element: <CustomerServiceRequestCreatePage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
@@ -149,10 +169,22 @@ const adminRoutes = [
       },
       { path: 'accounts', element: <AccountsPage /> },
       { path: 'roles', element: <RolesPage /> },
+      { path: 'service-types', element: <ServiceTypesPage /> },
       { path: 'contracts', element: <ContractListPage basePath="/internal/admin/contracts" canCreate /> },
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/admin/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/admin/contracts" /> },
+      {
+        element: (
+          <RoleDashboardGate dashboardPath="/internal/admin">
+            <ReviewerWorkspaceProvider />
+          </RoleDashboardGate>
+        ),
+        children: [
+          { path: 'certificates', element: <CertificatesPage /> },
+          { path: 'seals', element: <SealsPage /> },
+        ],
+      },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -162,7 +194,7 @@ const salesRoutes = [
   {
     path: '/internal/sales',
     element: (
-      <ProtectedRoute allowedRoles={['sales', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['sales', 'headsales', 'admin', 'ceo']} portalType="staff">
         <SalesLayout />
       </ProtectedRoute>
     ),
@@ -173,6 +205,22 @@ const salesRoutes = [
           <RoleDashboardGate dashboardPath="/internal/sales">
             <SalesDashboardPage />
           </RoleDashboardGate>
+        ),
+      },
+      {
+        path: 'customer-assignments',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesCustomerAssignmentPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'quotation-approvals',
+        element: (
+          <ProtectedRoute allowedRoles={['headsales', 'admin', 'ceo']} portalType="staff">
+            <HeadSalesQuotationApprovalPage />
+          </ProtectedRoute>
         ),
       },
       { path: 'customers', element: <SalesCustomerListPage /> },
@@ -189,6 +237,7 @@ const salesRoutes = [
       { path: 'contracts/new', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id', element: <ContractDetailPage basePath="/internal/sales/contracts" /> },
       { path: 'contracts/:id/edit', element: <ContractFormPage basePath="/internal/sales/contracts" /> },
+      { path: 'work-orders', element: <SalesWorkOrderListPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -216,6 +265,8 @@ const warehouseRoutes = [
       { path: 'inbound', element: <WarehouseInboundPage /> },
       { path: 'outbound', element: <WarehouseOutboundPage /> },
       { path: 'transactions', element: <WarehouseHistoryPage /> },
+      { path: 'chat', element: <ChatPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -244,7 +295,10 @@ const internalRoutes = [
     children: [
       {
         element: (
-          <RoleDashboardGate dashboardPath="/internal/head-of-tech">
+          <RoleDashboardGate
+            allowedDashboardPaths={['/internal/head-of-tech', '/internal']}
+            dashboardPath="/internal/head-of-tech"
+          >
             <ReviewerWorkspaceProvider />
           </RoleDashboardGate>
         ),
@@ -254,16 +308,24 @@ const internalRoutes = [
           { path: 'assignments', element: <AssignmentsPage /> },
           { path: 'service-types', element: <ServiceTypesPage /> },
           { path: 'procedures', element: <ProceduresPage /> },
+          { path: 'procedures/new', element: <ProcedureHeaderPage /> },
+          { path: 'procedures/:id', element: <ProcedureDetailPage /> },
+          { path: 'procedures/:id/edit', element: <ProcedureHeaderPage /> },
+          { path: 'procedures/:id/steps', element: <ProcedureStepsPage /> },
+          { path: 'procedures/:id/parameters', element: <ProcedureParametersPage /> },
+          { path: 'procedures/:id/preview', element: <ProcedurePreviewPage /> },
           { path: 'standards', element: <StandardsPage /> },
           { path: 'review-queue', element: <ReviewQueuePage /> },
           { path: 'drift', element: <DriftPage /> },
           { path: 'certificates', element: <CertificatesPage /> },
           { path: 'seals', element: <SealsPage /> },
-          { path: 'verification-logs', element: <VerificationLogsPage /> },
-          { path: 'signatures', element: <SignaturesPage /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'warehouse', element: <WarehousePage /> },
+          { path: 'warehouse/inbound', element: <WarehouseInboundPage /> },
+          { path: 'warehouse/outbound', element: <WarehouseOutboundPage /> },
+          { path: 'warehouse/transactions', element: <WarehouseHistoryPage /> },
+          { path: 'warehouse/devices', element: <DeviceListPage role="warehouse" basePath="/internal/head-of-tech/warehouse/devices" /> },
         ],
       },
       { path: 'profile', element: <ProfilePage /> },
