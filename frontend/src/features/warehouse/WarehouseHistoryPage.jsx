@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   getWarehouseInventorySummaryApi,
   getWarehouseTransactionsApi,
@@ -7,6 +7,14 @@ import {
 
 function WarehouseHistoryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const inboundPath = location.pathname.startsWith('/internal/head-of-tech')
+    ? '/internal/head-of-tech/warehouse/inbound'
+    : '/internal/warehouse/inbound';
+  const outboundPath = location.pathname.startsWith('/internal/head-of-tech')
+    ? '/internal/head-of-tech/warehouse/outbound'
+    : '/internal/warehouse/outbound';
+
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +60,7 @@ function WarehouseHistoryPage() {
 
         <div style={{ display: 'flex', gap: 12 }}>
           <button
-            onClick={() => navigate('/internal/warehouse/inbound')}
+            onClick={() => navigate(inboundPath)}
             style={{
               padding: '10px 18px',
               borderRadius: 6,
@@ -69,7 +77,7 @@ function WarehouseHistoryPage() {
             + Lập phiếu Nhập kho (Inbound)
           </button>
           <button
-            onClick={() => navigate('/internal/warehouse/outbound')}
+            onClick={() => navigate(outboundPath)}
             style={{
               padding: '10px 18px',
               borderRadius: 6,

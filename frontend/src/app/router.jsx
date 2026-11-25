@@ -265,6 +265,8 @@ const warehouseRoutes = [
       { path: 'inbound', element: <WarehouseInboundPage /> },
       { path: 'outbound', element: <WarehouseOutboundPage /> },
       { path: 'transactions', element: <WarehouseHistoryPage /> },
+      { path: 'chat', element: <ChatPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -286,7 +288,7 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: (
-      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech']} portalType="staff">
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
         <HeadOfTechLayout />
       </ProtectedRoute>
     ),
@@ -320,6 +322,10 @@ const internalRoutes = [
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'warehouse', element: <WarehousePage /> },
+          { path: 'warehouse/inbound', element: <WarehouseInboundPage /> },
+          { path: 'warehouse/outbound', element: <WarehouseOutboundPage /> },
+          { path: 'warehouse/transactions', element: <WarehouseHistoryPage /> },
+          { path: 'warehouse/devices', element: <DeviceListPage role="warehouse" basePath="/internal/head-of-tech/warehouse/devices" /> },
         ],
       },
       { path: 'profile', element: <ProfilePage /> },

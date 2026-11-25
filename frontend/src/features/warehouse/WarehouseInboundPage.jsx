@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { createInboundApi, getWarehouseDevicesApi } from '../../services/warehouse-service.js';
 
 function WarehouseInboundPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const backPath = location.pathname.startsWith('/internal/head-of-tech')
+    ? '/internal/head-of-tech/warehouse'
+    : '/internal/warehouse/transactions';
+
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +96,7 @@ function WarehouseInboundPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <button
-            onClick={() => navigate('/internal/warehouse/transactions')}
+            onClick={() => navigate(backPath)}
             style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: 0, fontSize: '0.9rem', marginBottom: 6 }}
           >
             &larr; Xem lịch sử giao dịch kho
@@ -265,7 +270,7 @@ function WarehouseInboundPage() {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, borderTop: '1px solid #f1f5f9', paddingTop: 20 }}>
           <button
             type="button"
-            onClick={() => navigate('/internal/warehouse/transactions')}
+            onClick={() => navigate(backPath)}
             style={{ padding: '10px 20px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 500 }}
           >
             Hủy bỏ

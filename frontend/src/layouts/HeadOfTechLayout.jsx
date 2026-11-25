@@ -1,3 +1,5 @@
+import { useAppContext } from '../app/providers.jsx';
+import { getUserInitials } from '../app/role-routing.js';
 import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 // Menu 2 cấp: chỉ mở nhóm mới thấy mục con (tránh sidebar quá dài với 15 mục)
@@ -38,20 +40,25 @@ const links = [
     icon: '💬',
     label: 'Liên lạc & kho',
     children: [
+      { to: '/internal/head-of-tech/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)' },
+      { to: '/internal/head-of-tech/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)' },
+      { to: '/internal/head-of-tech/warehouse', label: 'Lịch sử kho' },
       { to: '/internal/head-of-tech/chat', label: 'Trao đổi kỹ thuật' },
       { to: '/internal/head-of-tech/notifications', label: 'Thông báo' },
-      { to: '/internal/head-of-tech/warehouse', label: 'Lịch sử kho' },
     ],
   },
 ];
 
 function HeadOfTechLayout() {
+  const { session } = useAppContext();
+  const userName = session?.user?.full_name || 'Nguyễn Thu Hương';
+
   return (
     <RoleDashboardLayout
       description="Không gian nghiệp vụ Reviewer: điều phối, quy trình, soát xét và truy vết."
-      initials="HT"
+      initials={getUserInitials(userName)}
       links={links}
-      name="Nguyễn Thu Hương"
+      name={userName}
       profilePath="/internal/head-of-tech/profile"
       role="Reviewer · Head of Tech"
     />

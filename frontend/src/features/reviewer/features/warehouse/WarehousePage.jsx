@@ -49,14 +49,14 @@ function WarehousePage() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               className="button button-secondary"
-              onClick={() => navigate('/internal/warehouse/inbound')}
+              onClick={() => navigate('/internal/head-of-tech/warehouse/inbound')}
               type="button"
             >
               + Phiếu Nhập (Inbound)
             </button>
             <button
               className="button button-primary"
-              onClick={() => navigate('/internal/warehouse/outbound')}
+              onClick={() => navigate('/internal/head-of-tech/warehouse/outbound')}
               type="button"
             >
               + Phiếu Xuất (Outbound)
