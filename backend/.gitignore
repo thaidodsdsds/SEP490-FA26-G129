@@ -9,3 +9,7 @@ node_modules/
 # Build output
 dist/
 coverage/
+
+# Generated signed documents
+storage/
+uploads/

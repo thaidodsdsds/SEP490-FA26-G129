@@ -2,6 +2,7 @@ const internalRoles = new Set([
   'admin',
   'accountant',
   'sales',
+  'headsales',
   'warehouse',
   'warehousestaff',
   'signatory',
@@ -19,6 +20,18 @@ export function getAccountRole(account) {
   return typeof role === 'string'
     ? role
     : role?.name || role?.code || account?.role_name || account?.role_code || '';
+}
+
+export function isHeadSalesAccount(account) {
+  if (!account) return false;
+  const role = normalizeRole(getAccountRole(account));
+  return role === 'headsales' || role === 'admin' || role === 'ceo';
+}
+
+export function isSalesStaffOnlyAccount(account) {
+  if (!account) return false;
+  const role = normalizeRole(getAccountRole(account));
+  return role === 'sales';
 }
 
 /**
@@ -48,6 +61,7 @@ export function getRoleDashboardPath(account) {
   if (role === 'admin' || role.includes('quantri')) return '/internal/admin';
   if (role === 'accountant' || role.includes('ketoan')) return '/internal/accountant';
   if (role === 'technician') return '/internal/technician';
+  if (role === 'ceo' || role === 'signatory') return '/internal/head-of-tech';
   if (role === 'sales' || role.includes('kinhdoanh') || role.includes('sales')) return '/internal/sales';
   if (
     role === 'warehouse'

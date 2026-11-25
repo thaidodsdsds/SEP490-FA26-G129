@@ -2,11 +2,22 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dataSource from '../database/dataSource.js';
-import { Account } from '../database/entities.js';
+import { Account, Customer, Role } from '../database/entities.js';
 import { buildSuccessResponse, buildErrorResponse } from '../common/response.js';
+import { sendPasswordResetEmail, send2FAOTPEmail } from '../common/emailService.js';
 import env from '../config/env.js';
 
 const router = Router();
+
+const maskEmail = (email: string): string => {
+  const parts = email.split('@');
+  if (parts.length !== 2) return email;
+  const [user, domain] = parts;
+  if (user.length <= 2) {
+    return `${user[0]}***@${domain}`;
+  }
+  return `${user[0]}***${user[user.length - 1]}@${domain}`;
+};
 
 /**
  * POST /api/v1/auth/login
@@ -35,6 +46,37 @@ router.post('/login', async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json(buildErrorResponse('Invalid email or password.', 'UNAUTHORIZED'));
     }
+
+    // ── Two-Factor Authentication (2FA) Check ────────────────────────────
+    if (account.is_2fa_enabled) {
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = await bcrypt.hash(otpCode, 8);
+      const twoFactorToken = jwt.sign(
+        {
+          sub: account.id,
+          type: '2fa_pending',
+          otp_hash: otpHash,
+        },
+        env.jwt.secret,
+        { expiresIn: '5m' },
+      );
+
+      await send2FAOTPEmail({
+        to: account.email,
+        otpCode,
+        fullName: account.full_name,
+      });
+
+      return res.status(200).json(
+        buildSuccessResponse({
+          require_2fa: true,
+          two_factor_token: twoFactorToken,
+          email_masked: maskEmail(account.email),
+          message: 'Mã xác thực 2FA đã được gửi đến email của bạn.',
+        }),
+      );
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
     const payload = {
       id: account.id,
@@ -73,52 +115,277 @@ router.post('/login', async (req, res) => {
 });
 
 /**
+ * POST /api/v1/auth/verify-2fa
+ * Body: { two_factor_token: string, otp: string }
+ * Verifies 6-digit OTP code and returns session token + account details
+ */
+router.post('/verify-2fa', async (req, res) => {
+  try {
+    const { two_factor_token, otp } = req.body as {
+      two_factor_token?: string;
+      otp?: string;
+    };
+
+    if (!two_factor_token || !otp?.trim()) {
+      return res.status(400).json(
+        buildErrorResponse('Mã OTP và token xác thực là bắt buộc.', 'BAD_REQUEST'),
+      );
+    }
+
+    let decoded: { sub: number; type: string; otp_hash: string } | null = null;
+    try {
+      decoded = jwt.verify(two_factor_token, env.jwt.secret) as unknown as {
+        sub: number;
+        type: string;
+        otp_hash: string;
+      };
+    } catch {
+      return res.status(401).json(
+        buildErrorResponse(
+          'Phiên xác thực 2FA đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.',
+          'INVALID_TOKEN',
+        ),
+      );
+    }
+
+    if (!decoded || decoded.type !== '2fa_pending' || !decoded.sub || !decoded.otp_hash) {
+      return res.status(401).json(
+        buildErrorResponse('Phiên xác thực 2FA không hợp lệ.', 'INVALID_TOKEN'),
+      );
+    }
+
+    const isOtpValid = await bcrypt.compare(otp.trim(), decoded.otp_hash);
+    if (!isOtpValid) {
+      return res.status(400).json(
+        buildErrorResponse('Mã OTP không chính xác hoặc đã hết hạn.', 'INVALID_OTP'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { id: decoded.sub },
+      relations: ['role', 'customer'],
+    });
+
+    if (!account) {
+      return res.status(404).json(
+        buildErrorResponse('Tài khoản không tồn tại.', 'NOT_FOUND'),
+      );
+    }
+
+    const payload = {
+      id: account.id,
+      email: account.email,
+      role: account.role?.name ?? '',
+      customer_id: account.customer_id,
+    };
+
+    const token = jwt.sign(payload, env.jwt.secret, {
+      expiresIn: env.jwt.expiresIn as jwt.SignOptions['expiresIn'],
+    });
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        token,
+        account: {
+          id: account.id,
+          full_name: account.full_name,
+          email: account.email,
+          phone: account.phone,
+          role: account.role?.name ?? '',
+          customer_id: account.customer_id,
+          customer: account.customer
+            ? {
+                id: account.customer.id,
+                company_name: account.customer.company_name,
+              }
+            : null,
+        },
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Verify 2FA error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * POST /api/v1/auth/resend-2fa
+ * Body: { two_factor_token: string }
+ * Resends a fresh 6-digit OTP code to the user's email
+ */
+router.post('/resend-2fa', async (req, res) => {
+  try {
+    const { two_factor_token } = req.body as { two_factor_token?: string };
+
+    if (!two_factor_token) {
+      return res.status(400).json(
+        buildErrorResponse('Token xác thực là bắt buộc.', 'BAD_REQUEST'),
+      );
+    }
+
+    let decoded: { sub: number; type: string } | null = null;
+    try {
+      decoded = jwt.verify(two_factor_token, env.jwt.secret) as unknown as {
+        sub: number;
+        type: string;
+      };
+    } catch {
+      return res.status(401).json(
+        buildErrorResponse(
+          'Phiên xác thực 2FA đã hết hạn. Vui lòng đăng nhập lại.',
+          'EXPIRED_TOKEN',
+        ),
+      );
+    }
+
+    if (!decoded || decoded.type !== '2fa_pending' || !decoded.sub) {
+      return res.status(401).json(
+        buildErrorResponse('Phiên xác thực 2FA không hợp lệ.', 'INVALID_TOKEN'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { id: decoded.sub },
+    });
+
+    if (!account) {
+      return res.status(404).json(
+        buildErrorResponse('Tài khoản không tồn tại.', 'NOT_FOUND'),
+      );
+    }
+
+    const newOtpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const newOtpHash = await bcrypt.hash(newOtpCode, 8);
+    const newTwoFactorToken = jwt.sign(
+      {
+        sub: account.id,
+        type: '2fa_pending',
+        otp_hash: newOtpHash,
+      },
+      env.jwt.secret,
+      { expiresIn: '5m' },
+    );
+
+    await send2FAOTPEmail({
+      to: account.email,
+      otpCode: newOtpCode,
+      fullName: account.full_name,
+    });
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        two_factor_token: newTwoFactorToken,
+        email_masked: maskEmail(account.email),
+        message: 'Mã OTP mới đã được gửi đến email của bạn.',
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Resend 2FA error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
  * POST /api/v1/auth/register
- * Body: { full_name, email, password }
- * Creates a customer account (role_id = 7)
+ * Body: { full_name, email, password, phone?, company_name, address, industry, tax_code? }
+ * Creates a customer row and a linked customer account.
  */
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, email, password } = req.body as {
+    const {
+      full_name,
+      email,
+      password,
+      phone,
+      company_name,
+      address,
+      industry,
+      tax_code,
+    } = req.body as {
       full_name?: string;
       email?: string;
       password?: string;
+      phone?: string;
+      company_name?: string;
+      address?: string;
+      industry?: string;
+      tax_code?: string;
     };
 
-    if (!full_name || !email || !password) {
+    if (!full_name?.trim() || !email?.trim() || !password) {
       return res.status(400).json(buildErrorResponse('Full name, email, and password are required.', 'BAD_REQUEST'));
+    }
+
+    if (!company_name?.trim() || !address?.trim() || !industry?.trim()) {
+      return res.status(400).json(
+        buildErrorResponse('Company name, industry, and address are required.', 'BAD_REQUEST'),
+      );
     }
 
     if (password.length < 6) {
       return res.status(400).json(buildErrorResponse('Password must be at least 6 characters.', 'BAD_REQUEST'));
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     const accountRepo = dataSource.getRepository(Account);
-    const existing = await accountRepo.findOne({ where: { email: email.trim().toLowerCase() } });
+    const existing = await accountRepo.findOne({ where: { email: normalizedEmail } });
     if (existing) {
       return res.status(409).json(buildErrorResponse('An account with this email already exists.', 'CONFLICT'));
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const account = accountRepo.create({
-      full_name: full_name.trim(),
-      email: email.trim().toLowerCase(),
-      password_hash: passwordHash,
-      role_id: 7, // Customer role
-      customer_id: null,
-      is_2fa_enabled: false,
-      failed_login_attempts: 0,
-    });
+    const customerRole = await dataSource.getRepository(Role).findOne({ where: { name: 'Customer' } });
+    if (!customerRole) {
+      return res.status(500).json(buildErrorResponse('Customer role is not configured.', 'INTERNAL_ERROR'));
+    }
 
-    await accountRepo.save(account);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const trimmedPhone = phone?.trim() || null;
+    const trimmedTaxCode = tax_code?.trim() || null;
+
+    if (trimmedTaxCode) {
+      const existingCustomer = await dataSource.getRepository(Customer).findOne({
+        where: { tax_code: trimmedTaxCode },
+      });
+      if (existingCustomer) {
+        return res.status(409).json(
+          buildErrorResponse('This tax code is already registered to another company.', 'CONFLICT'),
+        );
+      }
+    }
+
+    const savedAccount = await dataSource.transaction(async (manager) => {
+      const customer = manager.create(Customer, {
+        company_name: company_name.trim(),
+        tax_code: trimmedTaxCode,
+        address: address.trim(),
+        industry: industry.trim(),
+      });
+      const savedCustomer = await manager.save(customer);
+
+      const account = manager.create(Account, {
+        full_name: full_name.trim(),
+        email: normalizedEmail,
+        phone: trimmedPhone,
+        password_hash: passwordHash,
+        role_id: customerRole.id,
+        customer_id: savedCustomer.id,
+        is_2fa_enabled: false,
+        failed_login_attempts: 0,
+      });
+      return manager.save(account);
+    });
 
     return res.status(201).json(
       buildSuccessResponse({
         message: 'Account created successfully.',
         account: {
-          id: account.id,
-          full_name: account.full_name,
-          email: account.email,
+          id: savedAccount.id,
+          full_name: savedAccount.full_name,
+          email: savedAccount.email,
+          phone: savedAccount.phone,
+          customer_id: savedAccount.customer_id,
         },
       }),
     );
@@ -131,24 +398,167 @@ router.post('/register', async (req, res) => {
 /**
  * POST /api/v1/auth/forgot-password
  * Body: { email: string }
- * In a real app this would send a reset email. Here it just acknowledges the request.
+ * Sends a real password reset link to user's email if the account exists.
  */
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body as { email?: string };
 
-    if (!email) {
+    if (!email || !email.trim()) {
       return res.status(400).json(buildErrorResponse('Email is required.', 'BAD_REQUEST'));
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (account) {
+      // Create a secure single-use reset token containing password_hash slice so it becomes invalid once password is reset
+      const resetToken = jwt.sign(
+        {
+          id: account.id,
+          email: account.email,
+          type: 'password_reset',
+          v: account.password_hash.slice(-10),
+        },
+        env.jwt.secret,
+        { expiresIn: '15m' },
+      );
+
+      const resetUrl = `${env.frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+      try {
+        await sendPasswordResetEmail({
+          to: account.email,
+          resetUrl,
+          fullName: account.full_name,
+        });
+      } catch (mailError) {
+        console.error('[Auth] Error sending reset email:', mailError);
+        return res.status(500).json(
+          buildErrorResponse(
+            'Hệ thống không thể gửi email lúc này. Vui lòng kiểm tra lại cấu hình email máy chủ.',
+            'MAIL_SEND_FAILED',
+          ),
+        );
+      }
     }
 
     // Always respond with success to avoid user enumeration
     return res.status(200).json(
       buildSuccessResponse({
-        message: 'If that email exists in our system, a reset link has been sent.',
+        message: 'Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi đến hòm thư của bạn.',
       }),
     );
   } catch (error) {
     console.error('[Auth] Forgot-password error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * GET /api/v1/auth/verify-reset-token?token=...
+ * Verifies if the reset token is valid and not expired/already used.
+ */
+router.get('/verify-reset-token', async (req, res) => {
+  try {
+    const token = req.query.token as string | undefined;
+
+    if (!token) {
+      return res.status(400).json(buildErrorResponse('Mã xác thực là bắt buộc.', 'BAD_REQUEST'));
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.jwt.secret);
+    } catch {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 'TOKEN_INVALID'),
+      );
+    }
+
+    if (decoded?.type !== 'password_reset' || !decoded?.id || !decoded?.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ.', 'TOKEN_INVALID'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: decoded.id } });
+
+    if (!account || account.password_hash.slice(-10) !== decoded.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu này đã được sử dụng hoặc không còn hiệu lực.', 'TOKEN_EXPIRED'),
+      );
+    }
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        valid: true,
+        email: account.email,
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Verify reset token error:', error);
+    return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Body: { token: string, password: string }
+ * Resets user's password with the new password.
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body as { token?: string; password?: string };
+
+    if (!token || !password) {
+      return res.status(400).json(buildErrorResponse('Token và mật khẩu mới là bắt buộc.', 'BAD_REQUEST'));
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json(buildErrorResponse('Mật khẩu mới phải có ít nhất 6 ký tự.', 'BAD_REQUEST'));
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.jwt.secret);
+    } catch {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.', 'TOKEN_INVALID'),
+      );
+    }
+
+    if (decoded?.type !== 'password_reset' || !decoded?.id || !decoded?.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu không hợp lệ.', 'TOKEN_INVALID'),
+      );
+    }
+
+    const accountRepo = dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: decoded.id } });
+
+    if (!account || account.password_hash.slice(-10) !== decoded.v) {
+      return res.status(400).json(
+        buildErrorResponse('Liên kết đặt lại mật khẩu này đã được sử dụng hoặc không còn hiệu lực.', 'TOKEN_EXPIRED'),
+      );
+    }
+
+    const newPasswordHash = await bcrypt.hash(password, 10);
+    account.password_hash = newPasswordHash;
+    account.failed_login_attempts = 0;
+    await accountRepo.save(account);
+
+    return res.status(200).json(
+      buildSuccessResponse({
+        message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới.',
+      }),
+    );
+  } catch (error) {
+    console.error('[Auth] Reset-password error:', error);
     return res.status(500).json(buildErrorResponse('Internal server error.', 'INTERNAL_ERROR'));
   }
 });

@@ -392,6 +392,87 @@ a {
   color: #276f8c;
 }
 
+/* ---------- Menu 2 cấp (nhóm thu gọn) ---------- */
+.role-nav-group {
+  display: grid;
+  gap: 5px;
+}
+
+.role-nav-group-toggle {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.role-nav-group-toggle .role-nav-chevron {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  margin-left: auto;
+  place-items: center;
+  border-radius: 0;
+  background: none;
+  color: #9badba;
+  font-size: 0.68rem;
+  transition: transform 140ms ease;
+}
+
+.role-nav-group-toggle[aria-expanded='true'] .role-nav-chevron {
+  transform: rotate(180deg);
+}
+
+.role-nav-group--active > .role-nav-group-toggle {
+  background: #f2f8fa;
+  color: #216d8b;
+}
+
+.role-nav-group--active > .role-nav-group-toggle > span:first-child {
+  background: #dcecf2;
+  color: #276f8c;
+}
+
+.role-nav-sublist {
+  display: grid;
+  gap: 3px;
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid #e6edf1;
+}
+
+.role-nav-sublist[hidden] {
+  display: none;
+}
+
+.role-nav-link-child {
+  min-height: 33px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.role-nav-link-child > .role-nav-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 999px;
+  background: #c3d1da;
+}
+
+.role-nav-link-child.role-nav-link-active > .role-nav-dot {
+  background: #216d8b;
+}
+
+.role-sidebar-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+}
+
 .role-sidebar-footer {
   display: flex;
   flex: 0 0 auto;
@@ -1088,5 +1169,151 @@ a {
 
   .profile-header-bar {
     align-items: flex-start;
+  }
+}
+
+/* UI/UX pass: skip link, focus visibility and page motion. */
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 10px;
+  left: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #1f3a4d;
+  box-shadow: 0 8px 24px rgba(16, 37, 50, 0.2);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 150ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.role-nav-link:focus-visible,
+.role-menu-toggle:focus-visible,
+.role-nav-close:focus-visible,
+.role-dashboard-brand:focus-visible,
+.shortcut-card:focus-visible {
+  outline: 3px solid rgba(38, 121, 156, 0.28);
+  outline-offset: 2px;
+}
+
+.role-page-transition {
+  min-width: 0;
+}
+
+.role-sidebar-intro p {
+  color: #5a7083;
+  font-size: 0.75rem;
+}
+
+.role-sidebar-footer {
+  color: #5a7083;
+  font-size: 0.72rem;
+}
+
+.role-user-details small,
+.role-sidebar-eyebrow,
+.role-sidebar-label {
+  color: #5a7083;
+  font-size: 0.68rem;
+}
+
+.role-nav-link {
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.role-menu-toggle,
+.role-nav-close {
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.role-menu-toggle:active,
+.role-nav-close:active,
+.role-nav-link:active {
+  transform: translateY(1px);
+}
+
+.role-nav-link-soon,
+.role-nav-link-soon:hover {
+  color: #5a7083;
+}
+
+.role-nav-soon {
+  color: #5a7083;
+  font-size: 0.62rem;
+}
+
+@keyframes page-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.internal-home,
+.page-panel {
+  animation: page-rise-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.internal-shortcuts > .shortcut-card {
+  animation: page-rise-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.internal-shortcuts > .shortcut-card:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.internal-shortcuts > .shortcut-card:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.internal-shortcuts > .shortcut-card:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.internal-shortcuts > .shortcut-card:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+@media (max-width: 1024px) {
+  .role-dashboard-sidebar {
+    visibility: hidden;
+    transition: transform 220ms ease, visibility 0s linear 220ms;
+  }
+
+  .role-dashboard-body.nav-open .role-dashboard-sidebar {
+    visibility: visible;
+    transition: transform 220ms ease, visibility 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .skip-link {
+    transition: none;
+  }
+
+  .internal-home,
+  .page-panel,
+  .internal-shortcuts > .shortcut-card {
+    animation: none;
   }
 }

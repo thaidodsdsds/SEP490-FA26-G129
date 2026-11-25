@@ -48,7 +48,14 @@ function DeviceServiceCard({
         />
         <span className="sr-device-icon" aria-hidden="true">▣</span>
         <span className="sr-device-info">
-          <strong>{device.name}</strong>
+          <strong>
+            {device.name}
+            {device.is_group2 && (
+              <span className="sr-kind-tag" style={{ marginLeft: '6px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}>
+                ⚖ Nhóm 2 (Bắt buộc KĐ)
+              </span>
+            )}
+          </strong>
           <small>
             {[device.manufacturer, device.model].filter(Boolean).join(' · ') || 'Chưa cập nhật hãng / model'}
           </small>
@@ -123,12 +130,14 @@ function DeviceServiceCard({
           ) : (
             <div className="sr-service-grid">
               {filteredServices.map((service) => {
-                const disabled = !service.is_valid;
+                const isGroup2Restricted = Boolean(device.is_group2) && service.kind !== 'Verification';
+                const disabled = !service.is_valid || isGroup2Restricted;
                 const isChecked = selectedServiceIds.includes(service.id);
                 const kindLabel = KIND_LABELS[service.kind] || service.kind;
                 const fieldLabel = FIELD_LABELS[service.field] || service.field;
                 const blockedMessage =
-                  service.blocked_reason
+                  (isGroup2Restricted && 'Thiết bị thuộc nhóm 2: Bắt buộc chọn dịch vụ Kiểm định (Verification).')
+                  || service.blocked_reason
                   || (Array.isArray(service.errors) && service.errors[0])
                   || 'Dịch vụ hiện không đủ điều kiện thực hiện.';
 

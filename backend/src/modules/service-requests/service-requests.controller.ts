@@ -4,10 +4,17 @@ import { AppError } from '../../common/errors.js';
 import { buildSuccessResponse } from '../../common/response.js';
 import {
   ALLOWED_LOCATION_TYPES,
+  cancelServiceRequest,
+  type CreateServiceRequestAttachmentInput,
   type CreateServiceRequestItemInput,
   createServiceRequest,
+  getServiceRequestDetail,
+  listServiceRequests,
   REQUEST_CODE_REGEX,
+  resolveAccountCustomerId,
   type ServiceRequestLocationType,
+  updateServiceRequest,
+  type UpdateServiceRequestInput,
 } from './service-requests.service.js';
 
 const isPositiveInteger = (value: unknown): value is number =>
@@ -107,25 +114,142 @@ const parseRequestItems = (rawItems: unknown): CreateServiceRequestItemInput[] =
 };
 
 /**
+ * Chuẩn hóa danh sách tệp đính kèm (attachments) tùy chọn
+ */
+const parseRequestAttachments = (
+  rawAttachments: unknown,
+): CreateServiceRequestAttachmentInput[] => {
+  if (rawAttachments === undefined || rawAttachments === null) {
+    return [];
+  }
+
+  if (!Array.isArray(rawAttachments)) {
+    throw new AppError(
+      'attachments must be an array.',
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  return rawAttachments.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new AppError(
+        'Each attachment must be an object with file_name and file_url.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+    const record = entry as Record<string, unknown>;
+    const fileName = typeof record.file_name === 'string' ? record.file_name.trim() : '';
+    const fileUrl = typeof record.file_url === 'string' ? record.file_url.trim() : '';
+
+    if (!fileName || !fileUrl) {
+      throw new AppError(
+        'Each attachment requires non-empty file_name and file_url.',
+        400,
+        ERROR_CODES.BAD_REQUEST,
+      );
+    }
+
+    return {
+      file_name: fileName.slice(0, 255),
+      file_url: fileUrl,
+    };
+  });
+};
+
+/**
+ * Controller lấy danh sách phiếu yêu cầu dịch vụ kèm thông tin công ty, mã số thuế và địa chỉ (GET /api/v1/service-requests)
+ */
+export const getServiceRequestsHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    const normalizedRole = String(authUser.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    let customerIdFilter: number | undefined;
+    let assignedSalesIdFilter: number | undefined;
+
+    if (normalizedRole === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = isPositiveInteger(tokenCustomerId)
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        return res.status(200).json(buildSuccessResponse([]));
+      }
+      customerIdFilter = resolvedId;
+    } else if (normalizedRole === 'sales') {
+      const salesAccountId = Number(authUser.id);
+      if (isPositiveInteger(salesAccountId)) {
+        assignedSalesIdFilter = salesAccountId;
+      }
+    }
+
+    const serviceRequests = await listServiceRequests(customerIdFilter, assignedSalesIdFilter);
+    return res.status(200).json(buildSuccessResponse(serviceRequests));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
  * Controller tạo mới phiếu yêu cầu dịch vụ (POST /api/v1/service-requests)
+ * Hỗ trợ cả Nhân viên Sales (truyền customer_id) và Khách hàng (tự động lấy customer_id từ tài khoản đăng nhập)
  */
 export const createServiceRequestHandler: RequestHandler = async (req, res, next) => {
   try {
-    const userId =
+    const authUser =
       typeof req.user === 'object' && req.user !== null
-        ? Number((req.user as { id?: unknown }).id)
-        : NaN;
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
 
+    const userId = Number(authUser.id);
     if (!isPositiveInteger(userId)) {
       return next(
         new AppError('Authenticated user ID is missing or invalid.', 401, ERROR_CODES.UNAUTHORIZED),
       );
     }
 
-    const { request_code, customer_id, location_type, items } = (req.body ?? {}) as Record<string, unknown>;
-    const customerId = Number(customer_id);
+    const {
+      request_code,
+      customer_id,
+      location_type,
+      preferred_date,
+      special_notes,
+      accessories_note,
+      items,
+      attachments,
+    } = (req.body ?? {}) as Record<string, unknown>;
+    const isCustomerRole = String(authUser.role || '').toLowerCase() === 'customer';
 
-    if (!isPositiveInteger(customerId)) {
+    let customerId = Number(customer_id);
+    if (isCustomerRole) {
+      const accountCustomerId =
+        (await resolveAccountCustomerId(userId)) ?? Number(authUser.customer_id);
+      if (!isPositiveInteger(accountCustomerId)) {
+        return next(
+          new AppError(
+            'Tài khoản khách hàng chưa được liên kết với thông tin doanh nghiệp. Vui lòng cập nhật thông tin công ty trước khi tạo yêu cầu.',
+            400,
+            ERROR_CODES.VALIDATION_ERROR,
+          ),
+        );
+      }
+      if (isPositiveInteger(customerId) && customerId !== accountCustomerId) {
+        return next(
+          new AppError(
+            'Bạn chỉ có thể tạo phiếu yêu cầu cho doanh nghiệp của mình.',
+            403,
+            ERROR_CODES.FORBIDDEN,
+          ),
+        );
+      }
+      customerId = accountCustomerId;
+    } else if (!isPositiveInteger(customerId)) {
       return next(
         new AppError('Invalid customer ID.', 400, ERROR_CODES.BAD_REQUEST),
       );
@@ -158,14 +282,43 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
       );
     }
 
+    let normalizedPreferredDate: string | null = null;
+    if (preferred_date !== undefined && preferred_date !== null && String(preferred_date).trim() !== '') {
+      normalizedPreferredDate = String(preferred_date).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedPreferredDate) || Number.isNaN(Date.parse(normalizedPreferredDate))) {
+        return next(
+          new AppError(
+            'Invalid preferred_date format. Expected format: YYYY-MM-DD.',
+            400,
+            ERROR_CODES.BAD_REQUEST,
+          ),
+        );
+      }
+    }
+
+    const normalizedSpecialNotes =
+      typeof special_notes === 'string' && special_notes.trim() !== ''
+        ? special_notes.trim()
+        : null;
+    const normalizedAccessoriesNote =
+      typeof accessories_note === 'string' && accessories_note.trim() !== ''
+        ? accessories_note.trim()
+        : null;
+
     const normalizedItems = parseRequestItems(items);
+    const normalizedAttachments = parseRequestAttachments(attachments);
 
     const created = await createServiceRequest({
       request_code: normalizedRequestCode,
       customer_id: customerId,
       created_by: userId,
+      created_by_role: String(authUser.role || ''),
       location_type: location_type as ServiceRequestLocationType,
+      preferred_date: normalizedPreferredDate,
+      special_notes: normalizedSpecialNotes,
+      accessories_note: normalizedAccessoriesNote,
       items: normalizedItems,
+      attachments: normalizedAttachments,
     });
 
     return res.status(201).json(buildSuccessResponse(created));
@@ -174,3 +327,169 @@ export const createServiceRequestHandler: RequestHandler = async (req, res, next
   }
 };
 
+/**
+ * Controller xem chi tiết 1 phiếu yêu cầu (GET /api/v1/service-requests/:id)
+ */
+export const getServiceRequestDetailHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!isPositiveInteger(id)) {
+      return next(new AppError('Mã phiếu yêu cầu không hợp lệ.', 400, ERROR_CODES.BAD_REQUEST));
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = isPositiveInteger(tokenCustomerId)
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        return next(new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND));
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const detail = await getServiceRequestDetail(id, customerIdFilter);
+    return res.status(200).json(buildSuccessResponse(detail));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * Controller hủy phiếu yêu cầu (PATCH /api/v1/service-requests/:id/cancel)
+ */
+export const cancelServiceRequestHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!isPositiveInteger(id)) {
+      return next(new AppError('Mã phiếu yêu cầu không hợp lệ.', 400, ERROR_CODES.BAD_REQUEST));
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = isPositiveInteger(tokenCustomerId)
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        return next(new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND));
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const { reason } = (req.body ?? {}) as { reason?: string };
+    const updated = await cancelServiceRequest(id, reason, customerIdFilter);
+    return res.status(200).json(buildSuccessResponse(updated));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * Controller chỉnh sửa phiếu yêu cầu (PUT /api/v1/service-requests/:id)
+ */
+export const updateServiceRequestHandler: RequestHandler = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!isPositiveInteger(id)) {
+      return next(new AppError('Mã phiếu yêu cầu không hợp lệ.', 400, ERROR_CODES.BAD_REQUEST));
+    }
+
+    const authUser =
+      typeof req.user === 'object' && req.user !== null
+        ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
+        : {};
+
+    let customerIdFilter: number | undefined;
+    if (String(authUser.role || '').toLowerCase() === 'customer') {
+      const tokenCustomerId = Number(authUser.customer_id);
+      const resolvedId = isPositiveInteger(tokenCustomerId)
+        ? tokenCustomerId
+        : await resolveAccountCustomerId(Number(authUser.id));
+
+      if (!resolvedId) {
+        return next(new AppError('Không tìm thấy tài khoản doanh nghiệp liên kết.', 404, ERROR_CODES.NOT_FOUND));
+      }
+      customerIdFilter = resolvedId;
+    }
+
+    const { location_type, preferred_date, special_notes, accessories_note, items, attachments } =
+      (req.body ?? {}) as Record<string, unknown>;
+
+    const updatePayload: UpdateServiceRequestInput = {};
+
+    if (location_type !== undefined) {
+      if (
+        typeof location_type !== 'string'
+        || !ALLOWED_LOCATION_TYPES.includes(location_type as ServiceRequestLocationType)
+      ) {
+        return next(
+          new AppError(
+            `Invalid location_type. Allowed values: ${ALLOWED_LOCATION_TYPES.join(', ')}.`,
+            400,
+            ERROR_CODES.BAD_REQUEST,
+          ),
+        );
+      }
+      updatePayload.location_type = location_type as ServiceRequestLocationType;
+    }
+
+    if (preferred_date !== undefined) {
+      if (preferred_date !== null && String(preferred_date).trim() !== '') {
+        const dateStr = String(preferred_date).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || Number.isNaN(Date.parse(dateStr))) {
+          return next(
+            new AppError(
+              'Invalid preferred_date format. Expected format: YYYY-MM-DD.',
+              400,
+              ERROR_CODES.BAD_REQUEST,
+            ),
+          );
+        }
+        updatePayload.preferred_date = dateStr;
+      } else {
+        updatePayload.preferred_date = null;
+      }
+    }
+
+    if (special_notes !== undefined) {
+      updatePayload.special_notes =
+        typeof special_notes === 'string' && special_notes.trim() !== ''
+          ? special_notes.trim()
+          : null;
+    }
+
+    if (accessories_note !== undefined) {
+      updatePayload.accessories_note =
+        typeof accessories_note === 'string' && accessories_note.trim() !== ''
+          ? accessories_note.trim()
+          : null;
+    }
+
+    if (items !== undefined) {
+      updatePayload.items = parseRequestItems(items);
+    }
+
+    if (attachments !== undefined) {
+      updatePayload.attachments = parseRequestAttachments(attachments);
+    }
+
+    const updated = await updateServiceRequest(id, updatePayload, customerIdFilter);
+    return res.status(200).json(buildSuccessResponse(updated));
+  } catch (error) {
+    return next(error);
+  }
+};

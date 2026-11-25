@@ -12,11 +12,26 @@ function QuotationPricingSummary({
   hasValidLineItems,
   isDiscountValid,
   canSubmit,
+  activeDraftQuotation,
+  lockedQuotation,
+  submittingStatus,
   formError,
+  isHeadSales = false,
+  salesSubmissionNote = '',
+  onSalesSubmissionNoteChange,
   onExtraDiscountChange,
   onTravelFeeChange,
   onSubmitWithStatus,
 }) {
+  const isUnchangedFromRejection = Boolean(
+    activeDraftQuotation
+      && activeDraftQuotation.head_sales_decision === 'Rejected'
+      && activeDraftQuotation.last_rejected_total != null
+      && Math.abs(Number(totalAmount) - Number(activeDraftQuotation.last_rejected_total)) < 0.01
+      && Math.abs(
+        Number(totalDiscountAmount) - Number(activeDraftQuotation.last_rejected_discount || 0),
+      ) < 0.01,
+  );
   return (
     <section className="qt-card qt-summary-card" aria-labelledby="qt-step3-heading">
       <div className="qt-section-heading">
@@ -149,7 +164,68 @@ function QuotationPricingSummary({
           <span aria-hidden="true">{isDiscountValid && Number(travelFee) >= 0 ? '✓' : '○'}</span>
           Thỏa mãn ràng buộc CSDL: <code>discount_amount &lt;= subtotal</code> và <code>travel_fee &gt;= 0</code>
         </li>
+        <li className={!lockedQuotation ? 'passed' : ''}>
+          <span aria-hidden="true">{!lockedQuotation ? '✓' : '✕'}</span>
+          {lockedQuotation
+            ? `Đơn đã có báo giá hiệu lực (${lockedQuotation.quotation_code} · ${lockedQuotation.status}) — không tạo trùng`
+            : activeDraftQuotation
+              ? `Đang chỉnh sửa trực tiếp bản nháp ${activeDraftQuotation.quotation_code} (không sinh bản ghi thừa)`
+              : 'Đơn chưa có báo giá hiệu lực — đủ điều kiện khởi tạo'}
+        </li>
+        {activeDraftQuotation?.head_sales_decision === 'Rejected' && (
+          <li className={!isUnchangedFromRejection ? 'passed' : ''}>
+            <span aria-hidden="true">{!isUnchangedFromRejection ? '✓' : '✕'}</span>
+            {!isUnchangedFromRejection
+              ? 'Đã thay đổi tổng tiền hoặc chiết khấu so với lúc bị HeadSales từ chối'
+              : `Cảnh báo chống spam: Chưa điều chỉnh tổng tiền hoặc mức chiết khấu (${formatCurrency(totalAmount)})`}
+          </li>
+        )}
       </ul>
+
+      {activeDraftQuotation?.head_sales_decision === 'Rejected' && (
+        <div
+          style={{
+            margin: '16px 0',
+            padding: '14px 18px',
+            borderRadius: '8px',
+            background: '#fffbeb',
+            border: '1px solid #fcd34d',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+            📝 Giải trình chỉnh sửa theo yêu cầu HeadSales (Bắt buộc khi trình lại) *
+          </div>
+          {isUnchangedFromRejection && (
+            <div
+              style={{
+                marginBottom: '10px',
+                padding: '8px 12px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                color: '#991b1b',
+                fontSize: '0.84rem',
+              }}
+            >
+              ⚠️ <strong>Cảnh báo chống spam:</strong> Bạn chưa hề thay đổi tổng giá trị ({formatCurrency(totalAmount)}) hoặc mức chiết khấu so với lúc bị Trưởng phòng từ chối. Vui lòng điều chỉnh lại phương án giá trước khi trình duyệt lại.
+            </div>
+          )}
+          <textarea
+            disabled={Boolean(submittingStatus)}
+            onChange={(e) => onSalesSubmissionNoteChange?.(e.target.value)}
+            placeholder="Nêu rõ các thay đổi bạn đã thực hiện theo yêu cầu của Trưởng phòng..."
+            rows={2}
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.88rem',
+            }}
+            value={salesSubmissionNote || ''}
+          />
+        </div>
+      )}
 
       {formError && (
         <p className="qt-form-error" role="alert">
@@ -159,24 +235,54 @@ function QuotationPricingSummary({
 
       <div className="qt-submit-row">
         <span>
-          Báo giá có thể được lưu ở trạng thái <strong>Draft</strong> (nháp) hoặc chuyển sang <strong>Sent</strong> để gửi khách hàng phê duyệt.
+          {lockedQuotation ? (
+            <>
+              Phiếu yêu cầu này đã có báo giá <strong>{lockedQuotation.quotation_code}</strong> ở trạng thái{' '}
+              <strong>{lockedQuotation.status}</strong>. Chỉ được lập báo giá mới khi báo giá cũ bị <strong>Rejected</strong>.
+            </>
+          ) : activeDraftQuotation ? (
+            <>
+              Đang làm việc trên báo giá <strong>{activeDraftQuotation.quotation_code}</strong> ({activeDraftQuotation.status}): mọi thay đổi sẽ cập nhật trực tiếp lên bản ghi này.
+            </>
+          ) : (
+            <>
+              Báo giá sau khi lập sẽ được lưu nháp (<strong>Draft</strong>) hoặc trình <strong>Trưởng phòng Kinh doanh (HeadSales)</strong> phê duyệt trước khi gửi tới tay khách hàng.
+            </>
+          )}
         </span>
         <div className="qt-submit-actions">
           <button
             className="button button-secondary"
-            disabled={!canSubmit}
+            disabled={!canSubmit || Boolean(submittingStatus) || Boolean(lockedQuotation)}
             onClick={() => onSubmitWithStatus('Draft')}
             type="button"
           >
-            Lưu bản nháp (Draft)
+            {submittingStatus === 'Draft'
+              ? 'Đang lưu bản nháp...'
+              : activeDraftQuotation
+                ? 'Cập nhật bản nháp (Draft)'
+                : 'Lưu bản nháp (Draft)'}
           </button>
           <button
             className="button button-primary"
-            disabled={!canSubmit}
-            onClick={() => onSubmitWithStatus('Sent')}
+            disabled={
+              !canSubmit
+              || Boolean(submittingStatus)
+              || Boolean(lockedQuotation)
+              || (!isHeadSales && isUnchangedFromRejection)
+            }
+            onClick={() => onSubmitWithStatus(isHeadSales ? 'Sent' : 'PendingApproval')}
             type="button"
           >
-            Tạo & Gửi báo giá (Sent)
+            {submittingStatus === 'PendingApproval' || submittingStatus === 'Sent'
+              ? 'Đang xử lý...'
+              : isHeadSales
+                ? activeDraftQuotation
+                  ? '✓ Duyệt & Gửi khách hàng (Sent)'
+                  : '✓ Tạo, Duyệt & Gửi khách hàng (Sent)'
+                : activeDraftQuotation
+                  ? '📤 Cập nhật & Trình HeadSales duyệt'
+                  : '📤 Tạo & Trình HeadSales duyệt'}
           </button>
         </div>
       </div>

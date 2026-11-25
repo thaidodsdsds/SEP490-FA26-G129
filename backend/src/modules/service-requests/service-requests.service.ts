@@ -3,8 +3,11 @@ import { ERROR_CODES } from '../../common/constants.js';
 import { AppError } from '../../common/errors.js';
 import dataSource from '../../database/dataSource.js';
 import {
+  Account,
+  Attachment,
   Customer,
   Device,
+  InitialInspection,
   ServiceRequest,
   ServiceRequestItem,
   ServiceType,
@@ -19,14 +22,32 @@ export interface CreateServiceRequestItemInput {
   service_type_id: number;
 }
 
+export interface CreateServiceRequestAttachmentInput {
+  file_name: string;
+  file_url: string;
+}
+
 export const REQUEST_CODE_REGEX = /^SR-\d{4}-\d{3,}$/;
 
 export interface CreateServiceRequestInput {
   request_code?: string | null;
   customer_id: number;
   created_by: number;
+  created_by_role?: string | null;
   location_type: ServiceRequestLocationType;
+  preferred_date?: string | null;
+  special_notes?: string | null;
+  accessories_note?: string | null;
   items: CreateServiceRequestItemInput[];
+  attachments?: CreateServiceRequestAttachmentInput[];
+}
+
+export interface CreatedServiceRequestAttachmentResult {
+  id: number;
+  service_request_id: number;
+  file_name: string;
+  file_url: string;
+  uploaded_at: Date;
 }
 
 export interface CreatedServiceRequestItemResult {
@@ -43,9 +64,107 @@ export interface CreatedServiceRequestResult {
   customer_id: number;
   created_by: number;
   location_type: string;
+  preferred_date: string | null;
+  special_notes: string | null;
+  accessories_note: string | null;
   status: string;
   created_at: Date;
   items: CreatedServiceRequestItemResult[];
+  attachments?: CreatedServiceRequestAttachmentResult[];
+}
+
+export interface ServiceRequestCustomerInfo {
+  id: number;
+  company_name: string;
+  tax_code: string | null;
+  address: string;
+  assigned_sales_id?: number | null;
+}
+
+export interface ServiceRequestItemSummary {
+  id: number;
+  service_request_item_id: number;
+  device_id: number;
+  device_name: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
+  internal_code: string | null;
+  service_type_id: number;
+  service_type_name: string;
+  service_kind: string;
+  standard_code: string | null;
+  status: string;
+  initial_inspection?: {
+    id: number;
+    result: string;
+    defect_note: string | null;
+    photo_url: string | null;
+    customer_written_consent: boolean;
+    customer_consent_status: string | null;
+    customer_consent_note: string | null;
+    customer_consent_file: string | null;
+    customer_consented_at: string | null;
+    customer_consent_signer_name: string | null;
+    customer_consent_method: string | null;
+    inspected_at: string;
+  } | null;
+}
+
+export interface ServiceRequestQuotationSummary {
+  id: number;
+  quotation_code: string;
+  subtotal: number;
+  discount_amount: number;
+  travel_fee: number;
+  total_amount: number;
+  estimated_completion_date: string | null;
+  status: string;
+  customer_reject_reason?: string | null;
+  customer_responded_at?: string | null;
+  head_sales_note?: string | null;
+  head_sales_decision?: string | null;
+  head_sales_reviewed_at?: string | null;
+  line_items: Array<{
+    id: number;
+    service_request_item_id: number;
+    description: string;
+    unit_price: number;
+    discount_amount: number;
+  }>;
+}
+
+export interface ServiceRequestSummary {
+  id: number;
+  request_code: string;
+  customer_id?: number;
+  location_type?: string;
+  preferred_date?: string | null;
+  special_notes?: string | null;
+  accessories_note?: string | null;
+  status?: string;
+  created_at?: Date;
+  customer: ServiceRequestCustomerInfo;
+  items?: ServiceRequestItemSummary[];
+  attachments?: CreatedServiceRequestAttachmentResult[];
+  latest_quotation?: ServiceRequestQuotationSummary | null;
+}
+
+export interface ServiceRequestDetailResult extends ServiceRequestSummary {
+  created_by?: number;
+  can_edit: boolean;
+  can_cancel: boolean;
+  attachments: CreatedServiceRequestAttachmentResult[];
+  quotations?: ServiceRequestQuotationSummary[];
+}
+
+export interface UpdateServiceRequestInput {
+  location_type?: ServiceRequestLocationType;
+  preferred_date?: string | null;
+  special_notes?: string | null;
+  accessories_note?: string | null;
+  items?: CreateServiceRequestItemInput[];
+  attachments?: CreateServiceRequestAttachmentInput[];
 }
 
 export const formatServiceRequestCode = (
@@ -54,6 +173,533 @@ export const formatServiceRequestCode = (
 ): string => {
   const year = date.getFullYear();
   return `SR-${year}-${String(id).padStart(3, '0')}`;
+};
+
+/**
+ * Tìm customer_id liên kết với tài khoản Account hiện tại (hỗ trợ tài khoản khách hàng)
+ */
+export const resolveAccountCustomerId = async (accountId: number): Promise<number | null> => {
+  const account = await dataSource.getRepository(Account).findOne({
+    select: { id: true, customer_id: true },
+    where: { id: accountId },
+  });
+  return account?.customer_id ?? null;
+};
+
+/**
+ * Lấy danh sách các phiếu yêu cầu dịch vụ (id, request_code, location_type, status)
+ * kèm thông tin khách hàng (id, company_name, tax_code, address) và các hạng mục dịch vụ (items)
+ */
+export const listServiceRequests = async (
+  customerIdFilter?: number,
+  assignedSalesIdFilter?: number,
+): Promise<ServiceRequestSummary[]> => {
+  const whereClause: Record<string, unknown> = {};
+  if (customerIdFilter) {
+    whereClause.customer_id = customerIdFilter;
+  }
+  if (assignedSalesIdFilter) {
+    whereClause.customer = { assigned_sales_id: assignedSalesIdFilter };
+  }
+
+  const requests = await dataSource.getRepository(ServiceRequest).find({
+    ...(Object.keys(whereClause).length > 0 ? { where: whereClause } : {}),
+    select: {
+      id: true,
+      request_code: true,
+      location_type: true,
+      preferred_date: true,
+      special_notes: true,
+      accessories_note: true,
+      status: true,
+      created_at: true,
+      customer: {
+        id: true,
+        company_name: true,
+        tax_code: true,
+        address: true,
+        assigned_sales_id: true,
+      },
+      items: {
+        id: true,
+        device_id: true,
+        service_type_id: true,
+        status: true,
+        device: {
+          id: true,
+          name: true,
+          manufacturer: true,
+          model: true,
+          serial_number: true,
+          internal_code: true,
+        },
+        service_type: {
+          id: true,
+          name: true,
+          kind: true,
+          standard_code: true,
+        },
+      },
+      quotations: {
+        id: true,
+        subtotal: true,
+        discount_amount: true,
+        travel_fee: true,
+        total_amount: true,
+        estimated_completion_date: true,
+        status: true,
+        head_sales_note: true,
+        head_sales_decision: true,
+        head_sales_reviewed_at: true,
+        line_items: {
+          id: true,
+          service_request_item_id: true,
+          description: true,
+          unit_price: true,
+          discount_amount: true,
+        },
+      },
+    },
+    relations: {
+      customer: true,
+      items: {
+        device: true,
+        service_type: true,
+      },
+      quotations: {
+        line_items: true,
+      },
+      attachments: true,
+    },
+    order: {
+      id: 'DESC',
+    },
+  });
+
+  return requests.map((req) => {
+    const sortedQuotations = Array.isArray(req.quotations)
+      ? [...req.quotations].sort((a, b) => b.id - a.id)
+      : null;
+    const visibleQuotations = sortedQuotations
+      ? (customerIdFilter
+          ? sortedQuotations.filter(
+              (q) => q.status !== 'Draft' && q.status !== 'PendingApproval',
+            )
+          : sortedQuotations)
+      : null;
+    const targetQuotation = visibleQuotations
+      ? (visibleQuotations[0] || null)
+      : undefined;
+
+    return {
+      id: req.id,
+      request_code:
+        req.request_code
+        || formatServiceRequestCode(
+          req.id,
+          req.created_at instanceof Date ? req.created_at : new Date(),
+        ),
+      customer_id: req.customer_id,
+      ...(req.location_type ? { location_type: req.location_type } : {}),
+      ...(req.preferred_date ? { preferred_date: String(req.preferred_date).slice(0, 10) } : {}),
+      ...(req.special_notes ? { special_notes: req.special_notes } : {}),
+      ...(req.accessories_note ? { accessories_note: req.accessories_note } : {}),
+      ...(req.status ? { status: req.status } : {}),
+      created_at: req.created_at,
+      customer: {
+        id: req.customer.id,
+        company_name: req.customer.company_name,
+        tax_code: req.customer.tax_code ?? null,
+        address: req.customer.address,
+        assigned_sales_id: req.customer.assigned_sales_id ?? null,
+      },
+      ...(Array.isArray(req.items)
+        ? {
+            items: req.items.map((item) => ({
+              id: item.id,
+              service_request_item_id: item.id,
+              device_id: item.device_id,
+              device_name: item.device?.name ?? `Thiết bị #${item.device_id}`,
+              manufacturer: item.device?.manufacturer ?? null,
+              model: item.device?.model ?? null,
+              serial_number: item.device?.serial_number ?? null,
+              internal_code: item.device?.internal_code ?? null,
+              service_type_id: item.service_type_id,
+              service_type_name: item.service_type?.name ?? `Dịch vụ #${item.service_type_id}`,
+              service_kind: item.service_type?.kind ?? 'Calibration',
+              standard_code: item.service_type?.standard_code ?? null,
+              status: item.status,
+            })),
+          }
+        : {}),
+      ...(Array.isArray(req.attachments) && req.attachments.length > 0
+        ? {
+            attachments: req.attachments.map((att) => ({
+              id: att.id,
+              service_request_id: att.service_request_id,
+              file_name: att.file_name,
+              file_url: att.file_url,
+              uploaded_at: att.uploaded_at,
+            })),
+          }
+        : {}),
+      ...(targetQuotation !== undefined
+        ? {
+            latest_quotation: targetQuotation
+              ? {
+                  id: targetQuotation.id,
+                  quotation_code: `QT-${new Date().getFullYear()}-${String(targetQuotation.id).padStart(3, '0')}`,
+                  subtotal: Number(targetQuotation.subtotal),
+                  discount_amount: Number(targetQuotation.discount_amount),
+                  travel_fee: Number(targetQuotation.travel_fee),
+                  total_amount: Number(targetQuotation.total_amount),
+                  estimated_completion_date: targetQuotation.estimated_completion_date ?? null,
+                  status: targetQuotation.status,
+                  head_sales_note: targetQuotation.head_sales_note ?? null,
+                  head_sales_decision: targetQuotation.head_sales_decision ?? null,
+                  head_sales_reviewed_at: targetQuotation.head_sales_reviewed_at
+                    ? new Date(targetQuotation.head_sales_reviewed_at).toISOString()
+                    : null,
+                  line_items: (targetQuotation.line_items ?? []).map((li) => ({
+                    id: li.id,
+                    service_request_item_id: li.service_request_item_id,
+                    description: li.description,
+                    unit_price: Number(li.unit_price),
+                    discount_amount: Number(li.discount_amount),
+                  })),
+                }
+              : null,
+          }
+        : {}),
+    };
+  });
+};
+
+/**
+ * Lấy chi tiết 1 phiếu yêu cầu dịch vụ (ServiceRequest) theo ID
+ */
+export const getServiceRequestDetail = async (
+  id: number,
+  customerIdFilter?: number,
+): Promise<ServiceRequestDetailResult> => {
+  const req = await dataSource.getRepository(ServiceRequest).findOne({
+    where: {
+      id,
+      ...(customerIdFilter ? { customer_id: customerIdFilter } : {}),
+    },
+    relations: {
+      customer: true,
+      items: {
+        device: true,
+        service_type: true,
+      },
+      attachments: true,
+      quotations: {
+        line_items: true,
+      },
+    },
+  });
+
+  if (!req) {
+    throw new AppError('Phiếu yêu cầu không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  const sortedQuotations = Array.isArray(req.quotations)
+    ? [...req.quotations].sort((a, b) => b.id - a.id)
+    : [];
+
+  const visibleQuotations = customerIdFilter
+    ? sortedQuotations.filter(
+        (q) => q.status !== 'Draft' && q.status !== 'PendingApproval',
+      )
+    : sortedQuotations;
+
+  const targetQuotation = visibleQuotations[0] || null;
+
+  const quotationSummaries = visibleQuotations.map((q) => ({
+    id: q.id,
+    quotation_code: `QT-${new Date().getFullYear()}-${String(q.id).padStart(3, '0')}`,
+    subtotal: Number(q.subtotal),
+    discount_amount: Number(q.discount_amount),
+    travel_fee: Number(q.travel_fee),
+    total_amount: Number(q.total_amount),
+    estimated_completion_date: q.estimated_completion_date ?? null,
+    status: q.status,
+    customer_reject_reason: q.customer_reject_reason ?? null,
+    customer_responded_at: q.customer_responded_at
+      ? new Date(q.customer_responded_at).toISOString()
+      : null,
+    head_sales_note: q.head_sales_note ?? null,
+    head_sales_decision: q.head_sales_decision ?? null,
+    head_sales_reviewed_at: q.head_sales_reviewed_at
+      ? new Date(q.head_sales_reviewed_at).toISOString()
+      : null,
+    line_items: (q.line_items ?? []).map((li) => ({
+      id: li.id,
+      service_request_item_id: li.service_request_item_id,
+      description: li.description,
+      unit_price: Number(li.unit_price),
+      discount_amount: Number(li.discount_amount),
+    })),
+  }));
+
+  const canEdit = req.status === 'New';
+  const canCancel = ['New', 'Quoted'].includes(req.status);
+
+  const itemIds = Array.isArray(req.items) ? req.items.map((i) => i.id) : [];
+  let inspectionMap = new Map<number, InitialInspection>();
+  if (itemIds.length > 0) {
+    const inspectionRepo = dataSource.getRepository(InitialInspection);
+    if (typeof inspectionRepo?.find === 'function') {
+      const inspections = await inspectionRepo.find({
+        where: { service_request_item_id: In(itemIds) },
+      });
+      if (Array.isArray(inspections)) {
+        inspectionMap = new Map(inspections.map((insp) => [insp.service_request_item_id, insp]));
+      }
+    }
+  }
+
+  return {
+    id: req.id,
+    request_code:
+      req.request_code
+      || formatServiceRequestCode(
+        req.id,
+        req.created_at instanceof Date ? req.created_at : new Date(),
+      ),
+    customer_id: req.customer_id,
+    created_by: req.created_by,
+    location_type: req.location_type,
+    preferred_date: req.preferred_date ? String(req.preferred_date).slice(0, 10) : null,
+    special_notes: req.special_notes ?? null,
+    accessories_note: req.accessories_note ?? null,
+    status: req.status,
+    created_at: req.created_at,
+    customer: {
+      id: req.customer.id,
+      company_name: req.customer.company_name,
+      tax_code: req.customer.tax_code ?? null,
+      address: req.customer.address,
+    },
+    items: Array.isArray(req.items)
+      ? req.items.map((item) => {
+          const insp = inspectionMap.get(item.id);
+          return {
+            id: item.id,
+            service_request_item_id: item.id,
+            device_id: item.device_id,
+            device_name: item.device?.name ?? `Thiết bị #${item.device_id}`,
+            manufacturer: item.device?.manufacturer ?? null,
+            model: item.device?.model ?? null,
+            serial_number: item.device?.serial_number ?? null,
+            internal_code: item.device?.internal_code ?? null,
+            service_type_id: item.service_type_id,
+            service_type_name: item.service_type?.name ?? `Dịch vụ #${item.service_type_id}`,
+            service_kind: item.service_type?.kind ?? 'Calibration',
+            standard_code: item.service_type?.standard_code ?? null,
+            status: item.status,
+            initial_inspection: insp
+              ? {
+                  id: insp.id,
+                  result: insp.result,
+                  defect_note: insp.defect_note,
+                  photo_url: insp.photo_url,
+                  customer_written_consent: insp.customer_written_consent,
+                  customer_consent_status: insp.customer_consent_status,
+                  customer_consent_note: insp.customer_consent_note,
+                  customer_consent_file: insp.customer_consent_file,
+                  customer_consented_at: insp.customer_consented_at
+                    ? new Date(insp.customer_consented_at).toISOString()
+                    : null,
+                  customer_consent_signer_name: insp.customer_consent_signer_name,
+                  customer_consent_method: insp.customer_consent_method,
+                  inspected_at: insp.inspected_at.toISOString(),
+                }
+              : null,
+          };
+        })
+      : [],
+    attachments: Array.isArray(req.attachments)
+      ? req.attachments.map((att) => ({
+          id: att.id,
+          service_request_id: att.service_request_id,
+          file_name: att.file_name,
+          file_url: att.file_url,
+          uploaded_at: att.uploaded_at,
+        }))
+      : [],
+    latest_quotation: targetQuotation
+      ? quotationSummaries.find((q) => q.id === targetQuotation.id) || null
+      : null,
+    quotations: quotationSummaries,
+    can_edit: canEdit,
+    can_cancel: canCancel,
+  };
+};
+
+/**
+ * Hủy phiếu yêu cầu dịch vụ (chỉ cho phép khi status là 'New' hoặc 'Quoted')
+ */
+export const cancelServiceRequest = async (
+  id: number,
+  reason?: string | null,
+  customerIdFilter?: number,
+): Promise<ServiceRequestDetailResult> => {
+  const serviceRequestRepo = dataSource.getRepository(ServiceRequest);
+  const req = await serviceRequestRepo.findOne({
+    where: {
+      id,
+      ...(customerIdFilter ? { customer_id: customerIdFilter } : {}),
+    },
+  });
+
+  if (!req) {
+    throw new AppError('Phiếu yêu cầu không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (req.status === 'Cancelled') {
+    throw new AppError('Phiếu yêu cầu đã được hủy trước đó.', 400, ERROR_CODES.BAD_REQUEST);
+  }
+
+  if (!['New', 'Quoted'].includes(req.status)) {
+    throw new AppError(
+      `Không thể hủy phiếu yêu cầu ở trạng thái "${req.status}". Chỉ có thể hủy khi ở trạng thái Mới tạo hoặc Chờ báo giá.`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
+  }
+
+  req.status = 'Cancelled';
+  if (reason && reason.trim()) {
+    const formattedReason = `[Hủy yêu cầu: ${reason.trim()}]`;
+    req.special_notes = req.special_notes
+      ? `${req.special_notes}\n${formattedReason}`
+      : formattedReason;
+  }
+
+  await serviceRequestRepo.save(req);
+  return getServiceRequestDetail(id, customerIdFilter);
+};
+
+/**
+ * Chỉnh sửa thông tin phiếu yêu cầu (chỉ cho phép khi status là 'New')
+ */
+export const updateServiceRequest = async (
+  id: number,
+  input: UpdateServiceRequestInput,
+  customerIdFilter?: number,
+): Promise<ServiceRequestDetailResult> => {
+  const serviceRequestRepo = dataSource.getRepository(ServiceRequest);
+  const req = await serviceRequestRepo.findOne({
+    where: {
+      id,
+      ...(customerIdFilter ? { customer_id: customerIdFilter } : {}),
+    },
+  });
+
+  if (!req) {
+    throw new AppError('Phiếu yêu cầu không tồn tại hoặc bạn không có quyền truy cập.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (req.status !== 'New') {
+    throw new AppError('Chỉ có thể chỉnh sửa phiếu yêu cầu khi đang ở trạng thái Mới tạo (New).', 400, ERROR_CODES.BAD_REQUEST);
+  }
+
+  if (input.location_type) {
+    req.location_type = input.location_type;
+  }
+
+  if (input.preferred_date !== undefined) {
+    req.preferred_date = input.preferred_date ? input.preferred_date.trim() : null;
+  }
+
+  if (input.special_notes !== undefined) {
+    req.special_notes = input.special_notes ? input.special_notes.trim() : null;
+  }
+
+  if (input.accessories_note !== undefined) {
+    req.accessories_note = input.accessories_note ? input.accessories_note.trim() : null;
+  }
+
+  if (Array.isArray(input.items) && input.items.length > 0) {
+    const uniqueDeviceIds = [...new Set(input.items.map((item) => item.device_id))];
+    const deviceRepo = dataSource.getRepository(Device);
+    const devices = await deviceRepo.find({
+      select: { id: true, customer_id: true, name: true },
+      where: { id: In(uniqueDeviceIds) },
+    });
+
+    if (devices.length !== uniqueDeviceIds.length) {
+      throw new AppError('Một hoặc nhiều thiết bị không tìm thấy.', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const invalidOwner = devices.find((d) => d.customer_id !== req.customer_id);
+    if (invalidOwner) {
+      throw new AppError('Tất cả thiết bị phải thuộc về khách hàng sở hữu.', 400, ERROR_CODES.VALIDATION_ERROR);
+    }
+
+    const uniqueServiceTypeIds = [...new Set(input.items.map((item) => item.service_type_id))];
+    const serviceTypeRepo = dataSource.getRepository(ServiceType);
+    const serviceTypes = await serviceTypeRepo.find({
+      relations: { calibration_procedures: true },
+      where: { id: In(uniqueServiceTypeIds) },
+    });
+
+    if (serviceTypes.length !== uniqueServiceTypeIds.length) {
+      throw new AppError('Một hoặc nhiều loại dịch vụ không tìm thấy.', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    for (const st of serviceTypes) {
+      const val = buildServiceTypeValidation(st);
+      if (!val.is_valid) {
+        throw new AppError(val.blocked_reason || `Dịch vụ "${st.name}" không hợp lệ.`, 400, ERROR_CODES.VALIDATION_ERROR);
+      }
+    }
+
+    const deviceMap = new Map(devices.map((d) => [d.id, d]));
+    const serviceTypeMap = new Map(serviceTypes.map((st) => [st.id, st]));
+    for (const item of input.items) {
+      const dev = deviceMap.get(item.device_id);
+      const st = serviceTypeMap.get(item.service_type_id);
+      if (dev?.is_group2 && st?.kind !== 'Verification') {
+        throw new AppError(
+          `Thiết bị "${dev.name}" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).`,
+          400,
+          ERROR_CODES.VALIDATION_ERROR,
+          { device_id: dev.id, service_type_id: st?.id, service_kind: st?.kind },
+        );
+      }
+    }
+
+    const itemRepo = dataSource.getRepository(ServiceRequestItem);
+    await itemRepo.delete({ service_request_id: req.id });
+
+    const newItems = input.items.map((item) =>
+      itemRepo.create({
+        service_request_id: req.id,
+        device_id: item.device_id,
+        service_type_id: item.service_type_id,
+        status: 'Pending',
+      }),
+    );
+    await itemRepo.save(newItems);
+  }
+
+  if (Array.isArray(input.attachments) && input.attachments.length > 0) {
+    const attachmentRepo = dataSource.getRepository(Attachment);
+    const newAttachments = input.attachments.map((att) =>
+      attachmentRepo.create({
+        service_request_id: req.id,
+        file_name: att.file_name,
+        file_url: att.file_url,
+      }),
+    );
+    await attachmentRepo.save(newAttachments);
+  }
+
+  await serviceRequestRepo.save(req);
+  return getServiceRequestDetail(id, customerIdFilter);
 };
 
 /**
@@ -67,8 +713,13 @@ export const createServiceRequest = async (
     request_code: rawRequestCode,
     customer_id: customerId,
     created_by: createdBy,
+    created_by_role: createdByRole,
     location_type: locationType,
+    preferred_date: rawPreferredDate,
+    special_notes: rawSpecialNotes,
+    accessories_note: rawAccessoriesNote,
     items,
+    attachments = [],
   } = input;
   const customRequestCode = rawRequestCode?.trim() || null;
 
@@ -80,15 +731,24 @@ export const createServiceRequest = async (
     );
   }
 
-  // 1. Kiểm tra khách hàng tồn tại
+  // 1. Kiểm tra khách hàng tồn tại & quyền phụ trách của nhân viên Sales
   const customerRepo = dataSource.getRepository(Customer);
   const customer = await customerRepo.findOne({
-    select: { id: true },
+    select: { id: true, company_name: true, assigned_sales_id: true },
     where: { id: customerId },
   });
 
   if (!customer) {
     throw new AppError('Customer not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  const normalizedRole = String(createdByRole || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalizedRole === 'sales' && customer.assigned_sales_id !== createdBy) {
+    throw new AppError(
+      `Khách hàng "${customer.company_name}" chưa được Trưởng phòng Kinh doanh (HeadSales) phân công cho bạn phụ trách. Nhân viên Sales chỉ được phép tạo yêu cầu cho các khách hàng đã được gán.`,
+      403,
+      ERROR_CODES.FORBIDDEN,
+    );
   }
 
   // 2. Kiểm tra tất cả thiết bị tồn tại và thuộc về đúng khách hàng
@@ -189,6 +849,29 @@ export const createServiceRequest = async (
     );
   }
 
+  // 3.1. Ràng buộc thiết bị nhóm 2 (is_group2) chỉ được chọn dịch vụ Kiểm định (Verification)
+  const deviceMap = new Map(devices.map((d) => [d.id, d]));
+  const serviceTypeMap = new Map(serviceTypes.map((st) => [st.id, st]));
+  for (const item of items) {
+    const dev = deviceMap.get(item.device_id);
+    const st = serviceTypeMap.get(item.service_type_id);
+    if (dev?.is_group2 && st?.kind !== 'Verification') {
+      throw new AppError(
+        `Thiết bị "${dev.name}" thuộc phương tiện đo nhóm 2, bắt buộc phải chọn dịch vụ Kiểm định (Verification).`,
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        {
+          device_id: dev.id,
+          device_name: dev.name,
+          is_group2: true,
+          service_type_id: st?.id,
+          service_name: st?.name,
+          service_kind: st?.kind,
+        },
+      );
+    }
+  }
+
   // 4. Lưu phiếu yêu cầu và các hạng mục dịch vụ
   const persistRequest = async (
     getRepository: typeof dataSource.getRepository,
@@ -201,6 +884,9 @@ export const createServiceRequest = async (
       customer_id: customerId,
       created_by: createdBy,
       location_type: locationType,
+      preferred_date: rawPreferredDate ? rawPreferredDate.trim() : null,
+      special_notes: rawSpecialNotes ? rawSpecialNotes.trim() : null,
+      accessories_note: rawAccessoriesNote ? rawAccessoriesNote.trim() : null,
       status: 'New',
     });
 
@@ -228,12 +914,30 @@ export const createServiceRequest = async (
 
     const savedItems = await serviceRequestItemRepo.save(itemEntities);
 
+    let savedAttachments: Attachment[] = [];
+    if (attachments.length > 0) {
+      const attachmentRepo = getRepository(Attachment);
+      const attachmentEntities = attachments.map((att) =>
+        attachmentRepo.create({
+          service_request_id: savedRequest.id,
+          file_name: att.file_name,
+          file_url: att.file_url,
+        }),
+      );
+      savedAttachments = await attachmentRepo.save(attachmentEntities);
+    }
+
     return {
       id: savedRequest.id,
       request_code: requestCode,
       customer_id: savedRequest.customer_id,
       created_by: savedRequest.created_by,
       location_type: savedRequest.location_type,
+      preferred_date: savedRequest.preferred_date
+        ? String(savedRequest.preferred_date).slice(0, 10)
+        : null,
+      special_notes: savedRequest.special_notes ?? null,
+      accessories_note: savedRequest.accessories_note ?? null,
       status: savedRequest.status,
       created_at: savedRequest.created_at,
       items: savedItems.map((savedItem) => ({
@@ -243,6 +947,17 @@ export const createServiceRequest = async (
         service_type_id: savedItem.service_type_id,
         status: savedItem.status,
       })),
+      ...(savedAttachments.length > 0
+        ? {
+            attachments: savedAttachments.map((att) => ({
+              id: att.id,
+              service_request_id: att.service_request_id,
+              file_name: att.file_name,
+              file_url: att.file_url,
+              uploaded_at: att.uploaded_at,
+            })),
+          }
+        : {}),
     };
   };
 

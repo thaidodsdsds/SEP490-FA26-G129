@@ -2,16 +2,19 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/customer', label: 'Tổng quan', icon: '▦' },
-  { to: '/internal/customer/devices', label: 'Thiết bị', icon: '▤', soon: true },
-  { to: '/internal/customer/service-requests', label: 'Đơn dịch vụ', icon: '⌁', soon: true },
-  { to: '/internal/customer/certificates', label: 'Chứng nhận & tem', icon: '✓', soon: true },
+  { to: '/internal/customer/service-requests/new', label: 'Tạo yêu cầu dịch vụ', icon: '＋' },
+  { to: '/internal/customer/devices', label: 'Hồ sơ thiết bị', icon: '▤' },
+  { to: '/internal/customer/service-requests', label: 'Đơn dịch vụ', icon: '⌁' },
+  { to: '/internal/customer/contracts', label: 'Hợp đồng', icon: '✎' },
+  { to: '/internal/customer/certificates', label: 'Chứng nhận', icon: '✓' },
+  { to: '/internal/customer/seals', label: 'Tem hiệu chuẩn', icon: '◉' },
   { to: '/internal/customer/invoices', label: 'Công nợ', icon: '₫', soon: true },
 ];
 
 function CustomerLayout() {
   return (
     <RoleDashboardLayout
-      description="Theo dõi thiết bị, đơn dịch vụ, chứng nhận và công nợ của công ty."
+      description="Theo dõi thiết bị, đăng ký hiệu chuẩn, chứng nhận và công nợ của công ty."
       initials="KH"
       links={links}
       name="Khách hàng"
