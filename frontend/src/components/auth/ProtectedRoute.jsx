@@ -59,7 +59,7 @@ export function ProtectedRoute({ allowedRoles = [], portalType = 'auto', childre
           allowedRoles={allowedRoles}
           onLogout={() => {
             endSession();
-            window.location.href = isCustomer ? '/login' : '/staff-login';
+            window.location.href = '/login';
           }}
           targetPath={location.pathname}
           user={session.user}

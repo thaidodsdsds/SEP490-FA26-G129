@@ -17,16 +17,12 @@ export function SessionExpiredModal({ isOpen, user, onConfirm }) {
 
   if (!isOpen) return null;
 
-  const isCustomer = isCustomerAccount(user);
   const currentPath = window.location.pathname + window.location.search;
   const encodedRedirect = encodeURIComponent(currentPath);
 
   const handleLoginAgain = () => {
     if (onConfirm) onConfirm();
-    const loginTarget = isCustomer
-      ? `/login?redirect=${encodedRedirect}&reason=session_expired`
-      : `/staff-login?redirect=${encodedRedirect}&reason=session_expired`;
-    window.location.href = loginTarget;
+    window.location.href = `/login?redirect=${encodedRedirect}&reason=session_expired`;
   };
 
   const handleGoHome = () => {
