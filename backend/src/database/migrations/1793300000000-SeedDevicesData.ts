@@ -21,6 +21,15 @@ export default class SeedDevicesData1793300000000 implements MigrationInterface 
       SELECT setval(pg_get_serial_sequence('"service_types"', 'id'), COALESCE((SELECT MAX(id) FROM "service_types"), 1));
     `);
 
+    // Ensure customer 6 exists for BTC devices
+    await queryRunner.query(`
+      INSERT INTO "customers" ("id", "company_name", "tax_code", "address", "industry", "created_at")
+      VALUES
+        (6, 'BTC Technology Co., Ltd.', '0109998888', 'Hanoi, Vietnam', 'Electronics', NOW())
+      ON CONFLICT (id) DO NOTHING;
+      SELECT setval(pg_get_serial_sequence('"customers"', 'id'), COALESCE((SELECT MAX(id) FROM "customers"), 1));
+    `);
+
     // 2. Seed realistic devices matching exact existing schema columns
     await queryRunner.query(`
       INSERT INTO "devices" (
@@ -73,7 +82,5 @@ export default class SeedDevicesData1793300000000 implements MigrationInterface 
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DELETE FROM "devices" WHERE id BETWEEN 1 AND 18;`);
-    await queryRunner.query(`DELETE FROM "service_types" WHERE id BETWEEN 1 AND 6;`);
   }
 }
-

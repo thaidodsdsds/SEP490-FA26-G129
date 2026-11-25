@@ -288,7 +288,7 @@ const internalRoutes = [
   {
     path: '/internal/head-of-tech',
     element: (
-      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech']} portalType="staff">
+      <ProtectedRoute allowedRoles={['reviewer', 'headtechnician', 'labmanager', 'headoftech', 'admin']} portalType="staff">
         <HeadOfTechLayout />
       </ProtectedRoute>
     ),
