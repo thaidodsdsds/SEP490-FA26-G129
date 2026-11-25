@@ -28,6 +28,7 @@ import calibrationRecordsRoutes from './modules/calibration-records/calibration-
 import certificatesRoutes from './modules/certificates/certificates.routes.js';
 import sealsRoutes from './modules/seals/seals.routes.js';
 import verificationRoutes from './modules/verification/verification.routes.js';
+import warehouseRoutes from './modules/warehouse/warehouse.routes.js';
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use(`${API_PREFIX}/calibration-records`, calibrationRecordsRoutes);
 app.use(`${API_PREFIX}/certificates`, certificatesRoutes);
 app.use(`${API_PREFIX}/seals`, sealsRoutes);
 app.use(`${API_PREFIX}/verify`, verificationRoutes);
+app.use(`${API_PREFIX}/warehouse`, warehouseRoutes);
 
 app.get(`${API_PREFIX}/health`, async (req, res, next) => {
   try {

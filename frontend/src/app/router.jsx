@@ -51,6 +51,9 @@ import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
 import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
 import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
 import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
+import WarehouseInboundPage from '../features/warehouse/WarehouseInboundPage.jsx';
+import WarehouseOutboundPage from '../features/warehouse/WarehouseOutboundPage.jsx';
+import WarehouseHistoryPage from '../features/warehouse/WarehouseHistoryPage.jsx';
 import TechnicianPage from '../features/operations/TechnicianPage.jsx';
 import { useAppContext } from './providers.jsx';
 import { getRoleDashboardPath } from './role-routing.js';
@@ -244,7 +247,7 @@ const warehouseRoutes = [
   {
     path: '/internal/warehouse',
     element: (
-      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin', 'reviewer', 'headtechnician', 'headoftech']} portalType="staff">
         <WarehouseLayout />
       </ProtectedRoute>
     ),
@@ -259,6 +262,11 @@ const warehouseRoutes = [
       },
       { path: 'devices', element: <DeviceListPage role="warehouse" basePath="/internal/warehouse/devices" /> },
       { path: 'devices/:id', element: <DeviceDetailPage role="warehouse" basePath="/internal/warehouse/devices" /> },
+      { path: 'inbound', element: <WarehouseInboundPage /> },
+      { path: 'outbound', element: <WarehouseOutboundPage /> },
+      { path: 'transactions', element: <WarehouseHistoryPage /> },
+      { path: 'chat', element: <ChatPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
@@ -314,6 +322,10 @@ const internalRoutes = [
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
           { path: 'warehouse', element: <WarehousePage /> },
+          { path: 'warehouse/inbound', element: <WarehouseInboundPage /> },
+          { path: 'warehouse/outbound', element: <WarehouseOutboundPage /> },
+          { path: 'warehouse/transactions', element: <WarehouseHistoryPage /> },
+          { path: 'warehouse/devices', element: <DeviceListPage role="warehouse" basePath="/internal/head-of-tech/warehouse/devices" /> },
         ],
       },
       { path: 'profile', element: <ProfilePage /> },
