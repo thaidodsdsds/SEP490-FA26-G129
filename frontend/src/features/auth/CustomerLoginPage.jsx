@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../app/providers.jsx';
 import { loginApi, verify2FAApi, resend2FAApi } from '../../services/auth-service.js';
-import { isCustomerAccount } from '../../app/role-routing.js';
 import isocalLogo from '../../assets/isocal_logo.png';
 import calibrationIllustration from '../../assets/calibration_illustration.png';
 import '../../styles/auth.css';
@@ -76,18 +75,6 @@ export function CustomerLoginPage() {
 
       const { token, account } = res;
 
-      // ── Portal access check ──────────────────────────────────────────
-      // This portal is ONLY for customer accounts.
-      // Staff/internal accounts must use the Staff Login portal.
-      if (!isCustomerAccount(account)) {
-        setError(
-          'Tài khoản này không phải tài khoản khách hàng. '
-          + 'Vui lòng đăng nhập qua cổng Nhân viên (Staff Login).',
-        );
-        return; // do NOT store token or start session
-      }
-      // ────────────────────────────────────────────────────────────────
-
       localStorage.setItem('isocal_token', token);
       const dashboardPath = startSession(account);
       const targetDestination = redirectParam || location.state?.from || dashboardPath;
@@ -114,14 +101,6 @@ export function CustomerLoginPage() {
         two_factor_token: twoFactorToken,
         otp: otp.trim(),
       });
-
-      if (!isCustomerAccount(account)) {
-        setError(
-          'Tài khoản này không phải tài khoản khách hàng. '
-          + 'Vui lòng đăng nhập qua cổng Nhân viên (Staff Login).',
-        );
-        return;
-      }
 
       localStorage.setItem('isocal_token', token);
       const dashboardPath = startSession(account);
@@ -169,14 +148,6 @@ export function CustomerLoginPage() {
         />
 
         <div className="auth-card">
-          {/* Tabs */}
-          {!is2faStep && (
-            <div className="auth-tabs">
-              <button className="auth-tab active" type="button">Customer Login</button>
-              <Link className="auth-tab" to="/staff-login">Staff Login</Link>
-            </div>
-          )}
-
           <h2 className="auth-title">
             {is2faStep ? 'Xác thực hai yếu tố (2FA)' : 'Welcome back'}
           </h2>
@@ -186,7 +157,7 @@ export function CustomerLoginPage() {
                 Nhập mã xác thực OTP 6 chữ số đã được gửi đến <strong>{maskedEmail}</strong>
               </>
             ) : (
-              'Sign in to your ISOCAL customer account'
+              'Sign in to your ISOCAL account'
             )}
           </p>
 
@@ -205,7 +176,7 @@ export function CustomerLoginPage() {
               <span className="auth-notice-banner-icon" aria-hidden="true">🔒</span>
               <div className="auth-notice-banner-body">
                 <strong>Yêu cầu đăng nhập</strong>
-                Vui lòng đăng nhập tài khoản Khách hàng để truy cập trang bạn vừa yêu cầu.
+                Vui lòng đăng nhập tài khoản để truy cập trang bạn vừa yêu cầu.
               </div>
             </div>
           )}
@@ -227,16 +198,6 @@ export function CustomerLoginPage() {
             <div className="auth-error" id="customer-login-error" style={{ marginBottom: 16 }}>
               <span>⚠</span>
               <span>{error}</span>
-              {/* Suggest staff portal if wrong portal */}
-              {error.includes('Staff Login') && (
-                <Link
-                  className="auth-link"
-                  style={{ display: 'block', marginTop: 6, fontWeight: 700 }}
-                  to="/staff-login"
-                >
-                  → Đến trang Staff Login
-                </Link>
-              )}
             </div>
           )}
 
