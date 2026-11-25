@@ -914,7 +914,7 @@ export class DigitalSignature {
 @Entity({ name: 'warehouse_transactions' })
 @Index('IDX_warehouse_transactions_device_id', ['device_id'])
 @Index('IDX_warehouse_transactions_service_request_item_id', ['service_request_item_id'])
-@Check('CHK_warehouse_transactions_type', "type" IN ('Inbound', 'Outbound'))
+@Check('CHK_warehouse_transactions_type', `"type" IN ('Inbound', 'Outbound')`)
 export class WarehouseTransaction {
   @PrimaryGeneratedColumn()
   id!: number;

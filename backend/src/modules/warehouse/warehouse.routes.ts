@@ -16,16 +16,31 @@ warehouseRoutes.get('/transactions', getTransactions);
 warehouseRoutes.get('/inventory', getInventorySummary);
 warehouseRoutes.get('/devices', getDevices);
 
-// Chỉ Warehouse staff, Admin hoặc Reviewer mới thao tác kho
+const ALLOWED_WAREHOUSE_ROLES = [
+  'Warehouse',
+  'WarehouseStaff',
+  'warehousestaff',
+  'warehouse',
+  'Admin',
+  'admin',
+  'Reviewer',
+  'reviewer',
+  'HeadTechnician',
+  'headtechnician',
+  'Head of Tech',
+  'headoftech',
+];
+
+// Cho phép Warehouse staff, Admin hoặc Reviewer thao tác kho
 warehouseRoutes.post(
   '/inbound',
-  authorize('Warehouse', 'WarehouseStaff', 'warehouse', 'Admin', 'admin'),
+  authorize(...ALLOWED_WAREHOUSE_ROLES),
   postInbound,
 );
 
 warehouseRoutes.post(
   '/outbound',
-  authorize('Warehouse', 'WarehouseStaff', 'warehouse', 'Admin', 'admin'),
+  authorize(...ALLOWED_WAREHOUSE_ROLES),
   postOutbound,
 );
 

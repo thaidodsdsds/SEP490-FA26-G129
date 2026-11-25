@@ -198,7 +198,7 @@ const warehouseRoutes = [
   {
     path: '/internal/warehouse',
     element: (
-      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin']} portalType="staff">
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin', 'reviewer', 'headtechnician', 'headoftech']} portalType="staff">
         <WarehouseLayout />
       </ProtectedRoute>
     ),
@@ -213,6 +213,9 @@ const warehouseRoutes = [
       },
       { path: 'devices', element: <DeviceListPage role="warehouse" basePath="/internal/warehouse/devices" /> },
       { path: 'devices/:id', element: <DeviceDetailPage role="warehouse" basePath="/internal/warehouse/devices" /> },
+      { path: 'inbound', element: <WarehouseInboundPage /> },
+      { path: 'outbound', element: <WarehouseOutboundPage /> },
+      { path: 'transactions', element: <WarehouseHistoryPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
