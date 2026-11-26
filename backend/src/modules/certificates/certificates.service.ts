@@ -135,7 +135,7 @@ const CERTIFICATE_SELECT = `
     LIMIT 1
   ) woa ON true
   LEFT JOIN work_orders wo ON wo.id = woa.work_order_id
-  LEFT JOIN masterstandard ms ON ms.id = woa.master_standard_id
+  LEFT JOIN master_standards ms ON ms.id = woa.master_standard_id
   LEFT JOIN contracts ct ON ct.id = wo.contract_id
   LEFT JOIN LATERAL (
     SELECT ds.signer_name, ds.signed_at
