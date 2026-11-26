@@ -6,18 +6,9 @@ import SectionCard from '../../../components/ui/SectionCard.jsx';
 import StatusBadge from '../../../components/ui/StatusBadge.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
+import DashboardFetchNotice from '../../../components/ui/DashboardFetchNotice.jsx';
 import { BarChart, ProgressBar } from '../../../components/ui/Charts.jsx';
-import {
-  activeContracts,
-  expiringCustomerDevices,
-  pendingQuotations,
-  quotationFunnel,
-  recentServiceRequests,
-  salesKpis,
-  salesNotifications,
-  salesProfile,
-  serviceFieldDistribution,
-} from './mockData.js';
+import useDashboardOverview from '../../../hooks/useDashboardOverview.js';
 import { formatCurrency, formatCurrencyShort, formatDate, formatDueHint } from '../../../utils/formatters.js';
 
 const requestColumns = [
@@ -66,6 +57,19 @@ const deviceCareColumns = [
 function SalesDashboardPage() {
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
+  const { data, error, loading, reload } = useDashboardOverview();
+  const {
+    activeContracts = [],
+    expiringCustomerDevices = [],
+    pendingQuotations = [],
+    quotationFunnel = [],
+    quotationFunnelMax = 1,
+    recentServiceRequests = [],
+    salesKpis = [],
+    salesNotifications = [],
+    salesProfile = {},
+    serviceFieldDistribution = [],
+  } = data;
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -117,7 +121,7 @@ function SalesDashboardPage() {
     formatCurrencyShort(q.subtotal),
     q.discountAmount > 0 ? `-${formatCurrencyShort(q.discountAmount)}` : '—',
     q.travelFee > 0 ? formatCurrencyShort(q.travelFee) : '—',
-    <strong className="dash-nowrap dash-text-primary" key={`${q.id}-tot`}>{formatCurrency(q.totalAmount)}</strong>,
+    <strong className="dash-nowrap" key={`${q.id}-tot`}>{formatCurrency(q.totalAmount)}</strong>,
     <StatusBadge key={`${q.id}-st`} tone={q.tone}>{q.status}</StatusBadge>,
     <span className="dash-cell-sub" key={`${q.id}-exp`}>{formatDate(q.expiryDate)}</span>,
   ]);
@@ -127,7 +131,9 @@ function SalesDashboardPage() {
     <span className="dash-cell-title" key={`${c.id}-cust`}>{c.customer}</span>,
     <span className="dash-cell-sub" key={`${c.id}-title`}>{c.title}</span>,
     <strong className="dash-nowrap" key={`${c.id}-val`}>{formatCurrency(c.contractValue)}</strong>,
-    <span key={`${c.id}-term`}>{c.committedYears} năm (Hạn TT: {c.paymentTermDays} ngày)</span>,
+    <span key={`${c.id}-term`}>
+      {c.committedYears ? `${c.committedYears} năm` : '—'} (Hạn TT: {c.paymentTermDays || 30} ngày)
+    </span>,
     formatCurrencyShort(c.creditLimit),
     <StatusBadge key={`${c.id}-st`} tone={c.tone}>{c.status}</StatusBadge>,
     <span className="dash-cell-sub" key={`${c.id}-hint`}>{c.hint}</span>,
@@ -174,6 +180,7 @@ function SalesDashboardPage() {
 
   return (
     <div className="dash-page">
+      <DashboardFetchNotice error={error} loading={loading} onRetry={reload} />
       <PageHeader
         actions={(
           <>
@@ -207,11 +214,11 @@ function SalesDashboardPage() {
             </button>
           </>
         )}
-        description={`${salesProfile.department} · Phụ trách ${salesProfile.assignedCustomers} doanh nghiệp. Chỉ tiêu quý: ${formatCurrencyShort(salesProfile.quarterAchieved)} / ${formatCurrencyShort(salesProfile.quarterTarget)}.`}
+        description={`${salesProfile.department ?? 'Kinh doanh'} · Phụ trách ${salesProfile.assignedCustomers ?? 0} doanh nghiệp. Doanh số báo giá đã duyệt quý này: ${formatCurrencyShort(salesProfile.quarterAchieved)}.`}
         eyebrow="KHÔNG GIAN LÀM VIỆC KINH DOANH (SALES) · CRM & BÁO GIÁ"
         meta={[
           <span className="dash-meta-chip" key="agent">Nhân viên: {salesProfile.name} ({salesProfile.code})</span>,
-          <span className="dash-meta-chip" key="target">Đạt chỉ tiêu: {Math.round((salesProfile.quarterAchieved / salesProfile.quarterTarget) * 100)}%</span>,
+          <span className="dash-meta-chip" key="target">Báo giá đã duyệt: {formatCurrencyShort(salesProfile.quarterAchieved)}</span>,
           <span className="dash-meta-chip" key="support">Đường dây hỗ trợ: {salesProfile.phone}</span>,
         ]}
         title="Tổng quan kinh doanh & Báo giá"
@@ -231,7 +238,7 @@ function SalesDashboardPage() {
         ))}
       </section>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid two">
         <SectionCard
           action={(
             <button
@@ -273,7 +280,7 @@ function SalesDashboardPage() {
         </SectionCard>
       </div>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid two">
         <SectionCard
           action={(
             <button
@@ -315,7 +322,7 @@ function SalesDashboardPage() {
         </SectionCard>
       </div>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid two">
         <SectionCard
           subtitle="Tỷ lệ cơ cấu dịch vụ theo 8 Lĩnh vực đo lường theo chuẩn đặc tả SRS v1.5."
           title="Cơ cấu dịch vụ theo Lĩnh vực"
@@ -342,7 +349,7 @@ function SalesDashboardPage() {
                 </div>
                 <ProgressBar
                   label={`${step.value}`}
-                  max={20}
+                  max={quotationFunnelMax}
                   tone={step.tone}
                   value={step.value}
                 />
