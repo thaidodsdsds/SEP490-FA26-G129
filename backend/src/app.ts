@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import env from './config/env.js';
 import { API_PREFIX } from './common/constants.js';
-import { getPreferredLanIp } from './utils/network.js';
+import { getLanIpInfo } from './utils/network.js';
 import { buildSuccessResponse } from './common/response.js';
 import { requestLogger } from './middlewares/requestLogger.js';
 import { authenticate } from './middlewares/auth.js';
@@ -100,9 +100,7 @@ app.get(`${API_PREFIX}/health`, async (req, res, next) => {
 
 app.get(`${API_PREFIX}/system/lan-ip`, (req, res) => {
   res.status(200).json(
-    buildSuccessResponse({
-      lanIp: getPreferredLanIp(),
-    }),
+    buildSuccessResponse(getLanIpInfo()),
   );
 });
 
