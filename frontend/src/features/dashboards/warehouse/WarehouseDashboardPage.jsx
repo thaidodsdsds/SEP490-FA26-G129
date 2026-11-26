@@ -5,17 +5,9 @@ import SectionCard from '../../../components/ui/SectionCard.jsx';
 import StatusBadge from '../../../components/ui/StatusBadge.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
+import DashboardFetchNotice from '../../../components/ui/DashboardFetchNotice.jsx';
 import { BarChart, ProgressBar } from '../../../components/ui/Charts.jsx';
-import {
-  pendingLabTransfer,
-  readyToReturnDevices,
-  recentWarehouseTransactions,
-  warehouseKpis,
-  warehouseNotifications,
-  warehouseProfile,
-  warehouseStatusDistribution,
-  weeklyThroughput,
-} from './mockData.js';
+import useDashboardOverview from '../../../hooks/useDashboardOverview.js';
 
 const transactionColumns = [
   { key: 'id', label: 'Mã phiếu' },
@@ -53,6 +45,18 @@ const pendingColumns = [
 
 function WarehouseDashboardPage() {
   const [toast, setToast] = useState(null);
+  const { data, error, loading, reload } = useDashboardOverview();
+  const {
+    pendingLabTransfer = [],
+    readyToReturnDevices = [],
+    recentWarehouseTransactions = [],
+    warehouseKpis = [],
+    warehouseNotifications = [],
+    warehouseProfile = {},
+    warehouseStatusDistribution = [],
+    warehouseStatusMax = 1,
+    weeklyThroughput = [],
+  } = data;
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -109,9 +113,9 @@ function WarehouseDashboardPage() {
         <span className={`dash-cell-title${item.daysInWarehouse > 7 ? ' dash-text-danger' : ''}`}>
           {item.daysInWarehouse} ngày
         </span>
-        {item.overdueNotice && (
+        {item.daysInWarehouse > 7 && (
           <span className="dash-cell-sub dash-text-danger" style={{ display: 'block', fontSize: '0.68rem' }}>
-            {item.overdueNotice}
+            Lưu kho quá 7 ngày
           </span>
         )}
       </div>
@@ -157,6 +161,7 @@ function WarehouseDashboardPage() {
 
   return (
     <div className="dash-page">
+      <DashboardFetchNotice error={error} loading={loading} onRetry={reload} />
       <PageHeader
         actions={(
           <>
@@ -194,7 +199,7 @@ function WarehouseDashboardPage() {
         eyebrow="KHÔNG GIAN LÀM VIỆC KHO VẬN (WAREHOUSE) · TIẾP NHẬN & BÀN GIAO"
         meta={[
           <span className="dash-meta-chip" key="keeper">Thủ kho: {warehouseProfile.name} ({warehouseProfile.code})</span>,
-          <span className="dash-meta-chip" key="capacity">Sức chứa kệ: {warehouseProfile.occupiedSlots}/{warehouseProfile.totalSlots} vị trí</span>,
+          <span className="dash-meta-chip" key="capacity">Thiết bị đang lưu kho: {warehouseProfile.occupiedSlots}</span>,
           <span className="dash-meta-chip" key="hotline">Nội bộ kho: {warehouseProfile.phone}</span>,
         ]}
         title="Tổng quan kho thiết bị In-lab"
@@ -221,7 +226,7 @@ function WarehouseDashboardPage() {
             onClick={() => notify('Chuyển tới danh mục thiết bị đã có kết quả đo kiểm sẵn sàng trả.')}
             type="button"
           >
-            Xem tất cả (12)
+            Xem tất cả ({readyToReturnDevices.length})
           </button>
         )}
         subtitle="Thiết bị đã hoàn tất hiệu chuẩn/kiểm định, đã được cấp Certificate & dán Tem Seal số, sẵn sàng lập phiếu xuất kho kèm biên bản bàn giao."
@@ -234,7 +239,7 @@ function WarehouseDashboardPage() {
         />
       </SectionCard>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid two">
         <SectionCard
           action={(
             <button
@@ -268,7 +273,7 @@ function WarehouseDashboardPage() {
                 </div>
                 <ProgressBar
                   label={`${item.value}`}
-                  max={38}
+                  max={warehouseStatusMax}
                   tone={item.tone}
                   value={item.value}
                 />
@@ -298,7 +303,7 @@ function WarehouseDashboardPage() {
         />
       </SectionCard>
 
-      <div className="dash-grid-2">
+      <div className="dash-grid two">
         <SectionCard
           subtitle="Số lượt thiết bị luân chuyển qua kho trong tuần (Thứ 2 đến Chủ nhật)."
           title="Lưu lượng giao dịch kho trong tuần"
