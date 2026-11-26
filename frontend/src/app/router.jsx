@@ -247,7 +247,7 @@ const warehouseRoutes = [
   {
     path: '/internal/warehouse',
     element: (
-      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'admin', 'reviewer', 'headtechnician', 'headoftech']} portalType="staff">
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'headofwarehouse', 'head of warehouse', 'headwarehouse', 'admin', 'reviewer', 'headtechnician', 'headoftech']} portalType="staff">
         <WarehouseLayout />
       </ProtectedRoute>
     ),

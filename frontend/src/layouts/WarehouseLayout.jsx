@@ -1,5 +1,5 @@
 import { useAppContext } from '../app/providers.jsx';
-import { getUserInitials } from '../app/role-routing.js';
+import { getUserInitials, isHeadOfWarehouseAccount } from '../app/role-routing.js';
 import HeadOfTechLayout from './HeadOfTechLayout.jsx';
 import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
@@ -22,16 +22,22 @@ function WarehouseLayout() {
     return <HeadOfTechLayout />;
   }
 
-  const userName = session?.user?.full_name || 'Trần Văn Khoa';
+  const isHeadOfWarehouse = isHeadOfWarehouseAccount(session?.user);
+  const roleDisplay = isHeadOfWarehouse ? 'Trưởng phòng kho · Head of Warehouse' : 'Kho vận · Warehouse';
+  const descriptionDisplay = isHeadOfWarehouse
+    ? 'Trưởng phòng Kho vận: Quản lý, điều phối kho In-lab, giám sát quy trình tiếp nhận và xuất trả bàn giao theo ISO/IEC 17025.'
+    : 'Tiếp nhận thiết bị In-lab, kiểm tra tình trạng vật lý ban đầu và xuất trả bàn giao.';
+
+  const userName = session?.user?.full_name || (isHeadOfWarehouse ? 'Trần Văn Khoa (Head of Warehouse)' : 'Nguyễn Văn Kho');
 
   return (
     <RoleDashboardLayout
-      description="Tiếp nhận thiết bị In-lab, kiểm tra tình trạng vật lý ban đầu và xuất trả bàn giao."
-      initials={getUserInitials(userName)}
+      description={descriptionDisplay}
+      initials={getUserInitials({ full_name: userName }, isHeadOfWarehouse ? 'HW' : 'WH')}
       links={links}
       name={userName}
       profilePath="/internal/warehouse/profile"
-      role="Kho vận · Warehouse"
+      role={roleDisplay}
     />
   );
 }
