@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../../app/providers.jsx';
 import {
   deleteFileFromCloudApi,
@@ -89,24 +89,57 @@ function TechnicianPage() {
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [installGuideOpen, setInstallGuideOpen] = useState(false);
   const [lanIp, setLanIp] = useState('192.168.1.7');
+  const [hotspotActive, setHotspotActive] = useState(false);
+  const [lanRefreshNote, setLanRefreshNote] = useState('');
 
-  useEffect(() => {
-    fetch('/api/v1/system/lan-ip')
+  // IP được backend chọn lại theo thời gian thực: bật/tắt Hotspot Windows
+  // sẽ đổi IP, nên phải fetch lại chứ không được chốt lúc mount trang.
+  const refreshLanIp = useCallback(() => {
+    return fetch('/api/v1/system/lan-ip')
       .then((res) => res.json())
       .then((data) => {
-        if (data?.data?.lanIp) {
-          setLanIp(data.data.lanIp);
+        if (data?.data?.lanIp) setLanIp(data.data.lanIp);
+        if (typeof data?.data?.hotspotActive === 'boolean') {
+          setHotspotActive(data.data.hotspotActive);
         }
       })
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    refreshLanIp();
+    const intervalId = window.setInterval(refreshLanIp, 30000);
+    const handleFocus = () => refreshLanIp();
+    const handleVisibility = () => {
+      if (!document.hidden) refreshLanIp();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [refreshLanIp]);
+
+  const handleRefreshLanIp = () => {
+    setLanRefreshNote('Đang cập nhật...');
+    refreshLanIp().finally(() => {
+      setLanRefreshNote('Đã cập nhật IP mới nhất.');
+      window.setTimeout(() => setLanRefreshNote(''), 3000);
+    });
+  };
+
   // Luôn dùng IP do backend chọn (ưu tiên IP hotspot 192.168.137.x) khi chạy local,
   // kể cả người dùng mở trang ở 192.168.1.x trên máy tính.
+  const isLocalDev =
+    typeof window === 'undefined' ||
+    /^(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(
+      window.location.hostname,
+    );
   const mobileAppUrl = (() => {
     if (typeof window === 'undefined') return `http://${lanIp}:5173/mobile/technician`;
     const hostname = window.location.hostname;
-    const isLocalDev = /^(localhost|127\.0\.0\.1|192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
     const host = isLocalDev ? lanIp : hostname;
     const port = isLocalDev ? window.location.port || '5173' : window.location.port;
     return `${window.location.protocol}//${host}${port ? `:${port}` : ''}/mobile/technician`;
@@ -2251,6 +2284,38 @@ function TechnicianPage() {
               </button>
             </div>
 
+            {/* Trạng thái Hotspot / IP đang dùng để tạo QR */}
+            {isLocalDev && (
+              <div
+                style={{
+                  background: hotspotActive ? '#f0fdf4' : '#fffbeb',
+                  border: `1px solid ${hotspotActive ? '#bbf7d0' : '#fde68a'}`,
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  marginBottom: '14px',
+                  fontSize: '0.74rem',
+                  color: hotspotActive ? '#166534' : '#92400e',
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong>
+                  {hotspotActive ? '✅ Hotspot đang phát' : '⚠️ Chưa phát hiện Hotspot'}
+                </strong>
+                {' — IP hiện tại: '}
+                <code>{lanIp}</code>
+                {hotspotActive ? (
+                  <div style={{ marginTop: '4px' }}>
+                    Giữ điện thoại dùng hotspot và tắt data di động để không bị chuyển mạng.
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '4px' }}>
+                    Hãy bật Mobile Hotspot trên máy tính, rồi bấm{' '}
+                    <strong>🔄 Tạo lại QR</strong> bên dưới.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* QR Code & Direct Link */}
             <div
               style={{
@@ -2277,7 +2342,7 @@ function TechnicianPage() {
 
               <div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', marginBottom: '4px' }}>
-                  1. Mở liên kết trên điện thoại (Cùng mạng Wifi):
+                  1. Mở liên kết trên điện thoại (cùng Hotspot máy tính / Wi-Fi):
                 </div>
                 <div
                   style={{
@@ -2314,6 +2379,28 @@ function TechnicianPage() {
                 >
                   📋 Sao chép liên kết
                 </button>
+                <button
+                  onClick={handleRefreshLanIp}
+                  style={{
+                    background: '#0ea5e9',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    marginLeft: '8px',
+                  }}
+                  type="button"
+                >
+                  🔄 Tạo lại QR
+                </button>
+                {lanRefreshNote && (
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '8px' }}>
+                    {lanRefreshNote}
+                  </span>
+                )}
               </div>
             </div>
 
