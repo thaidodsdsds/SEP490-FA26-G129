@@ -90,7 +90,7 @@ export const getReviewQueue = async (filters: ReviewQueueFilter = {}) => {
       LIMIT 1
     ) woa ON true
     LEFT JOIN work_orders wo ON wo.id = woa.work_order_id
-    LEFT JOIN masterstandard ms ON ms.id = woa.master_standard_id
+    LEFT JOIN master_standards ms ON ms.id = woa.master_standard_id
     LEFT JOIN LATERAL (
       SELECT ds.id, ds.document_hash, ds.signed_file_url, ds.contract_id
       FROM digital_signatures ds
