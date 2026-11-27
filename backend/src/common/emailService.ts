@@ -403,3 +403,176 @@ Hệ thống ISOCAL
     return { sent: false };
   }
 };
+
+interface CalibrationDueReminderDevice {
+  name: string;
+  serialNumber?: string | null;
+  model?: string | null;
+  dueDate: string;
+  daysLeft: number;
+}
+
+interface SendCalibrationDueReminderEmailOptions {
+  to: string;
+  fullName?: string;
+  companyName: string;
+  devices: CalibrationDueReminderDevice[];
+  dueInDays: number;
+  renewalUrl: string;
+}
+
+const escapeHtml = (value: string): string => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const formatDueDate = (value: string): string => {
+  const [year, month, day] = value.split('-');
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+};
+
+/**
+ * Gửi nhắc hiệu chuẩn lại cho thiết bị sắp đến hạn.
+ */
+export const sendCalibrationDueReminderEmail = async ({
+  to,
+  fullName,
+  companyName,
+  devices,
+  dueInDays,
+  renewalUrl,
+}: SendCalibrationDueReminderEmailOptions): Promise<{ sent: boolean }> => {
+  const recipientName = fullName?.trim() || 'Quý khách';
+  const transporter = getMailTransporter();
+  const safeCompany = escapeHtml(companyName);
+
+  const deviceRows = devices
+    .map((device) => {
+      const secondary = [
+        device.serialNumber ? `SN: ${escapeHtml(device.serialNumber)}` : '',
+        device.model ? `Model: ${escapeHtml(device.model)}` : '',
+      ].filter(Boolean).join(' · ');
+
+      return `
+        <tr>
+          <td style="padding: 13px 14px; border-bottom: 1px solid #e2e8f0;">
+            <strong style="color:#0f172a;">${escapeHtml(device.name)}</strong>
+            ${secondary ? `<br><span style="color:#64748b; font-size:13px;">${secondary}</span>` : ''}
+          </td>
+          <td style="padding: 13px 14px; border-bottom: 1px solid #e2e8f0; white-space:nowrap;">
+            <strong>${formatDueDate(device.dueDate)}</strong>
+          </td>
+          <td style="padding: 13px 14px; border-bottom: 1px solid #e2e8f0; white-space:nowrap;">
+            <strong style="color:#b45309;">${device.daysLeft} ngày</strong>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nhắc hiệu chuẩn lại thiết bị - ISOCAL</title>
+  <style>
+    body { margin:0; padding:0; background:#f4f7fb; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#1e293b; }
+    .wrapper { width:100%; background:#f4f7fb; padding:40px 16px; box-sizing:border-box; }
+    .card { max-width:640px; margin:0 auto; background:#ffffff; border-radius:14px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:0 4px 18px rgba(15,23,42,0.05); }
+    .header { background:linear-gradient(135deg,#1a4ea6 0%,#2563eb 100%); padding:30px 36px; text-align:center; color:#ffffff; }
+    .header h1 { margin:0; font-size:24px; font-weight:700; }
+    .header p { margin:6px 0 0; font-size:13px; opacity:0.9; }
+    .body { padding:36px; line-height:1.6; font-size:15px; color:#334155; }
+    .greeting { font-size:17px; font-weight:600; color:#0f172a; margin-bottom:16px; }
+    table { width:100%; border-collapse:collapse; margin:22px 0; font-size:14px; }
+    th { text-align:left; padding:11px 14px; background:#f8fafc; color:#475569; font-size:13px; border-bottom:2px solid #e2e8f0; }
+    .notice { background:#fef3c7; border-left:4px solid #f59e0b; padding:12px 16px; border-radius:4px; font-size:13.5px; color:#92400e; margin-top:20px; }
+    .btn-container { text-align:center; margin:28px 0 8px; }
+    .btn { display:inline-block; background:linear-gradient(135deg,#1a4ea6 0%,#2563eb 100%); color:#ffffff !important; text-decoration:none; padding:13px 30px; border-radius:8px; font-weight:600; font-size:15px; }
+    .footer { background:#f8fafc; border-top:1px solid #e2e8f0; padding:22px 36px; text-align:center; font-size:12.5px; color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="header">
+        <h1>ISOCAL</h1>
+        <p>Nhắc lịch hiệu chuẩn thiết bị</p>
+      </div>
+      <div class="body">
+        <div class="greeting">Xin chào ${escapeHtml(recipientName)},</div>
+        <p>Hệ thống ISOCAL gửi thông báo: thiết bị của <strong>${safeCompany}</strong> sẽ đến hạn hiệu chuẩn lại trong vòng <strong>${dueInDays} ngày</strong> tới.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Thiết bị</th>
+              <th>Hạn hiệu chuẩn</th>
+              <th>Còn lại</th>
+            </tr>
+          </thead>
+          <tbody>${deviceRows}</tbody>
+        </table>
+
+        <div class="notice">
+          <strong>Vui lòng sớm tạo đơn dịch vụ</strong> để được bố trí lịch hiệu chuẩn trước khi thiết bị quá hạn.
+        </div>
+
+        <div class="btn-container">
+          <a href="${escapeHtml(renewalUrl)}" target="_blank" class="btn">Tạo đơn hiệu chuẩn lại</a>
+        </div>
+
+        <p style="margin-top:20px; font-size:13.5px; color:#64748b;">
+          Nếu nút trên không bấm được, bạn có thể sao chép liên kết sau vào trình duyệt:<br>
+          <span style="word-break:break-all;">${escapeHtml(renewalUrl)}</span>
+        </p>
+      </div>
+      <div class="footer">
+        <p style="margin:0;">© ${new Date().getFullYear()} ISOCAL Calibration Management Platform. All rights reserved.</p>
+        <p style="margin:4px 0 0;">Email này được gửi tự động, vui lòng không phản hồi trực tiếp.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const textContent = `
+Xin chào ${recipientName},
+
+Hệ thống ISOCAL thông báo thiết bị của ${companyName} sẽ đến hạn hiệu chuẩn lại trong vòng ${dueInDays} ngày tới:
+
+${devices.map((device) => `- ${device.name}${device.serialNumber ? ` (SN: ${device.serialNumber})` : ''}: hạn ${formatDueDate(device.dueDate)} (còn ${device.daysLeft} ngày)`).join('\n')}
+
+Vui lòng tạo đơn dịch vụ tại: ${renewalUrl}
+
+Trân trọng,
+Đội ngũ ISOCAL
+  `.trim();
+
+  if (!transporter) {
+    console.warn('[EmailService] SMTP credentials are not configured; simulated reminder email.');
+    console.warn(`[EmailService] To: ${to}`);
+    return { sent: false };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: env.smtp.from,
+      to,
+      subject: `[ISOCAL] Nhắc hiệu chuẩn lại thiết bị trong ${dueInDays} ngày tới`,
+      text: textContent,
+      html: htmlContent,
+    });
+    console.log(`[EmailService] Reminder email sent to ${to}. MessageId: ${info.messageId}`);
+    return { sent: true };
+  } catch (err) {
+    console.error(`[EmailService] Failed to send reminder email to ${to}:`, err);
+    throw err;
+  }
+};
