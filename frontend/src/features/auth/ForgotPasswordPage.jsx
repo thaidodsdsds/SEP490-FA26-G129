@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPasswordApi } from '../../services/auth-service.js';
-import isocalLogo from '../../assets/isocal_logo.png';
-import calibrationIllustration from '../../assets/calibration_illustration.png';
+import loginBg from '../../assets/login_bg.jpg';
+import { AuthBrandPanel, MailIcon, ShieldCheckIcon } from './AuthBrandPanel.jsx';
 import '../../styles/auth.css';
 
 export function ForgotPasswordPage() {
@@ -34,28 +34,24 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="auth-shell">
-      <div className="auth-container">
-        {/* Left brand panel */}
-        <div className="auth-brand">
-          <img src={isocalLogo} alt="ISOCAL" className="auth-brand__logo" />
-          <h2 className="auth-brand__headline">Hiệu chuẩn &amp; Kiểm định cho Thế giới Chính xác hơn</h2>
-          <p className="auth-brand__desc">
-            Quản trị toàn diện quy trình dịch vụ từ yêu cầu báo giá đến cấp chứng nhận,
-            minh bạch và tin cậy.
-          </p>
-          <div className="auth-illustration">
-            <img src={calibrationIllustration} alt="Thiết bị hiệu chuẩn ISOCAL" />
-          </div>
-        </div>
+    <div
+      className="auth-shell auth-shell--login"
+      style={{ backgroundImage: `url(${loginBg})` }}
+    >
+      <div className="auth-container auth-container--login">
+        <AuthBrandPanel />
 
         {/* Right form card */}
-        <div className="auth-card">
+        <div className="auth-card auth-card--login">
           <Link to="/login" className="auth-back-link">← Quay lại đăng nhập</Link>
+
+          <div className="auth-card__badge" aria-hidden="true">
+            <ShieldCheckIcon size={32} />
+          </div>
 
           <h2 className="auth-title">Quên mật khẩu?</h2>
           <p className="auth-subtitle">
-            Nhập địa chỉ email đăng ký tài khoản của bạn. Hệ thống sẽ gửi thư kèm liên kết hướng dẫn đặt lại mật khẩu thật về hòm thư của bạn.
+            Nhập địa chỉ email đăng ký tài khoản của bạn. Hệ thống sẽ gửi thư kèm liên kết hướng dẫn đặt lại mật khẩu về hòm thư của bạn.
           </p>
 
           {error && (
@@ -95,7 +91,9 @@ export function ForgotPasswordPage() {
           ) : (
             <form className="auth-form" onSubmit={handleSubmit} noValidate>
               <div className="auth-input-wrapper">
-                <span className="auth-input-icon">✉</span>
+                <span className="auth-input-icon">
+                  <MailIcon />
+                </span>
                 <input
                   id="forgot-email"
                   type="email"
@@ -115,14 +113,20 @@ export function ForgotPasswordPage() {
                 disabled={loading || !email.trim()}
               >
                 {loading ? <span className="auth-spinner" /> : null}
-                {loading ? 'Đang gửi email...' : 'Gửi liên kết đặt lại mật khẩu →'}
+                <span>{loading ? 'Đang gửi email...' : 'Gửi liên kết đặt lại mật khẩu'}</span>
+                {!loading && <span aria-hidden="true">→</span>}
               </button>
             </form>
           )}
 
-          <p className="auth-divider" style={{ marginTop: 24 }}>
+          <p className="auth-divider" style={{ marginTop: 22 }}>
             <Link to="/login" className="auth-link">Bạn đã nhớ mật khẩu? Đăng nhập ngay</Link>
           </p>
+
+          <div className="auth-security-footer">
+            <ShieldCheckIcon size={15} filled />
+            <span>Dữ liệu của bạn được bảo mật bởi ISOCAL</span>
+          </div>
         </div>
       </div>
     </div>
