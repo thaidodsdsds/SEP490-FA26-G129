@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { resetPasswordApi, verifyResetTokenApi } from '../../services/auth-service.js';
-import isocalLogo from '../../assets/isocal_logo.png';
-import calibrationIllustration from '../../assets/calibration_illustration.png';
+import loginBg from '../../assets/login_bg.jpg';
+import { AuthBrandPanel, EyeIcon, LockIcon, ShieldCheckIcon } from './AuthBrandPanel.jsx';
 import '../../styles/auth.css';
 
 export function ResetPasswordPage() {
@@ -82,24 +82,20 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className="auth-shell">
-      <div className="auth-container">
-        {/* Left brand panel */}
-        <div className="auth-brand">
-          <img src={isocalLogo} alt="ISOCAL" className="auth-brand__logo" />
-          <h2 className="auth-brand__headline">Hiệu chuẩn &amp; Kiểm định cho Thế giới Chính xác hơn</h2>
-          <p className="auth-brand__desc">
-            Quản trị toàn diện quy trình dịch vụ từ yêu cầu báo giá đến cấp chứng nhận,
-            minh bạch và tin cậy.
-          </p>
-          <div className="auth-illustration">
-            <img src={calibrationIllustration} alt="Thiết bị hiệu chuẩn ISOCAL" />
-          </div>
-        </div>
+    <div
+      className="auth-shell auth-shell--login"
+      style={{ backgroundImage: `url(${loginBg})` }}
+    >
+      <div className="auth-container auth-container--login">
+        <AuthBrandPanel />
 
         {/* Right form card */}
-        <div className="auth-card">
+        <div className="auth-card auth-card--login">
           <Link to="/login" className="auth-back-link">← Quay lại đăng nhập</Link>
+
+          <div className="auth-card__badge" aria-hidden="true">
+            <ShieldCheckIcon size={32} />
+          </div>
 
           <h2 className="auth-title">Đặt lại mật khẩu mới</h2>
           <p className="auth-subtitle">
@@ -110,7 +106,10 @@ export function ResetPasswordPage() {
 
           {verifying ? (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <span className="auth-spinner" style={{ borderColor: '#1a4ea6', borderTopColor: 'transparent', width: 28, height: 28 }} />
+              <span
+                className="auth-spinner"
+                style={{ borderColor: '#1a4ea6', borderTopColor: 'transparent', width: 28, height: 28, display: 'inline-block' }}
+              />
               <p style={{ marginTop: 12, color: '#6b83a5', fontSize: 14 }}>
                 Đang kiểm tra tính hợp lệ của liên kết...
               </p>
@@ -160,11 +159,13 @@ export function ResetPasswordPage() {
 
               {/* Password */}
               <div className="auth-input-wrapper">
-                <span className="auth-input-icon">🔒</span>
+                <span className="auth-input-icon">
+                  <LockIcon />
+                </span>
                 <input
                   id="reset-password-input"
                   type={showPassword ? 'text' : 'password'}
-                  className="auth-input"
+                  className="auth-input auth-input--password"
                   placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -176,15 +177,17 @@ export function ResetPasswordPage() {
                   type="button"
                   className="auth-password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
-                  {showPassword ? '👁' : '👁‍🗨'}
+                  <EyeIcon visible={showPassword} />
                 </button>
               </div>
 
               {/* Confirm Password */}
               <div className="auth-input-wrapper">
-                <span className="auth-input-icon">🔒</span>
+                <span className="auth-input-icon">
+                  <LockIcon />
+                </span>
                 <input
                   id="reset-confirm-password-input"
                   type={showPassword ? 'text' : 'password'}
@@ -204,17 +207,22 @@ export function ResetPasswordPage() {
                 disabled={loading || !password || !confirmPassword}
               >
                 {loading ? <span className="auth-spinner" /> : null}
-                {loading ? 'Đang cập nhật mật khẩu...' : 'Cập nhật mật khẩu mới →'}
+                <span>{loading ? 'Đang cập nhật mật khẩu...' : 'Cập nhật mật khẩu mới'}</span>
+                {!loading && <span aria-hidden="true">→</span>}
               </button>
             </form>
           )}
 
-          <p className="auth-divider" style={{ marginTop: 24 }}>
+          <p className="auth-divider" style={{ marginTop: 22 }}>
             <Link to="/login" className="auth-link">Quay lại trang Đăng nhập</Link>
           </p>
+
+          <div className="auth-security-footer">
+            <ShieldCheckIcon size={15} filled />
+            <span>Dữ liệu của bạn được bảo mật bởi ISOCAL</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
