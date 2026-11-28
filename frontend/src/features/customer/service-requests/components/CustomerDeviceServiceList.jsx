@@ -6,12 +6,9 @@ const FIELD_LABELS = {
   ALL: 'Tất cả lĩnh vực',
   DIEN: 'Điện – Điện tử',
   KHOILUONG: 'Khối lượng',
-  NHIET: 'Nhiệt – Độ ẩm',
-  APSUAT: 'Áp suất',
   DODAI: 'Độ dài – Kích thước',
-  DUNGTICH: 'Dung tích – Lưu lượng',
-  HOAHOC: 'Hóa lý – Quang học',
-  LUCLUC: 'Lực – Độ cứng',
+  APSUAT: 'Áp suất',
+  NHIET: 'Nhiệt – Độ ẩm',
 };
 
 function CustomerDeviceServiceList({

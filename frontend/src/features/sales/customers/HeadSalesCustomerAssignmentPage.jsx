@@ -28,6 +28,7 @@ export default function HeadSalesCustomerAssignmentPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | UNASSIGNED | ASSIGNED
   const [salesFilter, setSalesFilter] = useState('ALL'); // ALL | sales_id
+  const [showWorkloadModal, setShowWorkloadModal] = useState(false);
 
   // Row & Bulk assignment states
   const [savingCustomerId, setSavingCustomerId] = useState(null);
@@ -226,84 +227,28 @@ export default function HeadSalesCustomerAssignmentPage() {
           </div>
         </div>
 
-        <div className="sales-cust-stat-card">
+        <div
+          className="sales-cust-stat-card"
+          onClick={() => setShowWorkloadModal(true)}
+          style={{ cursor: 'pointer' }}
+          title="Nhấn để xem bảng phân bổ tải công việc chi tiết của đội ngũ Sales"
+        >
           <div className="sales-cust-stat-icon devices">👥</div>
           <div className="sales-cust-stat-info">
             <span className="sales-cust-stat-num">{summary.total_sales_staff}</span>
-            <span className="sales-cust-stat-label">Nhân viên Sales hoạt động</span>
+            <span className="sales-cust-stat-label">
+              Nhân viên Sales hoạt động
+              <span style={{ display: 'block', fontSize: '0.72rem', color: '#1a56db', fontWeight: 600, marginTop: 2 }}>
+                Xem tải công việc ↗
+              </span>
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Sales Staff Workload Cards */}
-      {salesStaff.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: 12,
-            marginBottom: 18,
-          }}
-        >
-          {salesStaff.map((staff) => {
-            const isActiveFilter = String(salesFilter) === String(staff.id);
-            return (
-              <button
-                key={staff.id}
-                onClick={() =>
-                  setSalesFilter((prev) =>
-                    String(prev) === String(staff.id) ? 'ALL' : String(staff.id),
-                  )
-                }
-                style={{
-                  textAlign: 'left',
-                  padding: '14px 16px',
-                  borderRadius: 12,
-                  border: isActiveFilter ? '2px solid #1a56db' : '1px solid #e2e8f0',
-                  background: isActiveFilter ? '#eff6ff' : '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                }}
-                type="button"
-              >
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
-                    👤 {staff.full_name}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
-                    {staff.email}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '4px 10px',
-                      borderRadius: 999,
-                      background: '#dbeafe',
-                      color: '#1e40af',
-                      fontWeight: 700,
-                      fontSize: '0.78rem',
-                    }}
-                  >
-                    {staff.assigned_customers_count} khách
-                  </span>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 3 }}>
-                    {staff.service_requests_count || 0} đơn YC
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Toolbar & Filters */}
       <div className="sales-cust-toolbar" style={{ flexWrap: 'wrap', gap: 12 }}>
-        <div className="sales-cust-filters" style={{ flexWrap: 'wrap', flex: 1 }}>
+        <div className="sales-cust-filters" style={{ flexWrap: 'wrap', flex: 1, alignItems: 'center' }}>
           <input
             className="sales-cust-search-input"
             onChange={(e) => setSearch(e.target.value)}
@@ -327,13 +272,25 @@ export default function HeadSalesCustomerAssignmentPage() {
             onChange={(e) => setSalesFilter(e.target.value)}
             value={salesFilter}
           >
-            <option value="ALL">Tất cả nhân viên Sales</option>
+            <option value="ALL">Tất cả nhân viên Sales ({salesStaff.length})</option>
             {salesStaff.map((s) => (
               <option key={s.id} value={String(s.id)}>
-                {s.full_name} ({s.email})
+                {s.full_name} — {s.assigned_customers_count} khách ({s.service_requests_count || 0} đơn YC)
               </option>
             ))}
           </select>
+
+          {salesFilter !== 'ALL' && (
+            <button
+              className="button button-sm button-secondary"
+              onClick={() => setSalesFilter('ALL')}
+              style={{ fontSize: '0.75rem', height: 38, padding: '0 12px' }}
+              title="Bỏ lọc theo nhân viên Sales"
+              type="button"
+            >
+              ✕ Bỏ lọc Sales
+            </button>
+          )}
         </div>
 
         {/* Bulk Assignment Action Bar */}
@@ -537,6 +494,155 @@ export default function HeadSalesCustomerAssignmentPage() {
           </div>
         )}
       </div>
+
+      {/* Modal chi tiết tải công việc đội ngũ Sales */}
+      {showWorkloadModal && (
+        <div
+          className="sales-cust-modal-backdrop"
+          onClick={() => setShowWorkloadModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+        >
+          <div
+            className="sales-cust-modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: 16,
+              maxWidth: 760,
+              width: '100%',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <div
+              style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a', fontWeight: 800 }}>
+                  👥 Bảng phân bổ tải công việc của đội ngũ Sales
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Hệ thống ghi nhận {salesStaff.length} nhân viên Sales đang hoạt động
+                </p>
+              </div>
+              <button
+                className="sales-cust-modal-close"
+                onClick={() => setShowWorkloadModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.4rem',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: 4,
+                }}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.86rem' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', color: '#475569', fontWeight: 700 }}>Nhân viên Sales</th>
+                    <th style={{ padding: '10px 12px', color: '#475569', fontWeight: 700 }}>Email</th>
+                    <th style={{ padding: '10px 12px', color: '#475569', fontWeight: 700, textAlign: 'center' }}>Số khách phụ trách</th>
+                    <th style={{ padding: '10px 12px', color: '#475569', fontWeight: 700, textAlign: 'center' }}>Số đơn YC</th>
+                    <th style={{ padding: '10px 12px', color: '#475569', fontWeight: 700, textAlign: 'right' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesStaff.map((staff) => (
+                    <tr
+                      key={staff.id}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        background: String(salesFilter) === String(staff.id) ? '#eff6ff' : 'transparent',
+                      }}
+                    >
+                      <td style={{ padding: '12px', fontWeight: 600, color: '#0f172a' }}>
+                        👤 {staff.full_name}
+                      </td>
+                      <td style={{ padding: '12px', color: '#64748b' }}>
+                        {staff.email}
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            padding: '3px 10px',
+                            borderRadius: 999,
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                          }}
+                        >
+                          {staff.assigned_customers_count} khách
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: '#475569' }}>
+                        {staff.service_requests_count || 0}
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <button
+                          className="button button-sm button-secondary"
+                          onClick={() => {
+                            setSalesFilter(String(staff.id));
+                            setShowWorkloadModal(false);
+                          }}
+                          style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                          type="button"
+                        >
+                          Lọc khách hàng 🔍
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                background: '#f8fafc',
+                borderBottomLeftRadius: 16,
+                borderBottomRightRadius: 16,
+              }}
+            >
+              <button
+                className="button button-secondary"
+                onClick={() => setShowWorkloadModal(false)}
+                type="button"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
