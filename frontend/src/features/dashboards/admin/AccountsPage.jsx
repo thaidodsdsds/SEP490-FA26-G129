@@ -112,12 +112,24 @@ function AccountsPage() {
       setPagination(data.pagination ?? { total: 0, total_pages: 1 });
       setPage(pg);
       setRoles(rls);
-      setStats({
-        total: data.pagination?.total ?? accs.length,
-        locked: accs.filter((a) => a.is_locked).length,
-        twoFa: accs.filter((a) => a.is_2fa_enabled).length,
-        active: accs.filter((a) => !a.is_locked).length,
-      });
+
+      // Thống kê toàn hệ thống (không phụ thuộc vào trang hiện tại)
+      if (data.stats) {
+        setStats({
+          total: Number(data.stats.total ?? 0),
+          locked: Number(data.stats.locked ?? 0),
+          twoFa: Number(data.stats.two_fa ?? data.stats.twoFa ?? 0),
+          active: Number(data.stats.active ?? 0),
+        });
+      } else {
+        // Fallback giữ nguyên thống kê tổng nếu backend chưa có field stats
+        setStats((prev) => ({
+          total: data.pagination?.total ?? prev.total,
+          locked: prev.locked,
+          twoFa: prev.twoFa,
+          active: (data.pagination?.total ?? prev.total) - prev.locked,
+        }));
+      }
     } catch (err) {
       notify(err?.message || 'Không thể tải dữ liệu từ server.', 'danger');
     } finally {

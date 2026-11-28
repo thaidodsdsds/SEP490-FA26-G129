@@ -5,21 +5,15 @@ import SectionCard from '../../../components/ui/SectionCard.jsx';
 import StatusBadge from '../../../components/ui/StatusBadge.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
-import {
-  activityLog,
-  adminKpis,
-  adminProfile,
-  recentLogins,
-  roleSummary,
-  systemHealth,
-} from './mockData.js';
+import DashboardFetchNotice from '../../../components/ui/DashboardFetchNotice.jsx';
+import useDashboardOverview from '../../../hooks/useDashboardOverview.js';
 import { formatDate } from '../../../utils/formatters.js';
 
 const loginColumns = [
   { key: 'account', label: 'Tài khoản' },
   { key: 'role', label: 'Vai trò' },
-  { key: 'time', label: 'Thời gian' },
-  { key: 'client', label: 'Thiết bị / IP' },
+  { key: 'id', label: 'Mã tài khoản' },
+  { key: 'client', label: 'Email' },
   { key: 'status', label: 'Trạng thái' },
 ];
 
@@ -32,6 +26,15 @@ const roleColumns = [
 
 function AdminDashboardPage() {
   const [toast, setToast] = useState(null);
+  const { data, error, loading, reload } = useDashboardOverview();
+  const {
+    activityLog = [],
+    adminKpis = [],
+    adminProfile = {},
+    recentLogins = [],
+    roleSummary = [],
+    systemHealth = [],
+  } = data;
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -49,8 +52,8 @@ function AdminDashboardPage() {
       </div>
     ),
     login.role,
-    <span className="dash-nowrap" key={`${login.id}-time`}>
-      {formatDate(login.date)} · {login.time}
+    <span className="dash-nowrap" key={`${login.id}-code`}>
+      #{login.id}
     </span>,
     login.client,
     <StatusBadge key={`${login.id}-status`} tone={login.tone}>{login.status}</StatusBadge>,
@@ -70,6 +73,7 @@ function AdminDashboardPage() {
 
   return (
     <div className="dash-page">
+      <DashboardFetchNotice error={error} loading={loading} onRetry={reload} />
       <PageHeader
         actions={(
           <>
@@ -116,8 +120,8 @@ function AdminDashboardPage() {
             Xem tất cả
           </button>
         )}
-        subtitle={`${recentLogins.length} phiên mới nhất · Ghi nhận cả phiên thất bại`}
-        title="Đăng nhập gần đây"
+        subtitle={`${recentLogins.length} tài khoản được tạo gần nhất`}
+        title="Tài khoản gần đây"
       >
         <DataTable columns={loginColumns} rows={loginRows} />
       </SectionCard>

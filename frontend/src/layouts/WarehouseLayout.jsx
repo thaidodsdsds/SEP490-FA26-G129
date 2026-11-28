@@ -5,12 +5,33 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/warehouse', label: 'Tổng quan kho', icon: '▦' },
-  { to: '/internal/warehouse/devices', label: 'Quản lý thiết bị', icon: '◫' },
-  { to: '/internal/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)', icon: '↓' },
-  { to: '/internal/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)', icon: '↑' },
-  { to: '/internal/warehouse/transactions', label: 'Lịch sử phiếu kho', icon: '≡' },
-  { to: '/internal/warehouse/chat', label: 'Trao đổi kỹ thuật', icon: '💬' },
-  { to: '/internal/warehouse/notifications', label: 'Thông báo', icon: '🔔' },
+  {
+    id: 'warehouse-ops',
+    icon: '📦',
+    label: 'Xuất nhập kho',
+    children: [
+      { to: '/internal/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)' },
+      { to: '/internal/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)' },
+      { to: '/internal/warehouse/transactions', label: 'Lịch sử phiếu kho' },
+    ],
+  },
+  {
+    id: 'warehouse-devices',
+    icon: '🏷️',
+    label: 'Quản lý thiết bị',
+    children: [
+      { to: '/internal/warehouse/devices', label: 'Danh sách thiết bị' },
+    ],
+  },
+  {
+    id: 'warehouse-comms',
+    icon: '💬',
+    label: 'Liên lạc & Thông báo',
+    children: [
+      { to: '/internal/warehouse/chat', label: 'Trao đổi kỹ thuật' },
+      { to: '/internal/warehouse/notifications', label: 'Thông báo' },
+    ],
+  },
 ];
 
 function WarehouseLayout() {

@@ -225,7 +225,7 @@ export default function SalesCustomerListPage() {
                 Thử lại
               </button>
               {error.includes('đăng nhập') && (
-                <Link to="/staff-login" className="sales-cust-btn-primary" style={{ textDecoration: 'none' }}>
+                <Link to="/login" className="sales-cust-btn-primary" style={{ textDecoration: 'none' }}>
                   Đăng nhập lại
                 </Link>
               )}

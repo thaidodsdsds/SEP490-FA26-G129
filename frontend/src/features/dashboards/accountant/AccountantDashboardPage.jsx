@@ -5,34 +5,23 @@ import SectionCard from '../../../components/ui/SectionCard.jsx';
 import StatusBadge from '../../../components/ui/StatusBadge.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
+import DashboardFetchNotice from '../../../components/ui/DashboardFetchNotice.jsx';
 import { DonutChart, LineChart, ProgressBar } from '../../../components/ui/Charts.jsx';
-import {
-  accountantKpis,
-  accountantProfile,
-  agingBuckets,
-  contractDebts,
-  creditLimits,
-  invoicesToIssue,
-  overdueByCustomer,
-  overdueSummary,
-  pendingPayments,
-  recentInvoices,
-  revenueByMonth,
-} from './mockData.js';
+import useDashboardOverview from '../../../hooks/useDashboardOverview.js';
 import { formatCurrency, formatCurrencyShort, formatDate } from '../../../utils/formatters.js';
 
 const invoiceColumns = [
-  { key: 'id', label: 'Mã hoá đơn' },
+  { key: 'id', label: 'Mã hợp đồng' },
   { key: 'customer', label: 'Khách hàng' },
-  { key: 'issuedAt', label: 'Ngày phát hành' },
-  { key: 'amount', label: 'Số tiền' },
-  { key: 'dueAt', label: 'Hạn thanh toán' },
+  { key: 'issuedAt', label: 'Ngày tạo' },
+  { key: 'amount', label: 'Giá trị' },
+  { key: 'dueAt', label: 'Hạn hợp đồng' },
   { key: 'status', label: 'Trạng thái' },
 ];
 
 const overdueColumns = [
   { key: 'customer', label: 'Khách hàng' },
-  { key: 'invoices', label: 'Số HĐ' },
+  { key: 'invoices', label: 'Số hợp đồng' },
   { key: 'd1', label: '1 – 30 ngày' },
   { key: 'd31', label: '31 – 60 ngày' },
   { key: 'd61', label: '61 – 90 ngày' },
@@ -44,7 +33,7 @@ const contractColumns = [
   { key: 'contract', label: 'Hợp đồng' },
   { key: 'customer', label: 'Khách hàng' },
   { key: 'value', label: 'Giá trị' },
-  { key: 'collected', label: 'Đã thu' },
+  { key: 'collected', label: 'Đã tất toán' },
   { key: 'remaining', label: 'Còn lại' },
   { key: 'status', label: 'Trạng thái' },
 ];
@@ -53,6 +42,20 @@ const shortOrDash = (value) => (value ? formatCurrencyShort(value) : '—');
 
 function AccountantDashboardPage() {
   const [toast, setToast] = useState(null);
+  const { data, error, loading, reload } = useDashboardOverview();
+  const {
+    accountantKpis = [],
+    accountantProfile = {},
+    agingBuckets = [],
+    contractDebts = [],
+    creditLimits = [],
+    invoicesToIssue = [],
+    overdueByCustomer = [],
+    overdueSummary = { total: 0 },
+    pendingPayments = [],
+    recentInvoices = [],
+    revenueByMonth = [],
+  } = data;
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -62,7 +65,6 @@ function AccountantDashboardPage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const pendingTotal = pendingPayments.reduce((sum, payment) => sum + payment.amount, 0);
   const issueTotal = invoicesToIssue.reduce((sum, invoice) => sum + invoice.amount, 0);
 
   const invoiceRows = recentInvoices.map((invoice) => [
@@ -100,6 +102,7 @@ function AccountantDashboardPage() {
 
   return (
     <div className="dash-page">
+      <DashboardFetchNotice error={error} loading={loading} onRetry={reload} />
       <PageHeader
         actions={(
           <>
@@ -119,7 +122,7 @@ function AccountantDashboardPage() {
             </button>
           </>
         )}
-        description="Theo dõi doanh thu, hoá đơn, thanh toán và công nợ của toàn bộ khách hàng."
+        description="Theo dõi giá trị hợp đồng, báo giá, công nợ và tình trạng thanh toán của khách hàng."
         eyebrow="TỔNG QUAN KẾ TOÁN"
         meta={[
           `Kỳ: ${accountantProfile.period}`,
@@ -139,10 +142,10 @@ function AccountantDashboardPage() {
       <div className="dash-grid two">
         <SectionCard
           subtitle="Đơn vị: triệu đồng"
-          title="Doanh thu 6 tháng gần nhất"
+          title="Giá trị hợp đồng 6 tháng gần nhất"
         >
           <LineChart
-            ariaLabel="Doanh thu 6 tháng gần nhất, đơn vị triệu đồng"
+            ariaLabel="Giá trị hợp đồng 6 tháng gần nhất, đơn vị triệu đồng"
             data={revenueByMonth}
           />
         </SectionCard>
@@ -153,7 +156,7 @@ function AccountantDashboardPage() {
           <DonutChart
             ariaLabel="Phân bổ công nợ phải thu theo tuổi nợ"
             data={agingBuckets}
-            totalDisplay="1,84 tỷ"
+            totalDisplay={formatCurrencyShort(accountantProfile.totalReceivable)}
             totalLabel="phải thu"
           />
         </SectionCard>
@@ -169,16 +172,16 @@ function AccountantDashboardPage() {
             Xem tất cả
           </button>
         )}
-        subtitle={`${recentInvoices.length} hoá đơn mới nhất`}
-        title="Hoá đơn gần đây"
+        subtitle={`${recentInvoices.length} hợp đồng gần nhất`}
+        title="Hợp đồng gần đây"
       >
         <DataTable columns={invoiceColumns} rows={invoiceRows} />
       </SectionCard>
 
       <div className="dash-grid split">
         <SectionCard
-          subtitle={`${pendingPayments.length} giao dịch · Tổng ${formatCurrencyShort(pendingTotal)}`}
-          title="Thanh toán chờ xác nhận"
+          subtitle={`${pendingPayments.length} chứng nhận chờ thanh toán`}
+          title="Chứng nhận chờ thanh toán"
         >
           <div className="dash-quote-list">
             {pendingPayments.map((payment) => (
@@ -213,8 +216,8 @@ function AccountantDashboardPage() {
         </SectionCard>
 
         <SectionCard
-          subtitle={`${invoicesToIssue.length} hồ sơ ưu tiên · Tổng ${formatCurrencyShort(issueTotal)}`}
-          title="Hoá đơn cần phát hành"
+          subtitle={`${invoicesToIssue.length} báo giá đã duyệt · Tổng ${formatCurrencyShort(issueTotal)}`}
+          title="Báo giá chưa lập hợp đồng"
         >
           <div className="dash-quote-list">
             {invoicesToIssue.map((invoice) => (
@@ -230,10 +233,10 @@ function AccountantDashboardPage() {
                 <div className="dash-quote-actions">
                   <button
                     className="dash-btn-xs primary"
-                    onClick={() => notify(`Đã phát hành hoá đơn cho ${invoice.id} (demo).`, 'success')}
+                    onClick={() => notify(`Báo giá ${invoice.id} đang chờ lập hợp đồng.`)}
                     type="button"
                   >
-                    Phát hành hoá đơn
+                    Xem báo giá
                   </button>
                 </div>
               </article>

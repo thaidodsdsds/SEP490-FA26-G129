@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import env from './config/env.js';
 import { API_PREFIX } from './common/constants.js';
-import { getPreferredLanIp } from './utils/network.js';
+import { getLanIpInfo } from './utils/network.js';
 import { buildSuccessResponse } from './common/response.js';
 import { requestLogger } from './middlewares/requestLogger.js';
 import { authenticate } from './middlewares/auth.js';
@@ -14,6 +14,7 @@ import { AppError } from './common/errors.js';
 import authRouter from './routes/authRouter.js';
 import profileRouter from './routes/profileRouter.js';
 import adminRouter from './routes/adminRouter.js';
+import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import customerRoutes from './modules/customers/customers.routes.js';
 import serviceTypesRoutes from './modules/service-types/service-types.routes.js';
 import proceduresRoutes from './modules/procedures/procedures.routes.js';
@@ -68,6 +69,7 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.use(`${API_PREFIX}/auth`, authRouter);
 app.use(`${API_PREFIX}/profile`, profileRouter);
 app.use(`${API_PREFIX}/admin`, adminRouter);
+app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
 app.use(`${API_PREFIX}/service-types`, serviceTypesRoutes);
 app.use(`${API_PREFIX}/calibration-procedures`, proceduresRoutes);
@@ -100,9 +102,7 @@ app.get(`${API_PREFIX}/health`, async (req, res, next) => {
 
 app.get(`${API_PREFIX}/system/lan-ip`, (req, res) => {
   res.status(200).json(
-    buildSuccessResponse({
-      lanIp: getPreferredLanIp(),
-    }),
+    buildSuccessResponse(getLanIpInfo()),
   );
 });
 

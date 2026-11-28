@@ -60,6 +60,25 @@ router.get('/accounts', async (req, res) => {
 
     const [accounts, total] = await qb.skip(offset).take(limitNum).getManyAndCount();
 
+    const statsRaw = await accountRepo
+      .createQueryBuilder('acc')
+      .select('COUNT(*)::int', 'total')
+      .addSelect('COUNT(CASE WHEN acc.failed_login_attempts >= 5 THEN 1 END)::int', 'locked')
+      .addSelect('COUNT(CASE WHEN acc.is_2fa_enabled = true THEN 1 END)::int', 'two_fa')
+      .getRawOne();
+
+    const totalCount = Number(statsRaw?.total ?? total);
+    const lockedCount = Number(statsRaw?.locked ?? 0);
+    const twoFaCount = Number(statsRaw?.two_fa ?? 0);
+    const activeCount = Math.max(0, totalCount - lockedCount);
+
+    const stats = {
+      total: totalCount,
+      locked: lockedCount,
+      two_fa: twoFaCount,
+      active: activeCount,
+    };
+
     const result = accounts.map((acc) => ({
       id: acc.id,
       full_name: acc.full_name,
@@ -82,6 +101,7 @@ router.get('/accounts', async (req, res) => {
         limit: limitNum,
         total_pages: Math.ceil(total / limitNum),
       },
+      stats,
     }));
   } catch (error) {
     console.error('[Admin] List accounts error:', error);

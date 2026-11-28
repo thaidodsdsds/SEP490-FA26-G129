@@ -35,3 +35,20 @@ GET /api/v1/roles
 
 The endpoint returns each role's `id`, `code`, and `name`, sorted by code. It
 does not require authentication.
+
+## Dashboard demo seed
+
+After migrations, populate realistic data for every dashboard with:
+
+```powershell
+npm run seed
+```
+
+The seed is idempotent: it refreshes only deterministic demo rows with IDs
+`101+` and leaves unrelated records untouched. Demo accounts use the password
+`Isocal@123`. Useful logins include `admin.demo@isocal.com`,
+`accountant2@isocal.com`, `sale2@isocal.com`, `head.sales@isocal.com`,
+`warehouse.manager@isocal.com`, `reviewer@isocal.com`,
+`technician2@isocal.com`, and `long@abc-calibration.com` (customer 1). The
+original `admin@isocal.com`, `head.technician@isocal.com`, and
+`ceo@isocal.com` accounts still require their configured 2FA flow.

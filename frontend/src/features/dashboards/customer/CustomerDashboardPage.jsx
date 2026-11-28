@@ -6,20 +6,9 @@ import SectionCard from '../../../components/ui/SectionCard.jsx';
 import StatusBadge from '../../../components/ui/StatusBadge.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
 import Toast from '../../../components/ui/Toast.jsx';
+import DashboardFetchNotice from '../../../components/ui/DashboardFetchNotice.jsx';
 import { BarChart, DonutChart, ProgressBar } from '../../../components/ui/Charts.jsx';
-import {
-  certificates,
-  customerKpis,
-  customerProfile,
-  debtSummary,
-  dueBuckets,
-  dueDevices,
-  invoices,
-  notifications,
-  orderStatus,
-  quotations,
-  recentOrders,
-} from './mockData.js';
+import useDashboardOverview from '../../../hooks/useDashboardOverview.js';
 import { formatCurrency, formatCurrencyShort, formatDate, formatDueHint } from '../../../utils/formatters.js';
 
 const orderColumns = [
@@ -49,6 +38,21 @@ const certificateColumns = [
 
 function CustomerDashboardPage() {
   const [toast, setToast] = useState(null);
+  const { data, error, loading, reload } = useDashboardOverview();
+  const {
+    certificates = [],
+    customerKpis = [],
+    customerProfile = {},
+    debtSummary = { total: 0, overdue: 0, overdueCount: 0 },
+    dueBuckets = [],
+    dueDevices = [],
+    invoices = [],
+    notifications = [],
+    orderStatus = [],
+    quotations = [],
+    recentOrders = [],
+  } = data;
+  const totalDevices = customerKpis.find((kpi) => kpi.key === 'devices')?.value ?? 0;
 
   const notify = (message, tone = 'info') => setToast({ message, tone });
 
@@ -66,7 +70,7 @@ function CustomerDashboardPage() {
       tone: 'danger',
       label: 'Công nợ chưa thanh toán',
       value: formatCurrencyShort(debtSummary.total),
-      hint: `${debtSummary.overdueCount} hoá đơn quá hạn`,
+      hint: `${debtSummary.overdueCount} hợp đồng quá hạn`,
       hintTone: 'danger',
     },
   ];
@@ -118,6 +122,7 @@ function CustomerDashboardPage() {
 
   return (
     <div className="dash-page">
+      <DashboardFetchNotice error={error} loading={loading} onRetry={reload} />
       <PageHeader
         actions={(
           <>
@@ -155,7 +160,7 @@ function CustomerDashboardPage() {
 
       <div className="dash-grid two">
         <SectionCard
-          subtitle="Tổng 128 thiết bị đang quản lý"
+          subtitle={`Tổng ${totalDevices} thiết bị đang quản lý`}
           title="Thiết bị theo hạn hiệu chuẩn"
         >
           <BarChart
@@ -272,12 +277,12 @@ function CustomerDashboardPage() {
         </SectionCard>
 
         <SectionCard
-          subtitle="Tổng hợp hoá đơn và công nợ hiện tại"
-          title="Công nợ & thanh toán"
+          subtitle="Tổng hợp giá trị hợp đồng và công nợ hiện tại"
+          title="Hợp đồng & công nợ"
         >
           <div className="dash-invoice-summary">
             <div className="dash-invoice-stat">
-              <span>Tổng chưa thanh toán</span>
+              <span>Tổng giá trị hợp đồng</span>
               <strong>{formatCurrencyShort(debtSummary.total)}</strong>
             </div>
             <div className="dash-invoice-stat">
@@ -291,7 +296,7 @@ function CustomerDashboardPage() {
                 <div className="dash-invoice-main">
                   <strong>{invoice.id}</strong>
                   <small>
-                    Phát hành {formatDate(invoice.issuedAt)} · Hạn {formatDate(invoice.dueAt)}
+                    Ngày tạo {formatDate(invoice.issuedAt)} · Hạn {formatDate(invoice.dueAt)}
                   </small>
                 </div>
                 <div className="dash-invoice-side">

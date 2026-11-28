@@ -16,7 +16,9 @@ const isVirtualInterface = (name: string): boolean =>
  * Điện thoại bắt hotspot sẽ ở mạng 192.168.137.x nên BẮT BUỘC dùng IP này,
  * không dùng IP Wi-Fi cũng như localhost (localhost trên điện thoại là chính điện thoại).
  */
-export const getPreferredLanIp = (fallback = '192.168.1.7'): string => {
+const resolveLanInfo = (
+  fallback = '192.168.1.7',
+): { lanIp: string; hotspotActive: boolean } => {
   const candidates: Array<{ name: string; address: string }> = [];
 
   for (const [name, list] of Object.entries(os.networkInterfaces())) {
@@ -30,10 +32,19 @@ export const getPreferredLanIp = (fallback = '192.168.1.7'): string => {
   }
 
   const hotspot = candidates.find(({ address }) => address.startsWith('192.168.137.'));
-  if (hotspot) return hotspot.address;
+  if (hotspot) return { lanIp: hotspot.address, hotspotActive: true };
 
   const preferred =
     candidates.find(({ name }) => /wi-?fi|wireless|ethernet/i.test(name)) ?? candidates[0];
 
-  return preferred?.address ?? fallback;
+  return { lanIp: preferred?.address ?? fallback, hotspotActive: false };
 };
+
+export const getPreferredLanIp = (fallback = '192.168.1.7'): string =>
+  resolveLanInfo(fallback).lanIp;
+
+/**
+ * Thông tin IP dùng cho QR cài đặt app lên điện thoại.
+ * hotspotActive = true khi Windows Mobile Hotspot đang phát (có IP 192.168.137.x).
+ */
+export const getLanIpInfo = (fallback = '192.168.1.7') => resolveLanInfo(fallback);

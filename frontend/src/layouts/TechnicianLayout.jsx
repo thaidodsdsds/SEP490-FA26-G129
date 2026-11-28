@@ -2,13 +2,19 @@ import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
   { to: '/internal/technician', label: 'Dashboard công việc', icon: '▦' },
-  { to: '/mobile/technician', label: '📱 App di động (Offline)', icon: '📱' },
+  {
+    id: 'tech-execution',
+    icon: '🔧',
+    label: 'Thực hiện hiệu chuẩn',
+    children: [
+      { to: '/mobile/technician', label: '📱 App di động (Offline)' },
+    ],
+  },
 ];
 
 function TechnicianLayout() {
   return (
     <RoleDashboardLayout
-      description="Theo dõi lịch được giao và hoàn tất hồ sơ đo."
       initials="KT"
       links={links}
       name="Kỹ thuật viên"

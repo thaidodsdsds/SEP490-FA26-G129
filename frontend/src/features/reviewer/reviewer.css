@@ -251,7 +251,8 @@
   line-height: 1.45;
 }
 
-.reviewer-feedback > span {
+.reviewer-feedback > span:first-child:not(.reviewer-feedback-text),
+.reviewer-feedback > span.reviewer-feedback-icon {
   display: grid;
   width: 17px;
   height: 17px;
@@ -261,6 +262,13 @@
   background: #dcefe3;
   font-size: 0.65rem;
   font-weight: 800;
+}
+
+.reviewer-feedback-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .reviewer-feedback button {
@@ -1194,7 +1202,8 @@
   color: #9a3f3f;
 }
 
-.reviewer-feedback.error > span {
+.reviewer-feedback.error > span:first-child:not(.reviewer-feedback-text),
+.reviewer-feedback.error > span.reviewer-feedback-icon {
   background: #f3dada;
 }
 

@@ -175,6 +175,15 @@ function HeadOfTechPage() {
     loadData();
   }, []);
 
+  // Auto-dismiss feedback toast after 5s
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timer = setTimeout(() => {
+      setFeedback(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+
   // Modal accessibility & focus management
   useEffect(() => {
     if (!assignmentOpen) return undefined;
@@ -590,16 +599,29 @@ function HeadOfTechPage() {
               marginBottom: '18px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              gap: '10px',
               fontSize: '0.82rem',
               fontWeight: 600,
             }}
           >
-            <span>{feedback.message}</span>
+            <span aria-hidden="true" className="reviewer-feedback-icon">
+              {feedback.tone === 'error' ? '!' : '✓'}
+            </span>
+            <div className="reviewer-feedback-text" style={{ flex: 1, minWidth: 0 }}>
+              {feedback.message}
+            </div>
             <button
               aria-label="Đóng"
               onClick={() => setFeedback(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'inherit' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.1rem',
+                color: 'inherit',
+                marginLeft: 'auto',
+                lineHeight: 1,
+              }}
               type="button"
             >
               ×

@@ -313,7 +313,7 @@ a {
 
 .role-sidebar-intro {
   flex: 0 0 auto;
-  padding: 3px 10px 18px;
+  padding: 3px 10px 12px;
   border-bottom: 1px solid #edf1f4;
 }
 
@@ -427,12 +427,14 @@ a {
   transform: rotate(180deg);
 }
 
-.role-nav-group--active > .role-nav-group-toggle {
+.role-nav-group--active > .role-nav-group-toggle,
+.role-nav-group-active > .role-nav-group-toggle {
   background: #f2f8fa;
   color: #216d8b;
 }
 
-.role-nav-group--active > .role-nav-group-toggle > span:first-child {
+.role-nav-group--active > .role-nav-group-toggle > span:first-child,
+.role-nav-group-active > .role-nav-group-toggle > span:first-child {
   background: #dcecf2;
   color: #276f8c;
 }
