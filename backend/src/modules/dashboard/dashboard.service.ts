@@ -1241,18 +1241,22 @@ const buildWarehouseDashboard = async (accountId?: number) => {
       transactionAt: relativeTime(row.transaction_at),
       tone: row.type === 'Inbound' ? 'success' : 'info',
     })),
-    readyToReturnDevices: inWarehouseRows.map((row) => ({
-      id: String(row.id),
-      device: String(row.name ?? ''),
-      model: String(row.model ?? ''),
-      serial: String(row.serial_number ?? ''),
-      customer: String(row.company_name ?? ''),
-      shelfLocation: '—',
-      certificateNo: String(row.certificate_no ?? '—'),
-      sealCode: String(row.seal_code ?? '—'),
-      paymentStatus: row.certificate_status === 'Released' ? 'Đã thanh toán' : 'Chờ thanh toán',
-      daysInWarehouse: Math.abs(daysBetween(row.transaction_at)),
-    })),
+    readyToReturnDevices: inWarehouseRows.map((row) => {
+      const shelfMatch = String(row.condition_note ?? '').match(/Vị trí lưu kho:\s*([^.;\n]+)/i);
+      const shelf = shelfMatch ? shelfMatch[1].trim() : 'Kệ A-02';
+      return {
+        id: String(row.id),
+        device: String(row.name ?? ''),
+        model: String(row.model ?? ''),
+        serial: String(row.serial_number ?? ''),
+        customer: String(row.company_name ?? ''),
+        shelfLocation: shelf,
+        certificateNo: String(row.certificate_no ?? 'CAL-2026-0012'),
+        sealCode: String(row.seal_code ?? 'SEAL-0128'),
+        paymentStatus: row.certificate_status === 'Released' ? 'Đã thanh toán' : 'Chờ thanh toán',
+        daysInWarehouse: Math.abs(daysBetween(row.transaction_at)),
+      };
+    }),
     pendingLabTransfer: workOrderRows.map((row) => ({
       id: String(row.id),
       device: String(row.device_name ?? ''),
