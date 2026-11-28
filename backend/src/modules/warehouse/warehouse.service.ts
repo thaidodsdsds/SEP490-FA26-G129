@@ -46,7 +46,11 @@ export const createInboundTransaction = async (input: CreateInboundInput) => {
     const sriRepo = dataSource.getRepository(ServiceRequestItem);
     const item = await sriRepo.findOne({ where: { id: input.service_request_item_id } });
     if (!item) {
-      throw new AppError('Service request item not found.', 404, ERROR_CODES.NOT_FOUND);
+      throw new AppError(
+        `Không tìm thấy dòng yêu cầu dịch vụ (Service Request Item ID: ${input.service_request_item_id}). Vui lòng để trống nếu không có mã yêu cầu cụ thể.`,
+        404,
+        ERROR_CODES.NOT_FOUND,
+      );
     }
   }
 

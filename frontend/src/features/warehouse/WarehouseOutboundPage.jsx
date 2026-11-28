@@ -82,7 +82,11 @@ function WarehouseOutboundPage() {
     } catch (err) {
       setFeedback({
         type: 'error',
-        message: err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi tạo phiếu xuất kho.',
+        message:
+          err?.response?.data?.error?.message ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Có lỗi xảy ra khi tạo phiếu xuất kho.',
       });
     } finally {
       setSubmitting(false);
@@ -247,9 +251,12 @@ function WarehouseOutboundPage() {
                   name="service_request_item_id"
                   value={formData.service_request_item_id}
                   onChange={handleChange}
-                  placeholder="Ví dụ: 101"
+                  placeholder="Để trống nếu không rõ hoặc không có"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.95rem' }}
                 />
+                <span style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4, display: 'block' }}>
+                  * Không bắt buộc: Hãy để trống ô này nếu xuất kho thiết bị độc lập hoặc chưa rõ mã yêu cầu.
+                </span>
               </div>
             </div>
           )}
