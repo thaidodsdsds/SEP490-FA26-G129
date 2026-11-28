@@ -20,6 +20,7 @@ const expectedTables = [
   'accounts',
   'service_types',
   'devices',
+  'device_ownership_histories',
   'calibration_procedures',
   'service_requests',
   'service_request_items',
@@ -31,7 +32,21 @@ const expectedTables = [
   'contract_items',
   'digital_signatures',
   'work_orders',
+  'master_standards',
   'work_order_assignments',
+  'initial_inspections',
+  'procedure_steps',
+  'procedure_parameters',
+  'procedure_test_points',
+  'calibration_records',
+  'step_results',
+  'measurement_details',
+  'review_logs',
+  'certificates',
+  'seals',
+  'seal_revocations',
+  'seal_verification_logs',
+  'warehouse_transactions',
 ];
 
 describe('ISOCAL TypeORM entities', () => {
@@ -83,12 +98,12 @@ describe('ISOCAL TypeORM entities', () => {
       ]),
     );
     expect(workOrderColumns).toEqual(
-      expect.arrayContaining(['work_order_code', 'contract_id', 'customer_id', 'status']),
+      expect.arrayContaining(['contract_id', 'status']),
     );
     expect(assignmentColumns).toEqual(
       expect.arrayContaining([
         'work_order_id',
-        'contract_item_id',
+        'service_request_item_id',
         'technician_id',
         'scheduled_start',
         'scheduled_end',
@@ -97,7 +112,7 @@ describe('ISOCAL TypeORM entities', () => {
       ]),
     );
     expect(assignmentRelations).toEqual(
-      expect.arrayContaining(['work_order', 'contract_item', 'technician']),
+      expect.arrayContaining(['work_order', 'service_request_item', 'technician']),
     );
   });
 

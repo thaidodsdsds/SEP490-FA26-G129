@@ -2000,4 +2000,5 @@ export const entities = [
   Seal,
   SealRevocation,
   SealVerificationLog,
+  WarehouseTransaction,
 ];
