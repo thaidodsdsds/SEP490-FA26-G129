@@ -155,52 +155,7 @@ export function AuthBrandPanel() {
         đến cấp chứng nhận, minh bạch và đáng tin cậy.
       </p>
 
-      <div className="auth-features">
-        <div className="auth-feature">
-          <div className="auth-feature__icon">
-            <ShieldCheckIcon size={20} filled />
-          </div>
-          <div>
-            <div className="auth-feature__title">Chất lượng</div>
-            <div className="auth-feature__sub">Tin cậy</div>
-          </div>
-        </div>
-
-        <div className="auth-feature__sep" aria-hidden="true" />
-
-        <div className="auth-feature">
-          <div className="auth-feature__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="8" />
-              <circle cx="12" cy="12" r="3" />
-              <line x1="12" y1="2" x2="12" y2="5" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-              <line x1="2" y1="12" x2="5" y2="12" />
-              <line x1="19" y1="12" x2="22" y2="12" />
-            </svg>
-          </div>
-          <div>
-            <div className="auth-feature__title">Kết quả</div>
-            <div className="auth-feature__sub">Chính xác</div>
-          </div>
-        </div>
-
-        <div className="auth-feature__sep" aria-hidden="true" />
-
-        <div className="auth-feature">
-          <div className="auth-feature__icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M11 17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1" />
-              <path d="M2 12l4-4 3 3 4-4 4 4 5-5" />
-              <path d="M16 6h6v6" />
-            </svg>
-          </div>
-          <div>
-            <div className="auth-feature__title">Tương lai</div>
-            <div className="auth-feature__sub">Bền vững</div>
-          </div>
-        </div>
-      </div>
+     
     </div>
   );
 }

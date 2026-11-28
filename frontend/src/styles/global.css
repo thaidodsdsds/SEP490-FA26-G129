@@ -427,12 +427,14 @@ a {
   transform: rotate(180deg);
 }
 
-.role-nav-group--active > .role-nav-group-toggle {
+.role-nav-group--active > .role-nav-group-toggle,
+.role-nav-group-active > .role-nav-group-toggle {
   background: #f2f8fa;
   color: #216d8b;
 }
 
-.role-nav-group--active > .role-nav-group-toggle > span:first-child {
+.role-nav-group--active > .role-nav-group-toggle > span:first-child,
+.role-nav-group-active > .role-nav-group-toggle > span:first-child {
   background: #dcecf2;
   color: #276f8c;
 }
