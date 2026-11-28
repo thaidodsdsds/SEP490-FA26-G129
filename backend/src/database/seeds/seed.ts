@@ -119,9 +119,6 @@ const seed = async (query: QueryFn): Promise<void> => {
       { id: 3, name: 'Hiệu chuẩn Độ dài – Dung tích', kind: 'Calibration', field: 'DODAI', standard_code: 'HC-DODAI', measuring_range: 'Kích thước, độ dài, dung tích', status: 'Active' },
       { id: 4, name: 'Hiệu chuẩn Áp suất – Lưu lượng', kind: 'Calibration', field: 'APSUAT', standard_code: 'HC-APSUAT', measuring_range: 'Áp suất âm, dương, lưu lượng', status: 'Active' },
       { id: 5, name: 'Hiệu chuẩn Nhiệt độ – Độ ẩm', kind: 'Calibration', field: 'NHIET', standard_code: 'HC-NHIET', measuring_range: '-80 đến 1200 °C, 5 - 98 %RH', status: 'Active' },
-      { id: 6, name: 'Hiệu chuẩn Hóa học – Y tế – Môi trường', kind: 'Calibration', field: 'HOA', standard_code: 'HC-HOA', measuring_range: 'pH, EC, quang phổ, nồng độ khí', status: 'Active' },
-      { id: 7, name: 'Hiệu chuẩn Quang học – Âm thanh', kind: 'Calibration', field: 'QUANG', standard_code: 'HC-QUANG', measuring_range: 'Độ rọi, độ đục, mức áp suất âm thanh', status: 'Active' },
-      { id: 8, name: 'Hiệu chuẩn Thiết bị Dệt may – Da giày', kind: 'Calibration', field: 'DET', standard_code: 'HC-DET', measuring_range: 'Độ bền, độ co giãn, độ ẩm vật liệu', status: 'Active' },
     ],
   );
 

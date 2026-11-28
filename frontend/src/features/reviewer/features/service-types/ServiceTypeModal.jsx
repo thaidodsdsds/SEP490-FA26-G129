@@ -10,9 +10,6 @@ const FIELD_LABELS = {
   DODAI: 'Độ dài – Dung tích',
   APSUAT: 'Áp suất – Lưu lượng',
   NHIET: 'Nhiệt độ – Độ ẩm',
-  HOA: 'Hóa học – Y tế – Môi trường',
-  QUANG: 'Quang học – Âm thanh',
-  DET: 'Dệt may – Da giày – Thực phẩm',
 };
 
 function ServiceTypeModal({ isOpen, onClose, onSave, editingItem }) {

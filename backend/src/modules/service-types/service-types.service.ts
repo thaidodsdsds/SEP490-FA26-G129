@@ -9,9 +9,6 @@ export const ALLOWED_FIELDS = [
   'DODAI',
   'APSUAT',
   'NHIET',
-  'HOA',
-  'QUANG',
-  'DET',
 ] as const;
 
 export const ALLOWED_KINDS = ['Calibration', 'Verification', 'Repair'] as const;
