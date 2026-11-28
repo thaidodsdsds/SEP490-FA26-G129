@@ -231,12 +231,12 @@ function WarehouseDashboardPage() {
             Xem lịch sử phiếu kho ({readyToReturnDevices.length})
           </button>
         )}
-        subtitle="Thiết bị đã hoàn tất hiệu chuẩn/kiểm định, đã được cấp Certificate & dán Tem Seal số, sẵn sàng lập phiếu xuất kho kèm biên bản bàn giao."
-        title="Thiết bị sẵn sàng xuất trả khách (Ready to Return)"
+        subtitle="Thiết bị đã tiếp nhận vào phòng Lab, lưu giữ tại kệ kho In-lab và sẵn sàng thực hiện đo kiểm hoặc xuất trả bàn giao."
+        title="Thiết bị đã nhập kho"
       >
         <DataTable
           columns={readyColumns}
-          emptyText="Không có thiết bị nào đang chờ xuất kho"
+          emptyText="Chưa có thiết bị nào trong kho"
           rows={readyRows}
         />
       </SectionCard>
