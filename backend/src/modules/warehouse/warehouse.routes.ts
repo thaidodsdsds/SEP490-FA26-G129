@@ -17,6 +17,12 @@ warehouseRoutes.get('/inventory', getInventorySummary);
 warehouseRoutes.get('/devices', getDevices);
 
 const ALLOWED_WAREHOUSE_ROLES = [
+  'HeadOfWarehouse',
+  'headofwarehouse',
+  'Head of Warehouse',
+  'head of warehouse',
+  'HeadWarehouse',
+  'headwarehouse',
   'Warehouse',
   'WarehouseStaff',
   'warehousestaff',
