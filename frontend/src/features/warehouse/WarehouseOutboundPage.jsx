@@ -199,13 +199,11 @@ function WarehouseOutboundPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 40, textAlign: 'center' }}>
             <div>
               <strong>ĐẠI DIỆN BÊN NHẬN</strong>
-              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#64748b', margin: '4px 0 60px' }}>(Ký và ghi rõ họ tên)</p>
-              <p><strong>{formData.recipient_name}</strong></p>
+              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#64748b', margin: '4px 0 80px' }}>(Ký và ghi rõ họ tên)</p>
             </div>
             <div>
               <strong>ĐẠI DIỆN BÊN GIAO (THỦ KHO)</strong>
-              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#64748b', margin: '4px 0 60px' }}>(Ký và ghi rõ họ tên)</p>
-              <p><strong>Nhân viên kho vận ISOCAL</strong></p>
+              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: '#64748b', margin: '4px 0 80px' }}>(Ký và ghi rõ họ tên)</p>
             </div>
           </div>
 
