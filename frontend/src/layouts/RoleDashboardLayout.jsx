@@ -126,14 +126,25 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
 
   const navLinks = links ?? [];
   const activeGroupId = findActiveGroupId(navLinks, location.pathname);
-  const [openGroupId, setOpenGroupId] = useState(activeGroupId);
+  const [openGroupMap, setOpenGroupMap] = useState(() => ({
+    ...(activeGroupId ? { [activeGroupId]: true } : {}),
+  }));
   const [lastActiveGroupId, setLastActiveGroupId] = useState(activeGroupId);
 
-  // Khi đổi route, tự mở nhóm chứa trang đang xem (không dùng effect để tránh render 2 lần)
+  // Khi đổi route, tự mở nhóm chứa trang đang xem
   if (activeGroupId !== lastActiveGroupId) {
     setLastActiveGroupId(activeGroupId);
-    setOpenGroupId(activeGroupId);
+    if (activeGroupId) {
+      setOpenGroupMap((prev) => ({ ...prev, [activeGroupId]: true }));
+    }
   }
+
+  const toggleGroup = (groupId) => {
+    setOpenGroupMap((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   useEffect(() => {
     if (!isNavOpen) return undefined;
@@ -269,19 +280,19 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
               if (Array.isArray(link.children)) {
                 const groupId = getGroupId(link, index);
                 const sublistId = `role-nav-sublist-${groupId}`;
-                const isOpen = openGroupId === groupId;
+                const isOpen = Boolean(openGroupMap[groupId]);
                 const hasActiveChild = link.children.some((child) => matchesPath(child.to, location.pathname));
 
                 return (
                   <div
-                    className={`role-nav-group${hasActiveChild ? ' role-nav-group-active' : ''}`}
+                    className={`role-nav-group${hasActiveChild ? ' role-nav-group-active role-nav-group--active' : ''}`}
                     key={groupId}
                   >
                     <button
                       aria-controls={sublistId}
                       aria-expanded={isOpen}
                       className="role-nav-link role-nav-group-toggle"
-                      onClick={() => setOpenGroupId((current) => (current === groupId ? null : groupId))}
+                      onClick={() => toggleGroup(groupId)}
                       type="button"
                     >
                       <span aria-hidden="true">{link.icon}</span>
@@ -290,17 +301,29 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
                     </button>
                     <div className="role-nav-sublist" hidden={!isOpen} id={sublistId} role="group">
                       {link.children.map((child) => (
-                        <NavLink
-                          className={({ isActive }) => `role-nav-link role-nav-link-child${isActive ? ' role-nav-link-active' : ''}`}
-                          end
-                          key={child.to}
-                          onClick={closeNav}
-                          title={child.label}
-                          to={child.to}
-                        >
-                          <span aria-hidden="true" className="role-nav-dot" />
-                          {child.label}
-                        </NavLink>
+                        child.soon ? (
+                          <span
+                            className="role-nav-link role-nav-link-child role-nav-link-soon"
+                            key={child.label}
+                            title={child.label}
+                          >
+                            <span aria-hidden="true" className="role-nav-dot" />
+                            {child.label}
+                            <small className="role-nav-soon">Sắp có</small>
+                          </span>
+                        ) : (
+                          <NavLink
+                            className={({ isActive }) => `role-nav-link role-nav-link-child${isActive ? ' role-nav-link-active' : ''}`}
+                            end
+                            key={child.to}
+                            onClick={closeNav}
+                            title={child.label}
+                            to={child.to}
+                          >
+                            <span aria-hidden="true" className="role-nav-dot" />
+                            {child.label}
+                          </NavLink>
+                        )
                       ))}
                     </div>
                   </div>
