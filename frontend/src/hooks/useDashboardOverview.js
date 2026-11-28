@@ -5,7 +5,7 @@ import { getDashboardOverviewApi } from '../services/dashboard-service.js';
  * Hook dùng chung cho các trang tổng quan: tải dữ liệu thật từ API,
  * expose trạng thái loading/error để trang hiển thị thông báo phù hợp.
  */
-export default function useDashboardOverview() {
+export default function useDashboardOverview(targetRole) {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -14,7 +14,7 @@ export default function useDashboardOverview() {
     setLoading(true);
     setError('');
     try {
-      const overview = await getDashboardOverviewApi();
+      const overview = await getDashboardOverviewApi(targetRole);
       setData(overview ?? {});
     } catch (err) {
       setError(
@@ -25,7 +25,7 @@ export default function useDashboardOverview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [targetRole]);
 
   useEffect(() => {
     let active = true;
@@ -34,7 +34,7 @@ export default function useDashboardOverview() {
       setLoading(true);
       setError('');
       try {
-        const overview = await getDashboardOverviewApi();
+        const overview = await getDashboardOverviewApi(targetRole);
         if (active) setData(overview ?? {});
       } catch (err) {
         if (active) {
@@ -53,7 +53,7 @@ export default function useDashboardOverview() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [targetRole]);
 
   return { data, error, loading, reload: load };
 }

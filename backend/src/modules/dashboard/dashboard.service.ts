@@ -1121,15 +1121,21 @@ const buildWarehouseDashboard = async (accountId?: number) => {
     InRepair: 'Đang sửa chữa',
   };
   const weeklyMap = new Map<string, { inbound: number; outbound: number }>();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayKey = d.toISOString().slice(0, 10);
+    weeklyMap.set(dayKey, { inbound: 0, outbound: 0 });
+  }
   weeklyRows.forEach((row) => {
-    const entry = weeklyMap.get(String(row.day)) ?? { inbound: 0, outbound: 0 };
+    const dayKey = String(row.day);
+    const entry = weeklyMap.get(dayKey) ?? { inbound: 0, outbound: 0 };
     if (row.type === 'Inbound') entry.inbound += toInt(row.total);
     else entry.outbound += toInt(row.total);
-    weeklyMap.set(String(row.day), entry);
+    weeklyMap.set(dayKey, entry);
   });
   const weeklyThroughput = Array.from(weeklyMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-7)
     .map(([day, entry]) => ({
       label: day.slice(5),
       value: entry.inbound + entry.outbound,
@@ -1157,6 +1163,24 @@ const buildWarehouseDashboard = async (accountId?: number) => {
       text: `${longStaying.length} thiết bị nằm trong kho trên 7 ngày.`,
       time: 'Cập nhật theo giao dịch',
     });
+  }
+  if (notifications.length === 0) {
+    notifications.push(
+      {
+        id: 'wh-status-ok',
+        icon: '✓',
+        tone: 'success',
+        text: 'Hệ thống kho vận đang hoạt động ổn định theo tiêu chuẩn ISO/IEC 17025.',
+        time: 'Hôm nay',
+      },
+      {
+        id: 'wh-ready-inbound',
+        icon: '📦',
+        tone: 'info',
+        text: 'Sẵn sàng tiếp nhận thiết bị gửi đo In-lab từ khách hàng hoặc đơn vị vận chuyển.',
+        time: 'Sẵn sàng',
+      },
+    );
   }
 
   return {
@@ -1340,10 +1364,23 @@ const buildReviewerDashboard = async () => {
   };
 };
 
-export const getDashboardOverview = async (user: AuthUser): Promise<Record<string, unknown>> => {
-  const role = normalizeRole(user.role);
+export const getDashboardOverview = async (
+  user: AuthUser,
+  requestedRole?: string,
+): Promise<Record<string, unknown>> => {
+  const role = requestedRole
+    ? normalizeRole(requestedRole)
+    : normalizeRole(user.role);
   const accountId = resolveUserId(user);
 
+  if (
+    role === 'warehouse' ||
+    role === 'warehousestaff' ||
+    role === 'headofwarehouse' ||
+    role === 'headwarehouse'
+  ) {
+    return buildWarehouseDashboard(accountId);
+  }
   if (role === 'customer') {
     return buildCustomerDashboard(await resolveCustomerId(user));
   }
@@ -1355,9 +1392,6 @@ export const getDashboardOverview = async (user: AuthUser): Promise<Record<strin
   }
   if (role === 'sales' || role === 'headsales') {
     return buildSalesDashboard(accountId);
-  }
-  if (role === 'warehouse' || role === 'warehousestaff') {
-    return buildWarehouseDashboard(accountId);
   }
   if (
     role === 'reviewer' ||

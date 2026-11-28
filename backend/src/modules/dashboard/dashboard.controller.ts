@@ -9,7 +9,8 @@ export const getDashboardOverviewHandler: RequestHandler = async (req, res, next
         ? (req.user as { id?: unknown; role?: unknown; customer_id?: unknown })
         : {};
 
-    const overview = await getDashboardOverview(authUser);
+    const requestedRole = typeof req.query.role === 'string' ? req.query.role : undefined;
+    const overview = await getDashboardOverview(authUser, requestedRole);
 
     return res.status(200).json(
       buildSuccessResponse({

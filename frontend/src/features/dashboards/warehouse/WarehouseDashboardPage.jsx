@@ -47,7 +47,7 @@ const pendingColumns = [
 function WarehouseDashboardPage() {
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
-  const { data, error, loading, reload } = useDashboardOverview();
+  const { data, error, loading, reload } = useDashboardOverview('warehouse');
   const {
     pendingLabTransfer = [],
     readyToReturnDevices = [],
