@@ -55,7 +55,6 @@ function HeadOfTechLayout() {
 
   return (
     <RoleDashboardLayout
-      description="Không gian nghiệp vụ Reviewer: điều phối, quy trình, soát xét và truy vết."
       initials={getUserInitials(userName)}
       links={links}
       name={userName}

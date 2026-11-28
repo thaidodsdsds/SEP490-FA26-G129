@@ -15,7 +15,6 @@ const links = [
 function TechnicianLayout() {
   return (
     <RoleDashboardLayout
-      description="Theo dõi lịch được giao và hoàn tất hồ sơ đo."
       initials="KT"
       links={links}
       name="Kỹ thuật viên"

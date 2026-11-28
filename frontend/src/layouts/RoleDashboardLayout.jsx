@@ -111,7 +111,7 @@ function UserDropdown({ displayName, displayInitials, roleName, profilePath, onL
 }
 
 /* ─── RoleDashboardLayout ─────────────────────────────────────── */
-function RoleDashboardLayout({ role, description, links, initials, name, profilePath }) {
+function RoleDashboardLayout({ role, links, initials, name, profilePath }) {
   const { session, endSession } = useAppContext();
   const navigate = useNavigate();
   const [isNavOpen, setIsNavOpen] = useState(false);
@@ -272,7 +272,6 @@ function RoleDashboardLayout({ role, description, links, initials, name, profile
           <div className="role-sidebar-intro">
             <span className="role-sidebar-eyebrow">KHÔNG GIAN LÀM VIỆC</span>
             <strong>{role}</strong>
-            <p>{description}</p>
           </div>
           <nav className="role-sidebar-nav">
             <span className="role-sidebar-label">MENU</span>

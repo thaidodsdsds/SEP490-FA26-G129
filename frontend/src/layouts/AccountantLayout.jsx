@@ -18,7 +18,6 @@ const links = [
 function AccountantLayout() {
   return (
     <RoleDashboardLayout
-      description="Theo dõi doanh thu, hoá đơn, thanh toán và công nợ của khách hàng."
       initials="KT"
       links={links}
       name="Kế toán"

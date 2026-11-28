@@ -35,7 +35,6 @@ const links = [
 function CustomerLayout() {
   return (
     <RoleDashboardLayout
-      description="Theo dõi thiết bị, đăng ký hiệu chuẩn, chứng nhận và công nợ của công ty."
       initials="KH"
       links={links}
       name="Khách hàng"

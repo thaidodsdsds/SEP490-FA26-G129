@@ -48,7 +48,6 @@ function SalesLayout() {
       ],
     },
 
-    // Nhóm Báo giá & Hợp đồng
     {
       id: 'sales-commercial',
       icon: '📑',
@@ -62,11 +61,6 @@ function SalesLayout() {
 
   return (
     <RoleDashboardLayout
-      description={
-        isHeadSales
-          ? 'Không gian làm việc Trưởng phòng Kinh doanh: điều phối khách hàng, phê duyệt báo giá và giám sát tiến độ.'
-          : 'Không gian làm việc Nhân viên Kinh doanh: quản lý khách hàng, tiếp nhận yêu cầu, tạo báo giá và theo dõi hợp đồng.'
-      }
       initials={getUserInitials(user, isHeadSales ? 'HS' : 'SL')}
       links={navLinks}
       name={user?.full_name || (isHeadSales ? 'Lê Hoàng Bách' : 'Nguyễn Văn An')}

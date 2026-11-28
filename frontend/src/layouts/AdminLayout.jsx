@@ -36,7 +36,6 @@ const links = [
 function AdminLayout() {
   return (
     <RoleDashboardLayout
-      description="Quản lý tài khoản, vai trò, danh mục và cấu hình hệ thống."
       initials="AD"
       links={links}
       name="Quản trị"

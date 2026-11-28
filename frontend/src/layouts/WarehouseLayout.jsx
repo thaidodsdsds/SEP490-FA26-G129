@@ -47,7 +47,6 @@ function WarehouseLayout() {
 
   return (
     <RoleDashboardLayout
-      description="Tiếp nhận thiết bị In-lab, kiểm tra tình trạng vật lý ban đầu và xuất trả bàn giao."
       initials={getUserInitials(userName)}
       links={links}
       name={userName}
