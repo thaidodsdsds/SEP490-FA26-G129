@@ -5,9 +5,6 @@ export const FIELD_LABELS = {
   DODAI: 'Độ dài',
   APSUAT: 'Áp suất',
   NHIET: 'Nhiệt độ',
-  HOA: 'Hóa - Lý',
-  QUANG: 'Quang học',
-  DET: 'Dung tích - Lưu lượng',
 };
 
 export const KIND_LABELS = {
