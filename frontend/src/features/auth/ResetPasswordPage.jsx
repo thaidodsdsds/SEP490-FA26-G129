@@ -217,10 +217,7 @@ export function ResetPasswordPage() {
             <Link to="/login" className="auth-link">Quay lại trang Đăng nhập</Link>
           </p>
 
-          <div className="auth-security-footer">
-            <ShieldCheckIcon size={15} filled />
-            <span>Dữ liệu của bạn được bảo mật bởi ISOCAL</span>
-          </div>
+         
         </div>
       </div>
     </div>
