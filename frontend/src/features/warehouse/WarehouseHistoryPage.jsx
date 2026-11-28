@@ -8,12 +8,8 @@ import {
 function WarehouseHistoryPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const inboundPath = location.pathname.startsWith('/internal/head-of-tech')
-    ? '/internal/head-of-tech/warehouse/inbound'
-    : '/internal/warehouse/inbound';
-  const outboundPath = location.pathname.startsWith('/internal/head-of-tech')
-    ? '/internal/head-of-tech/warehouse/outbound'
-    : '/internal/warehouse/outbound';
+  const inboundPath = '/internal/warehouse/inbound';
+  const outboundPath = '/internal/warehouse/outbound';
 
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);

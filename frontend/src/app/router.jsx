@@ -50,7 +50,6 @@ import CertificatesPage from '../features/reviewer/features/certificates/Certifi
 import SealsPage from '../features/reviewer/features/seals/SealsPage.jsx';
 import ChatPage from '../features/reviewer/features/chat/ChatPage.jsx';
 import NotificationsPage from '../features/reviewer/features/notifications/NotificationsPage.jsx';
-import WarehousePage from '../features/reviewer/features/warehouse/WarehousePage.jsx';
 import WarehouseInboundPage from '../features/warehouse/WarehouseInboundPage.jsx';
 import WarehouseOutboundPage from '../features/warehouse/WarehouseOutboundPage.jsx';
 import WarehouseHistoryPage from '../features/warehouse/WarehouseHistoryPage.jsx';
@@ -247,7 +246,7 @@ const warehouseRoutes = [
   {
     path: '/internal/warehouse',
     element: (
-      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'headofwarehouse', 'head of warehouse', 'headwarehouse', 'admin', 'reviewer', 'headtechnician', 'headoftech']} portalType="staff">
+      <ProtectedRoute allowedRoles={['warehouse', 'warehousestaff', 'headofwarehouse', 'head of warehouse', 'headwarehouse', 'admin']} portalType="staff">
         <WarehouseLayout />
       </ProtectedRoute>
     ),
@@ -321,11 +320,6 @@ const internalRoutes = [
           { path: 'seals', element: <SealsPage /> },
           { path: 'chat', element: <ChatPage /> },
           { path: 'notifications', element: <NotificationsPage /> },
-          { path: 'warehouse', element: <WarehousePage /> },
-          { path: 'warehouse/inbound', element: <WarehouseInboundPage /> },
-          { path: 'warehouse/outbound', element: <WarehouseOutboundPage /> },
-          { path: 'warehouse/transactions', element: <WarehouseHistoryPage /> },
-          { path: 'warehouse/devices', element: <DeviceListPage role="warehouse" basePath="/internal/head-of-tech/warehouse/devices" /> },
         ],
       },
       { path: 'profile', element: <ProfilePage /> },

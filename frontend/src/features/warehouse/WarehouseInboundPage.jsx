@@ -5,9 +5,7 @@ import { createInboundApi, getWarehouseDevicesApi } from '../../services/warehou
 function WarehouseInboundPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const backPath = location.pathname.startsWith('/internal/head-of-tech')
-    ? '/internal/head-of-tech/warehouse'
-    : '/internal/warehouse/transactions';
+  const backPath = '/internal/warehouse/transactions';
 
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);

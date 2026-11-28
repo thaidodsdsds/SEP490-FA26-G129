@@ -12,10 +12,6 @@ const warehouseRoutes = Router();
 
 warehouseRoutes.use(authenticate);
 
-warehouseRoutes.get('/transactions', getTransactions);
-warehouseRoutes.get('/inventory', getInventorySummary);
-warehouseRoutes.get('/devices', getDevices);
-
 const ALLOWED_WAREHOUSE_ROLES = [
   'HeadOfWarehouse',
   'headofwarehouse',
@@ -29,15 +25,25 @@ const ALLOWED_WAREHOUSE_ROLES = [
   'warehouse',
   'Admin',
   'admin',
-  'Reviewer',
-  'reviewer',
-  'HeadTechnician',
-  'headtechnician',
-  'Head of Tech',
-  'headoftech',
 ];
 
-// Cho phép Warehouse staff, Admin hoặc Reviewer thao tác kho
+// Chỉ cho phép Warehouse staff, Head of Warehouse hoặc Admin thao tác kho
+warehouseRoutes.get(
+  '/transactions',
+  authorize(...ALLOWED_WAREHOUSE_ROLES),
+  getTransactions,
+);
+warehouseRoutes.get(
+  '/inventory',
+  authorize(...ALLOWED_WAREHOUSE_ROLES),
+  getInventorySummary,
+);
+warehouseRoutes.get(
+  '/devices',
+  authorize(...ALLOWED_WAREHOUSE_ROLES),
+  getDevices,
+);
+
 warehouseRoutes.post(
   '/inbound',
   authorize(...ALLOWED_WAREHOUSE_ROLES),

@@ -5,9 +5,7 @@ import { createOutboundApi, getWarehouseDevicesApi } from '../../services/wareho
 function WarehouseOutboundPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const backPath = location.pathname.startsWith('/internal/head-of-tech')
-    ? '/internal/head-of-tech/warehouse'
-    : '/internal/warehouse/transactions';
+  const backPath = '/internal/warehouse/transactions';
 
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -240,7 +238,7 @@ function WarehouseOutboundPage() {
               </div>
               <button
                 type="button"
-                onClick={() => navigate(location.pathname.startsWith('/internal/head-of-tech') ? '/internal/head-of-tech/warehouse/inbound' : '/internal/warehouse/inbound')}
+                onClick={() => navigate('/internal/warehouse/inbound')}
                 style={{ marginTop: 12, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 500, cursor: 'pointer' }}
               >
                 + Chuyển đến Lập phiếu Nhập kho

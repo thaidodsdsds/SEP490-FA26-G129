@@ -1,6 +1,5 @@
 import { useAppContext } from '../app/providers.jsx';
 import { getUserInitials, isHeadOfWarehouseAccount } from '../app/role-routing.js';
-import HeadOfTechLayout from './HeadOfTechLayout.jsx';
 import RoleDashboardLayout from './RoleDashboardLayout.jsx';
 
 const links = [
@@ -36,13 +35,6 @@ const links = [
 
 function WarehouseLayout() {
   const { session } = useAppContext();
-  const rawRole = (session?.user?.role?.name || session?.user?.role || '').toLowerCase();
-  const isReviewer = ['reviewer', 'headtechnician', 'head of tech', 'headoftech'].includes(rawRole);
-
-  if (isReviewer) {
-    return <HeadOfTechLayout />;
-  }
-
   const isHeadOfWarehouse = isHeadOfWarehouseAccount(session?.user);
   const roleDisplay = isHeadOfWarehouse ? 'Trưởng phòng kho · Head of Warehouse' : 'Kho vận · Warehouse';
   const descriptionDisplay = isHeadOfWarehouse

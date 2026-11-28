@@ -38,11 +38,8 @@ const links = [
   {
     id: 'workspace',
     icon: '💬',
-    label: 'Liên lạc & kho',
+    label: 'Liên lạc & Thông báo',
     children: [
-      { to: '/internal/head-of-tech/warehouse/inbound', label: 'Phiếu nhập kho (Inbound)' },
-      { to: '/internal/head-of-tech/warehouse/outbound', label: 'Phiếu xuất kho (Outbound)' },
-      { to: '/internal/head-of-tech/warehouse', label: 'Lịch sử kho' },
       { to: '/internal/head-of-tech/chat', label: 'Trao đổi kỹ thuật' },
       { to: '/internal/head-of-tech/notifications', label: 'Thông báo' },
     ],
