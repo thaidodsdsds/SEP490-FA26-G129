@@ -10,9 +10,12 @@ import {
   listWarehouseTransactions,
 } from './warehouse.service.js';
 
-export const getDevices: RequestHandler = async (_req, res, next) => {
+export const getDevices: RequestHandler = async (req, res, next) => {
   try {
-    const devices = await listWarehouseDevices();
+    const { in_stock } = req.query as { in_stock?: string };
+    const inStockBool =
+      in_stock === 'true' ? true : in_stock === 'false' ? false : undefined;
+    const devices = await listWarehouseDevices({ in_stock: inStockBool });
     return res.status(200).json(buildSuccessResponse(devices));
   } catch (error) {
     return next(error);

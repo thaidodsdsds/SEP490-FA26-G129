@@ -29,10 +29,12 @@ function WarehouseInboundPage() {
     const loadDevices = async () => {
       try {
         setLoading(true);
-        const data = await getWarehouseDevicesApi();
+        const data = await getWarehouseDevicesApi({ in_stock: false });
         setDevices(data);
         if (data.length > 0) {
           setFormData((prev) => ({ ...prev, device_id: String(data[0].id) }));
+        } else {
+          setFormData((prev) => ({ ...prev, device_id: '' }));
         }
       } catch (err) {
         setFeedback({ type: 'error', message: 'Không thể tải danh sách thiết bị lưu trữ.' });
@@ -75,9 +77,15 @@ function WarehouseInboundPage() {
         message: `Đã lập phiếu nhập kho thành công cho thiết bị ${selectedDevice?.name || ''} (S/N: ${selectedDevice?.serial_number || ''}).`,
       });
 
+      // Cập nhật lại danh sách thiết bị chưa nhập kho
+      const updatedDevices = await getWarehouseDevicesApi({ in_stock: false });
+      setDevices(updatedDevices);
+
       // Reset form
       setFormData((prev) => ({
         ...prev,
+        device_id: updatedDevices.length > 0 ? String(updatedDevices[0].id) : '',
+        service_request_item_id: '',
         receiver_notes: '',
         photo_url: '',
       }));
@@ -156,13 +164,18 @@ function WarehouseInboundPage() {
                 value={formData.device_id}
                 onChange={handleChange}
                 required
+                disabled={devices.length === 0}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.95rem' }}
               >
-                {devices.map((dev) => (
-                  <option key={dev.id} value={dev.id}>
-                    {dev.name} (S/N: {dev.serial_number}) - {dev.customer?.company_name || 'Khách vãng lai'}
-                  </option>
-                ))}
+                {devices.length === 0 ? (
+                  <option value="">-- Tất cả thiết bị hiện đều đã được nhập vào kho --</option>
+                ) : (
+                  devices.map((dev) => (
+                    <option key={dev.id} value={dev.id}>
+                      {dev.name} (S/N: {dev.serial_number}) - {dev.customer?.company_name || 'Khách vãng lai'}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -284,8 +297,16 @@ function WarehouseInboundPage() {
           </button>
           <button
             type="submit"
-            disabled={submitting}
-            style={{ padding: '10px 24px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+            disabled={submitting || devices.length === 0}
+            style={{
+              padding: '10px 24px',
+              borderRadius: 6,
+              border: 'none',
+              background: devices.length === 0 ? '#94a3b8' : '#2563eb',
+              color: '#fff',
+              cursor: devices.length === 0 ? 'not-allowed' : 'pointer',
+              fontWeight: 600,
+            }}
           >
             {submitting ? 'Đang tạo phiếu...' : '✓ Xác nhận nhập kho & In nhãn mã vạch'}
           </button>

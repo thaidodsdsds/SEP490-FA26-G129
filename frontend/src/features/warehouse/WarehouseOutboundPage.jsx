@@ -32,10 +32,12 @@ function WarehouseOutboundPage() {
     const loadDevices = async () => {
       try {
         setLoading(true);
-        const data = await getWarehouseDevicesApi();
+        const data = await getWarehouseDevicesApi({ in_stock: true });
         setDevices(data);
         if (data.length > 0) {
           setFormData((prev) => ({ ...prev, device_id: String(data[0].id) }));
+        } else {
+          setFormData((prev) => ({ ...prev, device_id: '' }));
         }
       } catch (err) {
         setFeedback({ type: 'error', message: 'Không thể tải danh sách thiết bị lưu trữ.' });
@@ -77,6 +79,15 @@ function WarehouseOutboundPage() {
         type: 'success',
         message: `Đã lập phiếu xuất kho và hoàn tất biên bản bàn giao thiết bị ${selectedDevice?.name || ''} (S/N: ${selectedDevice?.serial_number || ''}).`,
       });
+
+      // Cập nhật lại danh sách thiết bị còn trong kho
+      const updatedDevices = await getWarehouseDevicesApi({ in_stock: true });
+      setDevices(updatedDevices);
+      setFormData((prev) => ({
+        ...prev,
+        device_id: updatedDevices.length > 0 ? String(updatedDevices[0].id) : '',
+        service_request_item_id: '',
+      }));
 
       setShowHandoverPreview(true);
     } catch (err) {
@@ -221,11 +232,27 @@ function WarehouseOutboundPage() {
 
           {loading ? (
             <p style={{ color: '#64748b' }}>Đang tải danh mục thiết bị...</p>
+          ) : devices.length === 0 ? (
+            <div style={{ padding: '16px 20px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, marginBottom: 20 }}>
+              <div style={{ fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+                📦 Hiện không có thiết bị nào đang lưu trữ trong kho để xuất bàn giao.
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                Chỉ những thiết bị đã được làm thủ tục <strong>Nhập kho (Inbound)</strong> và chưa xuất trả mới có thể lập phiếu xuất kho.
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(location.pathname.startsWith('/internal/head-of-tech') ? '/internal/head-of-tech/warehouse/inbound' : '/internal/warehouse/inbound')}
+                style={{ marginTop: 12, padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 500, cursor: 'pointer' }}
+              >
+                + Chuyển đến Lập phiếu Nhập kho
+              </button>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 24 }}>
               <div>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', marginBottom: 6 }}>
-                  Thiết bị cần bàn giao <span style={{ color: 'red' }}>*</span>
+                  Thiết bị cần bàn giao (Đang lưu trong kho) <span style={{ color: 'red' }}>*</span>
                 </label>
                 <select
                   name="device_id"
@@ -370,8 +397,16 @@ function WarehouseOutboundPage() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              style={{ padding: '10px 24px', borderRadius: 6, border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+              disabled={submitting || devices.length === 0}
+              style={{
+                padding: '10px 24px',
+                borderRadius: 6,
+                border: 'none',
+                background: devices.length === 0 ? '#94a3b8' : '#16a34a',
+                color: '#fff',
+                cursor: devices.length === 0 ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+              }}
             >
               {submitting ? 'Đang tạo phiếu...' : '✓ Xác nhận xuất kho & Xem biên bản bàn giao'}
             </button>

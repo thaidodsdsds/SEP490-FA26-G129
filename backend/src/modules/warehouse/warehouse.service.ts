@@ -30,6 +30,10 @@ export interface WarehouseTransactionFilter {
   search?: string;
 }
 
+export interface ListWarehouseDevicesFilter {
+  in_stock?: boolean;
+}
+
 export const createInboundTransaction = async (input: CreateInboundInput) => {
   const repo = dataSource.getRepository(WarehouseTransaction);
   const deviceRepo = dataSource.getRepository(Device);
@@ -40,6 +44,19 @@ export const createInboundTransaction = async (input: CreateInboundInput) => {
   });
   if (!device) {
     throw new AppError('Device not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  // Kiểm tra trạng thái kho: Thiết bị phải chưa có trong kho mới được nhập
+  const latestTx = await repo.findOne({
+    where: { device_id: input.device_id },
+    order: { transaction_at: 'DESC', id: 'DESC' },
+  });
+  if (latestTx && latestTx.type === 'Inbound') {
+    throw new AppError(
+      `Thiết bị "${device.name}" (S/N: ${device.serial_number}) hiện đã được nhập kho và đang lưu tại phòng Lab (chưa xuất kho).`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
   }
 
   if (input.service_request_item_id) {
@@ -73,6 +90,19 @@ export const createOutboundTransaction = async (input: CreateOutboundInput) => {
   const device = await deviceRepo.findOne({ where: { id: input.device_id } });
   if (!device) {
     throw new AppError('Device not found.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  // Kiểm tra trạng thái kho: Thiết bị PHẢI ĐANG TRONG KHO (giao dịch gần nhất là Inbound) mới được xuất
+  const latestTx = await repo.findOne({
+    where: { device_id: input.device_id },
+    order: { transaction_at: 'DESC', id: 'DESC' },
+  });
+  if (!latestTx || latestTx.type !== 'Inbound') {
+    throw new AppError(
+      `Thiết bị "${device.name}" (S/N: ${device.serial_number}) hiện không có trong kho để xuất (thiết bị chưa được nhập kho hoặc đã được xuất kho trước đó).`,
+      400,
+      ERROR_CODES.BAD_REQUEST,
+    );
   }
 
   const tx = repo.create({
@@ -138,21 +168,63 @@ export const getWarehouseInventorySummary = async () => {
     .where('tx.type = :type AND tx.transaction_at >= :today', { type: 'Outbound', today })
     .getCount();
 
+  // Đếm chính xác số lượng thiết bị đang nằm trong kho (giao dịch gần nhất là Inbound)
+  const inWarehouseCountResult: Array<{ count: string | number }> = await dataSource.query(`
+    SELECT COUNT(*)::int AS count FROM (
+      SELECT DISTINCT ON (device_id) type
+      FROM warehouse_transactions
+      ORDER BY device_id, transaction_at DESC, id DESC
+    ) sub
+    WHERE sub.type = 'Inbound'
+  `);
+  const currentInWarehouse = Number(inWarehouseCountResult[0]?.count ?? 0);
+
   return {
     totalInbound,
     totalOutbound,
-    currentInWarehouseEstimated: Math.max(0, totalInbound - totalOutbound),
+    currentInWarehouse,
+    currentInWarehouseEstimated: currentInWarehouse,
     todayInbound,
     todayOutbound,
   };
 };
 
-export const listWarehouseDevices = async () => {
+export const listWarehouseDevices = async (filter?: ListWarehouseDevicesFilter) => {
   const deviceRepo = dataSource.getRepository(Device);
-  return await deviceRepo.find({
+  const devices = await deviceRepo.find({
     relations: { customer: true },
     order: { id: 'DESC' },
     take: 100,
   });
+
+  // Lấy giao dịch mới nhất của từng thiết bị trong kho
+  const latestTxs: Array<{ device_id: number; type: string; transaction_at: Date; condition_note: string }> =
+    await dataSource.query(`
+      SELECT DISTINCT ON (device_id) device_id, type, transaction_at, condition_note
+      FROM warehouse_transactions
+      ORDER BY device_id, transaction_at DESC, id DESC
+    `);
+
+  const latestTxMap = new Map<number, { type: string; transaction_at: Date; condition_note: string }>();
+  for (const tx of latestTxs) {
+    latestTxMap.set(Number(tx.device_id), tx);
+  }
+
+  const enrichedDevices = devices.map((dev) => {
+    const lastTx = latestTxMap.get(dev.id);
+    const in_stock = lastTx?.type === 'Inbound';
+    return {
+      ...dev,
+      in_stock,
+      warehouse_status: in_stock ? 'InWarehouse' : 'OutsideWarehouse',
+      last_transaction: lastTx || null,
+    };
+  });
+
+  if (filter?.in_stock !== undefined) {
+    return enrichedDevices.filter((d) => d.in_stock === filter.in_stock);
+  }
+
+  return enrichedDevices;
 };
 

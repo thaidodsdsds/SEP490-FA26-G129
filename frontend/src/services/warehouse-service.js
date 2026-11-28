@@ -5,8 +5,8 @@ export const getWarehouseTransactionsApi = async (params = {}) => {
   return response.data?.data ?? [];
 };
 
-export const getWarehouseDevicesApi = async () => {
-  const response = await apiClient.get('/warehouse/devices');
+export const getWarehouseDevicesApi = async (params = {}) => {
+  const response = await apiClient.get('/warehouse/devices', { params });
   return response.data?.data ?? [];
 };
 
