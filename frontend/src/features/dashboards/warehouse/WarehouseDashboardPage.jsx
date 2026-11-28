@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/ui/PageHeader.jsx';
 import StatCard from '../../../components/ui/StatCard.jsx';
 import SectionCard from '../../../components/ui/SectionCard.jsx';
@@ -44,6 +45,7 @@ const pendingColumns = [
 ];
 
 function WarehouseDashboardPage() {
+  const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const { data, error, loading, reload } = useDashboardOverview();
   const {
@@ -124,7 +126,7 @@ function WarehouseDashboardPage() {
       <button
         className="button button-primary"
         key={`${item.id}-btn`}
-        onClick={() => notify(`Mở biên bản bàn giao & lập phiếu xuất kho cho thiết bị ${item.serial} (${item.customer})`)}
+        onClick={() => navigate('/internal/warehouse/outbound')}
         style={{ padding: '3px 8px', minHeight: 28, fontSize: '0.72rem' }}
         type="button"
       >
@@ -181,14 +183,14 @@ function WarehouseDashboardPage() {
             </button>
             <button
               className="button button-secondary"
-              onClick={() => notify('Mở màn hình Lập phiếu xuất kho & Biên bản bàn giao (Outbound)...')}
+              onClick={() => navigate('/internal/warehouse/outbound')}
               type="button"
             >
               + Phiếu xuất kho (Outbound)
             </button>
             <button
               className="button button-primary"
-              onClick={() => notify('Mở màn hình Tiếp nhận & Lập phiếu nhập kho In-lab (Inbound)...')}
+              onClick={() => navigate('/internal/warehouse/inbound')}
               type="button"
             >
               + Phiếu nhập kho (Inbound)
@@ -223,10 +225,10 @@ function WarehouseDashboardPage() {
         action={(
           <button
             className="button button-secondary"
-            onClick={() => notify('Chuyển tới danh mục thiết bị đã có kết quả đo kiểm sẵn sàng trả.')}
+            onClick={() => navigate('/internal/warehouse/transactions')}
             type="button"
           >
-            Xem tất cả ({readyToReturnDevices.length})
+            Xem lịch sử phiếu kho ({readyToReturnDevices.length})
           </button>
         )}
         subtitle="Thiết bị đã hoàn tất hiệu chuẩn/kiểm định, đã được cấp Certificate & dán Tem Seal số, sẵn sàng lập phiếu xuất kho kèm biên bản bàn giao."

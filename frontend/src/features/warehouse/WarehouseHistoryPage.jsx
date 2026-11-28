@@ -222,7 +222,7 @@ function WarehouseHistoryPage() {
                     <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '0.85rem' }}>
                       {tx.transaction_at ? new Date(tx.transaction_at).toLocaleString('vi-VN') : '—'}
                     </td>
-                    <td style={{ padding: '12px 14px' }}>
+                    <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                       <button
                         onClick={() => setSelectedTx(tx)}
                         style={{
@@ -232,10 +232,29 @@ function WarehouseHistoryPage() {
                           background: '#fff',
                           cursor: 'pointer',
                           fontSize: '0.8rem',
+                          marginRight: 6,
                         }}
                       >
-                        Xem
+                        👁️ Xem
                       </button>
+                      {tx.type === 'Inbound' && (
+                        <button
+                          onClick={() => navigate(outboundPath)}
+                          title="Lập phiếu xuất kho trả khách"
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: 4,
+                            border: 'none',
+                            background: '#dcfce7',
+                            color: '#166534',
+                            cursor: 'pointer',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ↑ Xuất kho
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -300,13 +319,61 @@ function WarehouseHistoryPage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-              <button
-                onClick={() => setSelectedTx(null)}
-                style={{ padding: '8px 18px', borderRadius: 6, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Đóng
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: 16, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                {selectedTx.type === 'Inbound' && (
+                  <button
+                    onClick={() => {
+                      setSelectedTx(null);
+                      navigate(outboundPath);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 6,
+                      background: '#16a34a',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    + Lập phiếu xuất kho cho thiết bị này
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    background: '#f1f5f9',
+                    color: '#1e293b',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  🖨️ In phiếu
+                </button>
+                <button
+                  onClick={() => setSelectedTx(null)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: 6,
+                    background: '#2563eb',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>
